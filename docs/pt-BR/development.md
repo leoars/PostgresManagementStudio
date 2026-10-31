@@ -14,11 +14,12 @@ dotnet run --project src/PGMS.Desktop
 
 ## Testar com isolamento
 
-Testes de banco exigem binários de servidor PostgreSQL 17 ou18 e ferramentas correspondentes. O caminho padrão é `C:\Program Files\PostgreSQL\17\bin`; use `-PostgresBin` para outra instalação. O harness cria cluster próprio em loopback sob `artifacts/postgres-test`, usa127.0.0.1:55439 e o encerra ao final. Não deve compartilhar serviço PostgreSQL ativo ou banco do usuário. Diretórios de dados são separados por versão principal. Testes de desktop exigem desktop Windows; algumas provas usam UI Automation nos próprios processos filhos.
+Testes de banco exigem binários de servidor PostgreSQL 17 ou18 e ferramentas correspondentes. O caminho padrão é `C:\Program Files\PostgreSQL\17\bin`; use `-PostgresBin` para outra instalação. O harness cria cluster próprio em loopback sob `artifacts/postgres-test`, usa 127.0.0.1:55439 por padrão e o encerra ao final. Se a porta estiver ocupada, use `-TestPort` com uma porta livre de loopback; o runner continua criando cluster próprio e recusa anexar a outro servidor. Não deve compartilhar serviço PostgreSQL ativo ou banco do usuário. Diretórios de dados são separados por versão principal. Testes de desktop exigem desktop Windows; algumas provas usam UI Automation nos próprios processos filhos.
 
 ```powershell
 ./scripts/Test-Integration.ps1
 ./scripts/Test-Integration.ps1 -PostgresBin 'C:\Program Files\PostgreSQL\18\bin'
+./scripts/Test-Integration.ps1 -TestPort 55441
 ./scripts/Test-Integration.ps1 -IdentityColumnsOnly
 ./scripts/Test-Integration.ps1 -BackupFormatsOnly
 ./scripts/Test-Package.ps1

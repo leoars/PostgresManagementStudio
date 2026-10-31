@@ -14,11 +14,12 @@ dotnet run --project src/PGMS.Desktop
 
 ## Test in isolation
 
-Database tests require local PostgreSQL 17 or18 server binaries and matching tools. The default binaries path is `C:\Program Files\PostgreSQL\17\bin`; use `-PostgresBin` for another installation. The harness creates its own loopback cluster under `artifacts/postgres-test`, uses127.0.0.1:55439 and stops it afterward. It must not share a running PostgreSQL service or user database. Data directories are separated by major version. Desktop tests require a Windows desktop; some probes use UI Automation against their own child processes.
+Database tests require local PostgreSQL 17 or18 server binaries and matching tools. The default binaries path is `C:\Program Files\PostgreSQL\17\bin`; use `-PostgresBin` for another installation. The harness creates its own loopback cluster under `artifacts/postgres-test`, uses 127.0.0.1:55439 by default and stops it afterward. If that port is occupied, use `-TestPort` with a free loopback port; the runner still creates its own cluster and refuses to attach to another server. It must not share a running PostgreSQL service or user database. Data directories are separated by major version. Desktop tests require a Windows desktop; some probes use UI Automation against their own child processes.
 
 ```powershell
 ./scripts/Test-Integration.ps1
 ./scripts/Test-Integration.ps1 -PostgresBin 'C:\Program Files\PostgreSQL\18\bin'
+./scripts/Test-Integration.ps1 -TestPort 55441
 ./scripts/Test-Integration.ps1 -IdentityColumnsOnly
 ./scripts/Test-Integration.ps1 -BackupFormatsOnly
 ./scripts/Test-Package.ps1

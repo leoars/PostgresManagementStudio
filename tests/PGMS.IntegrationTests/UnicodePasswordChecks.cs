@@ -8,7 +8,7 @@ internal static class UnicodePasswordChecks
     internal static async Task RunAsync(string connection, Action<bool, string> check)
     {
         var settings = new NpgsqlConnectionStringBuilder(connection);
-        if (settings.Host != "127.0.0.1" || settings.Port != 55439 || settings.Username != "pgms_test")
+        if (settings.Host != "127.0.0.1" || settings.Port != TestClusterEndpoint.Port || settings.Username != "pgms_test")
             throw new InvalidOperationException("Unicode password checks require the isolated cluster.");
         string role = "unicode_password_" + Guid.NewGuid().ToString("N");
         string psql = Path.Combine(Environment.GetEnvironmentVariable("PGMS_TEST_POSTGRES_BIN") ?? throw new Exception("Missing test tools"), "psql.exe");
@@ -37,7 +37,7 @@ internal static class UnicodePasswordChecks
         {
             var start = new ProcessStartInfo(psql) { UseShellExecute = false, RedirectStandardInput = true, StandardInputEncoding = new System.Text.UTF8Encoding(false), RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
             foreach (string key in start.Environment.Keys.Where(k => k.StartsWith("PG", StringComparison.OrdinalIgnoreCase)).ToArray()) start.Environment.Remove(key);
-            foreach (string arg in new[] { "-X", "-W", "-A", "-t", "-h", "127.0.0.1", "-p", "55439", "-U", role, "-d", "postgres", "-c", "SELECT 1" }) start.ArgumentList.Add(arg);
+            foreach (string arg in new[] { "-X", "-W", "-A", "-t", "-h", "127.0.0.1", "-p", TestClusterEndpoint.Port.ToString(System.Globalization.CultureInfo.InvariantCulture), "-U", role, "-d", "postgres", "-c", "SELECT 1" }) start.ArgumentList.Add(arg);
             // PG17 simple_prompt's MSYS fallback reads redirected stdin. Feed explicit
             // UTF-8 bytes; Windows ANSI getenv(PGPASSWORD) corrupts Unicode otherwise.
             start.Environment["OSTYPE"] = "msys";

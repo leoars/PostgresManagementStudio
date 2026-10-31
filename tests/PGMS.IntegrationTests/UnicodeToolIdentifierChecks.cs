@@ -7,7 +7,7 @@ internal static class UnicodeToolIdentifierChecks
     internal static async Task RunAsync(string connection,Action<bool,string> check)
     {
         var settings=new NpgsqlConnectionStringBuilder(connection);
-        if(settings.Host!="127.0.0.1" || settings.Port!=55439 || settings.Username!="pgms_test")throw new InvalidOperationException("Tool identifier checks require the isolated cluster.");
+        if(settings.Host!="127.0.0.1" || settings.Port!=TestClusterEndpoint.Port || settings.Username!="pgms_test")throw new InvalidOperationException("Tool identifier checks require the isolated cluster.");
         string suffix=Guid.NewGuid().ToString("N")[..12],role="tools_é密碼_"+suffix,source="source_é密碼_?%='/"+suffix,target="target_é密碼_?%='/"+suffix;
         string tools=Environment.GetEnvironmentVariable("PGMS_TEST_POSTGRES_BIN")??throw new Exception("Missing isolated tools.");
         string folder=Path.GetFullPath(Path.Combine("artifacts/tool-identifiers",suffix));Directory.CreateDirectory(folder);string archive=Path.Combine(folder,"source.backup");

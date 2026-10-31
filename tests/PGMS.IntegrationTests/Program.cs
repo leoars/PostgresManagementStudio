@@ -6,9 +6,23 @@ using PGMS.PostgreSql;
 
 // Only disposable local clusters are used: the runner's source and the
 // global-backup fixture's fresh target under artifacts/global-backup.
-const string connection = "Host=127.0.0.1;Port=55439;Database=postgres;Username=pgms_test;SSL Mode=Disable;Pooling=false;Application Name=PGMS.IntegrationTests;Timeout=3";
+string connection = $"Host=127.0.0.1;Port={TestClusterEndpoint.Port};Database=postgres;Username=pgms_test;SSL Mode=Disable;Pooling=false;Application Name=PGMS.IntegrationTests;Timeout=3";
 if(args.Length==4 && args[0]=="--restore-stage-child"){await RestoreInputStagingChecks.ChildAsync(args[1],args[2],args[3]);return;}
 int passed = 0;
+if(args.Contains("--test-port-guards"))
+{
+    Check(TestClusterEndpoint.ParsePort(null) == 55439, "Missing port keeps the isolated default");
+    Check(TestClusterEndpoint.ParsePort("55441") == 55441, "Explicit isolated port is preserved");
+    Check(TestClusterEndpoint.ParsePort("1024") == 1024 && TestClusterEndpoint.ParsePort("65535") == 65535, "Valid port boundaries accepted");
+    foreach (string invalid in new[] { "0", "1023", "65536", "-1", "+55441", " 55441", "55441;Host=remote", "" })
+    {
+        bool rejected = false;
+        try { _ = TestClusterEndpoint.ParsePort(invalid); } catch (InvalidOperationException) { rejected = true; }
+        Check(rejected, "Invalid isolated port refused: " + invalid);
+    }
+    Console.WriteLine($"{passed} test port guard checks passed.");
+    return;
+}
 if(args.Contains("--sessions")){await QuerySessionInfoChecks.RunAsync(connection,Check);Console.WriteLine($"{passed} session checks passed.");return;}
 if(args.Contains("--plans")){await QueryPlanChecks.RunAsync(connection,Check);Console.WriteLine($"{passed} plan checks passed.");return;}
 if(args.Contains("--export-roundtrip")){await ResultExportChecks.RunAsync(Check);await ExportRoundtripChecks.RunAsync(connection,Check);Console.WriteLine($"{passed} export roundtrip checks passed.");return;}

@@ -2,7 +2,7 @@
 
 [English](../en/validation.md) | Português (Brasil)
 
-O PGMS está em desenvolvimento. M1002 é o rótulo interno do build importado neste repositório, não release pública nem garantia de identidade binária de uma recompilação local. Histórico operacional e provas brutas privados não são incluídos intencionalmente.
+Pré-release atual: v0.1.0-alpha.1, rótulo M1008. Marcos são identificadores internos, não garantia de identidade binária de uma recompilação local. A importação pública inicial usou M1002. Histórico operacional e provas brutas privados não são incluídos intencionalmente.
 
 A implementação importada passou anteriormente em 5.187 checks automatizados (2.115 integração PostgreSQL e 3.072 WPF), além de abertura de pacote, preservação de perfil instalado e recuperação de três rascunhos entre rollback/reinício. São observações históricas, não testes novos a cada revisão. Reproduza o comportamento atual pelos scripts públicos e informe ambiente/resultados reais. As verificações da revisão pública inicial são registradas abaixo após execução.
 
@@ -16,10 +16,18 @@ Limites conhecidos: Windows x64; PostgreSQL 17/18 com ferramentas da mesma vers�
 ./scripts/Test-PublicDocumentation.ps1
 ```
 
-O harness cria cluster descartável em loopback no diretório artifacts ignorado deste checkout, exclusivamente 127.0.0.1:55439, e o encerra ao final. Nunca use bancos pessoais ou de produção nesses testes. Veja [desenvolvimento](development.md).
+O harness cria cluster descartável em loopback no diretório artifacts ignorado deste checkout, exclusivamente loopback (porta 55439 por padrão, configurável por -TestPort), e o encerra ao final. Nunca use bancos pessoais ou de produção nesses testes. Veja [desenvolvimento](development.md).
 
 ## Checks da fonte pública inicial — 31/10/2026
 
 Build Release passou sem avisos/erros. Foram 157 checks focados de arquivos desktop, 22 de pacote e 46 de instalação em fixtures. A documentação foi conferida em 12 pares de idiomas e links locais. Pacote self-contained local passou em manifesto/licença/guias bilíngues, carregou runtime próprio e fechou normalmente com saída0/estado isolado. Nenhuma release binária foi enviada.
 
 A regressão PostgreSQL completa foi tentada, mas parou antes de iniciar o servidor porque Windows negou bind na porta isolada 55439 (erro de acesso ao socket). Uma prova separada em loopback reproduziu; porta dinâmica funcionou. Não se atribui repetição dos 5.187 checks históricos a esta importação. O cluster descartável não estava ativo ao final. Não foram alterados firewall ou bancos do usuário. Gitleaks não encontrou alertas na fonte selecionada, sem exceções históricas.
+
+## v0.1.0-alpha.1 / M1008 — 31/10/2026
+
+Execução completa nova passou 2.115 integração +3.072 WPF =5.187 checks no PostgreSQL 17.11, com cluster descartável em 127.0.0.1:55441; fonte do aplicativo inalterada durante a execução, cluster encerrado e variável anterior de porta restaurada. Onze checks do parser de porta e duas recusas de porta inválida no runner passaram separadamente. A porta padrão estava ocupada; a configuração foi adicionada somente aos testes, sem alterar firewall ou encerrar processos alheios.
+
+A primeira tentativa integral encontrou corrida no arquivo de prontidão de um teste: o pai observou o arquivo antes de o escritor fechá-lo. Filhos de teste agora publicam o sinal renomeando temporário já fechado. Recortes de processos passaram 26+20, seguidos da regressão integral aprovada acima; a falha anterior não foi contada como aprovação. Essas mudanças de harness não alteram o comportamento de banco do aplicativo distribuído. Metadados/rótulo e empacotamento mudaram para esta pré-release.
+
+Resultados do pacote e instalador estão nas [notas da versão](release-notes.md). Provas históricas PostgreSQL 18/físicas/VM não foram reclassificadas como novas desta versão. Sem nova certificação Windows limpo ou SmartScreen.

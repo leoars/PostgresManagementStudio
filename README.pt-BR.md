@@ -4,11 +4,11 @@
 
 Aplicativo Windows para consultar e administrar PostgreSQL, desenvolvido em C#, WPF, .NET 10 e Npgsql. A interface tem o SQL Server Management Studio (SSMS) como referência, com semântica PostgreSQL e implementação própria.
 
-**Em desenvolvimento.** Candidato local atual: **M1002**. Os marcos são registros internos, não versões de release pública. Esta mudança documental não publica binários. Veja o [guia de validação](docs/pt-BR/validation.md) para escopo aceito e limites conhecidos; não se declara paridade integral com SSMS.
+**Pré-release: v0.1.0-alpha.1 (Windows x64).** [Download e instalação](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1) · [Notas da versão](docs/pt-BR/release-notes.md). ZIP portátil inclui .NET/WPF; o instalador opcional é um script PowerShell 7. O rótulo M1008 é interno. Veja o [guia de validação](docs/pt-BR/validation.md) para escopo aceito e limites conhecidos; não se declara paridade integral com SSMS.
 
 ![Editor, Object Explorer e resultados sintéticos do PGMS](docs/assets/pgms-results-m959.jpg)
 
-Prévia histórica M957 capturada na M959, com cluster isolado e dados sintéticos. A imagem ilustra a interface, não o pacote M1002. [Origem da imagem](docs/assets/README.md).
+Prévia histórica M957 capturada na M959, com cluster isolado e dados sintéticos. A imagem ilustra a interface, não o pacote atual. [Origem da imagem](docs/assets/README.md).
 
 ## Funcionalidades
 

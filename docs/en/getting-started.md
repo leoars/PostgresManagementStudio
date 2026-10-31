@@ -2,9 +2,11 @@
 
 English | [Português (Brasil)](../pt-BR/getting-started.md)
 
+[Download v0.1.0-alpha.1](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1): portable ZIP or optional PowerShell 7 installer. See [release notes](release-notes.md).
+
 ## Requirements
 
-PGMS targets Windows x64. Building requires PowerShell 7 and a .NET 10 SDK compatible with [global.json](../../global.json): 10.0.400 with latest-patch roll-forward. Dependencies are pinned in NuGet lockfiles. The M1002 package was built with SDK 10.0.403 and bundles .NET/WPF 10.0.14; a rebuild may use different installed runtime packs.
+PGMS targets Windows x64. Building requires PowerShell 7 and a .NET 10 SDK compatible with [global.json](../../global.json): 10.0.400 with latest-patch roll-forward. Dependencies are pinned in NuGet lockfiles. The M1008 package was built with SDK 10.0.403 and bundles .NET/WPF 10.0.14; a rebuild may use different installed runtime packs.
 
 PostgreSQL 17/18 with same-major client tools is the supported database scope. The historical matrix tested 17.11/18.6. A server is not needed just to open the shell. Backup/restore requires external pg_dump, pg_restore, psql and pg_dumpall as applicable; PGMS installs none of them.
 
@@ -17,11 +19,11 @@ dotnet run --project src/PGMS.Desktop
 
 ```powershell
 ./scripts/Publish.ps1 -SelfContained
-./scripts/Verify-Package.ps1 -PackagePath artifacts/M1002-win-x64
-./scripts/New-PackageArchive.ps1 -PackagePath artifacts/M1002-win-x64
+./scripts/Verify-Package.ps1 -PackagePath artifacts/M1008-win-x64
+./scripts/New-PackageArchive.ps1 -PackagePath artifacts/M1008-win-x64
 ```
 
-Paths follow `BuildInfo.Milestone`; replace M1002 if the build label changes. Existing package folders and ZIPs are refused rather than overwritten. A fresh clone contains neither local ZIPs nor acceptance artifacts. Extract the entire package and run PGMS.exe, retaining adjacent libraries and licenses. Without `-SelfContained`, the package needs an installed .NET10 Desktop Runtime. No SSMS is required.
+Paths follow `BuildInfo.Milestone`; replace M1008 if the build label changes. Existing package folders and ZIPs are refused rather than overwritten. A fresh clone contains neither local ZIPs nor acceptance artifacts. Extract the entire package and run PGMS.exe, retaining adjacent libraries and licenses. Without `-SelfContained`, the package needs an installed .NET10 Desktop Runtime. No SSMS is required.
 
 Optional managed installation/update/rollback uses the packaged PowerShell 7 scripts. Read `LEIA-ME.md` shipped with the exact package before using them. Portable execution does not require PowerShell 7. The current ZIP has no MSI, code signature or automatic updater; SmartScreen behavior has not been tested.
 

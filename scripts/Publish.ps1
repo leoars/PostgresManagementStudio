@@ -24,6 +24,8 @@ try {
         # ReadyToRun precompiles PGMS and its libraries; measured ~30% shorter first open of very long SQL lines.
         $publishArgs = @('-r', 'win-x64', '--self-contained', 'true', '-p:PublishReadyToRun=true')
     }
+    # Keep developer workstation paths and debug symbols out of distributable packages.
+    $publishArgs += @('-p:DebugType=None', '-p:DebugSymbols=false', '-p:IncludeSourceRevisionInInformationalVersion=false', "-p:PathMap=$projectRoot=/_/PGMS")
     dotnet publish src/PGMS.Desktop/PGMS.Desktop.csproj -c Release --no-restore -o $stagingPath @publishArgs
     if ($LASTEXITCODE -ne 0) { throw "Publish failed; staging retained at $stagingPath" }
     Copy-Item -LiteralPath 'LICENSE', 'THIRD-PARTY-NOTICES.md' -Destination $stagingPath

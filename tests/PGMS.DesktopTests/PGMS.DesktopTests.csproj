@@ -2,4 +2,5 @@
  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><RuntimeIdentifiers>win-x64</RuntimeIdentifiers><ApplicationManifest>../../src/PGMS.Desktop/app.manifest</ApplicationManifest></PropertyGroup>
  <ItemGroup><ProjectReference Include="../../src/PGMS.Desktop/PGMS.Desktop.csproj"/></ItemGroup>
  <ItemGroup><Compile Include="../PGMS.IntegrationTests/CommitAckProxy.cs" Link="CommitAckProxy.cs"/></ItemGroup>
+ <ItemGroup><Compile Include="../Shared/TestClusterEndpoint.cs" Link="TestClusterEndpoint.cs"/></ItemGroup>
 </Project>

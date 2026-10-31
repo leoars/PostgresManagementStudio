@@ -56,7 +56,7 @@ internal sealed class CommitAckProxy : IAsyncDisposable
         using(var server=new TcpClient())
         using(var lifetime=CancellationTokenSource.CreateLinkedTokenSource(stop.Token))
         {
-            await server.ConnectAsync(IPAddress.Loopback,55439,lifetime.Token);
+            await server.ConnectAsync(IPAddress.Loopback,TestClusterEndpoint.Port,lifetime.Token);
             var upstream=server.GetStream();var downstream=client.GetStream();
             await upstream.WriteAsync(await FrameAsync(downstream,true,lifetime.Token),lifetime.Token);
             async Task ForwardAsync(bool frontend)

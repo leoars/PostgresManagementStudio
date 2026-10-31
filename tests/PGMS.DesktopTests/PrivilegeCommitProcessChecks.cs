@@ -13,7 +13,7 @@ internal static class PrivilegeCommitProcessChecks
         public async Task RecordAsync(PrivilegeCommitReceipt receipt,CancellationToken token)
         {
             await store.RecordAsync(receipt,token);
-            File.WriteAllText(Path.Combine(state,"ready"),Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            ProcessCheckpoint.SignalReady(state);
             await Task.Delay(Timeout.Infinite,token);
         }
     }
@@ -41,7 +41,7 @@ internal static class PrivilegeCommitProcessChecks
         try{await new PrivilegeService(connection,journal).ApplyCurrentAsync(request);throw new Exception("Expected interrupted acknowledgement.");}
         catch(PrivilegeCommitUncertainException)when(phase=="after")
         {
-            File.WriteAllText(Path.Combine(state,"ready"),Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            ProcessCheckpoint.SignalReady(state);
             await Task.Delay(Timeout.Infinite);
         }
     }

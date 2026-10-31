@@ -8,7 +8,7 @@ internal static class ClientCertificateBackupChecks
     internal static async Task RunAsync(string connection,Action<bool,string> check)
     {
         var baseSettings=new NpgsqlConnectionStringBuilder(connection);
-        if(baseSettings.Host!="127.0.0.1" || baseSettings.Port!=55439 || baseSettings.Username!="pgms_test")throw new InvalidOperationException("Isolated cluster required.");
+        if(baseSettings.Host!="127.0.0.1" || baseSettings.Port!=TestClusterEndpoint.Port || baseSettings.Username!="pgms_test")throw new InvalidOperationException("Isolated cluster required.");
         string suffix=Guid.NewGuid().ToString("N"),role="cert_"+suffix,source="cert_source_"+suffix,target="cert_target_"+suffix;
         string tools=Environment.GetEnvironmentVariable("PGMS_TEST_POSTGRES_BIN")!;
         string folder=Path.GetFullPath(Path.Combine("artifacts/client-cert",suffix));Directory.CreateDirectory(folder);

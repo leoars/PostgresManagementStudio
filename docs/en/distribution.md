@@ -1,4 +1,4 @@
-# Portable distribution
+# PGMS v0.1.0-alpha.1 — portable distribution (M1008)
 
 English | Português (Brasil): LEIA-ME.md in the package, or docs/pt-BR/distribution.md in the source repository.
 
@@ -13,3 +13,5 @@ State defaults to %LOCALAPPDATA%/PGMS; PGMS_STATE_DIRECTORY allows a separate tr
 Verify integrity with ./Verify-Package.ps1 -PackagePath . in PowerShell 7; manifest hashes detect differences, not authorship. Optional managed installation also requires PowerShell 7. From the extracted package: ./Install-Pgms.ps1 -PackagePath .; inspect ./Get-PgmsInstallation.ps1; launch ./Start-Pgms.ps1; use ./Set-PgmsActiveVersion.ps1 -Milestone <installed-label> for rollback and ./Uninstall-Pgms.ps1 -Milestone <installed-label> for removal. Use -InstallRoot for an isolated managed location. These scripts preserve user state and refuse unmanaged/nonempty roots and unsafe paths; close running instances first.
 
 Source, bilingual guides and reporting: https://github.com/leoars/PostgresManagementStudio . Original work is MIT; third-party licenses and trademark terms remain separate. PGMS is independent and does not claim full SSMS parity or endorsement.
+
+Optional release installer: Install-PGMS-0.1.0-alpha.1.ps1 requires PowerShell 7, downloads the fixed release ZIP and verifies its pinned SHA256 before invoking managed installation. Use -ArchivePath for an already downloaded archive and -InstallRoot for another managed target. It does not launch the application, change execution policy or install PostgreSQL. Source and checksums are available on the release page.

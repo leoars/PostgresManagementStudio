@@ -1,4 +1,4 @@
-# Distribuição portátil
+# PGMS v0.1.0-alpha.1 — distribuição portátil (M1008)
 
 [English]: READ-ME.md no pacote, ou docs/en/distribution.md no repositório. Português (Brasil).
 
@@ -13,3 +13,5 @@ Estado padrão em %LOCALAPPDATA%/PGMS; PGMS_STATE_DIRECTORY permite pasta separa
 Confira integridade com ./Verify-Package.ps1 -PackagePath . no PowerShell 7; hashes detectam diferenças, não autoria. Instalação gerenciada opcional também exige PowerShell 7. No pacote extraído: ./Install-Pgms.ps1 -PackagePath .; consulte ./Get-PgmsInstallation.ps1; abra ./Start-Pgms.ps1; use ./Set-PgmsActiveVersion.ps1 -Milestone <rótulo-instalado> no rollback e ./Uninstall-Pgms.ps1 -Milestone <rótulo-instalado> na remoção. Use -InstallRoot para local gerenciado isolado. Scripts preservam estado do usuário e recusam raiz não gerenciada/não vazia e caminhos inseguros; feche instâncias primeiro.
 
 Fonte, guias bilíngues e relatos: https://github.com/leoars/PostgresManagementStudio . Trabalho próprio MIT; licenças de terceiros e condições de marca são separadas. PGMS é independente, sem paridade integral SSMS ou endosso.
+
+Instalador opcional da release: Install-PGMS-0.1.0-alpha.1.ps1 exige PowerShell 7, baixa o ZIP fixo da versão e verifica SHA256 fixado antes da instalação gerenciada. Use -ArchivePath para ZIP já baixado e -InstallRoot para outro destino gerenciado. Não abre o aplicativo, altera política de execução ou instala PostgreSQL. Fonte e checksums estão na página da release.

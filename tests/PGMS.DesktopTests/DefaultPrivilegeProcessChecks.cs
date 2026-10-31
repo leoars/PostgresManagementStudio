@@ -13,7 +13,7 @@ internal static class DefaultPrivilegeProcessChecks
         public async Task RecordAsync(PrivilegeCommitReceipt receipt,CancellationToken token)
         {
             await store.RecordAsync(receipt,token);
-            File.WriteAllText(Path.Combine(state,"ready"),Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            ProcessCheckpoint.SignalReady(state);
             await Task.Delay(Timeout.Infinite,token);
         }
     }
@@ -34,7 +34,7 @@ internal static class DefaultPrivilegeProcessChecks
         try{await new DefaultPrivilegeService(connection,journal).ApplyInspectedAsync(request,snapshot,recipient);throw new Exception("Expected interrupted acknowledgement.");}
         catch(PrivilegeCommitUncertainException)when(phase=="after")
         {
-            File.WriteAllText(Path.Combine(state,"ready"),Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            ProcessCheckpoint.SignalReady(state);
             await Task.Delay(Timeout.Infinite);
         }
     }

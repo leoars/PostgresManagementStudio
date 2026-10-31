@@ -17,7 +17,7 @@ Versions below follow the current `packages.lock.json` files. Original license t
 | Npgsql | 10.0.3 | PostgreSQL License; [project](https://github.com/npgsql/npgsql) |
 | Microsoft.Extensions.Logging.Abstractions | 10.0.0 | MIT; [runtime](https://github.com/dotnet/runtime) |
 | Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.0 | MIT; [runtime](https://github.com/dotnet/runtime) |
-| .NET/WPF self-contained runtime | package-specific | Licenses and notices copied from runtime packs when packaging; M1002 bundles 10.0.14. |
+| .NET/WPF self-contained runtime | package-specific | Licenses and notices copied from runtime packs when packaging; M1008 bundles 10.0.14. |
 | PostgreSQL elephant/Slonik | original artwork | Original license in [PostgreSQL-logo.txt](../licenses/PostgreSQL-logo.txt); [press kit](https://www.postgresql.org/about/press/presskit12/) and [trademark policy](https://www.postgresql.org/about/policies/trademarks/). |
 
 The application artwork includes the PostgreSQL elephant. Copyright permission and trademark conditions are separate. No permission to change/combine marks or imply endorsement is granted by the PGMS MIT license. Keep the original artwork provenance; any public branding redesign must follow the PostgreSQL trademark policy. PGMS is an independent application, without endorsement or affiliation with Microsoft or the PostgreSQL project.
@@ -26,4 +26,4 @@ The application artwork includes the PostgreSQL elephant. Copyright permission a
 
 SSMS is a UI reference, not a redistributed implementation. The tracked artifact inventory contains PGMS source/resources, not SSMS binaries. The public screenshot is of PGMS with synthetic data, with [provenance](../assets/README.md); it does not establish the licensing of vendor screenshots. Do not add proprietary assemblies, icons or copied vendor source.
 
-Source builds copy the project LICENSE, third-party notices and both distribution-guide languages into the package. No prebuilt binary release is published by this source import.
+Source builds copy the project LICENSE, third-party notices and both distribution-guide languages into the package. The first binary pre-release is v0.1.0-alpha.1; see the release notes for its exact validation.

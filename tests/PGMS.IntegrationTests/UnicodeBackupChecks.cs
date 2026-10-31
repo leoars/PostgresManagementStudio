@@ -7,7 +7,7 @@ internal static class UnicodeBackupChecks
     internal static async Task RunAsync(string connection,Action<bool,string> check)
     {
         var baseSettings=new NpgsqlConnectionStringBuilder(connection);
-        if(baseSettings.Host!="127.0.0.1" || baseSettings.Port!=55439 || baseSettings.Username!="pgms_test")throw new InvalidOperationException("Unicode backup checks require the isolated cluster.");
+        if(baseSettings.Host!="127.0.0.1" || baseSettings.Port!=TestClusterEndpoint.Port || baseSettings.Username!="pgms_test")throw new InvalidOperationException("Unicode backup checks require the isolated cluster.");
         string suffix=Guid.NewGuid().ToString("N"),role="backup_unicode_"+suffix,source="backup_unicode_source_"+suffix,target="backup_unicode_target_"+suffix;
         string qr=SqlIdentifier.Quote(role),qs=SqlIdentifier.Quote(source),qt=SqlIdentifier.Quote(target);
         string password="Café_密碼_🔑_"+suffix;
