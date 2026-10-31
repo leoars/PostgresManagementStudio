@@ -7,7 +7,8 @@ if (@(Compare-Object $english.Name $portuguese.Name).Count) { throw 'Public guid
 $pairs = @(
     @('README.md', 'README.pt-BR.md'),
     @('CONTRIBUTING.md', 'CONTRIBUTING.pt-BR.md'),
-    @('SECURITY.md', 'SECURITY.pt-BR.md')
+    @('SECURITY.md', 'SECURITY.pt-BR.md'),
+    @('CODE_OF_CONDUCT.md', 'CODE_OF_CONDUCT.pt-BR.md')
 )
 foreach ($file in $english) { $pairs += ,@("docs/en/$($file.Name)", "docs/pt-BR/$($file.Name)") }
 $paths = @('docs/README.md', 'docs/assets/README.md')

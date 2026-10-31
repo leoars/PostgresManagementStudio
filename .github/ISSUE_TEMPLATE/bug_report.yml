@@ -1,0 +1,64 @@
+name: Bug report / Relato de defeito
+description: Something behaves incorrectly. English and Brazilian Portuguese are welcome. / Algo se comporta incorretamente. Inglês e português do Brasil são bem-vindos.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use synthetic data only. Remove credentials, connection details and personal information from logs and screenshots. For vulnerabilities, follow SECURITY.md instead of opening an issue.
+
+        Use apenas dados sintéticos. Remova credenciais, dados de conexão e informações pessoais de logs e capturas. Para vulnerabilidades, siga SECURITY.pt-BR.md em vez de abrir uma issue.
+  - type: input
+    id: version
+    attributes:
+      label: PGMS version / Versão do PGMS
+      description: Release tag or build label shown in Help > About. / Tag da release ou rótulo de build exibido em Help > About.
+      placeholder: v0.1.0-alpha.1 (M1008)
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Windows and PostgreSQL versions / Versões do Windows e PostgreSQL
+      placeholder: Windows 11 24H2 x64; PostgreSQL 17.6; pg_dump 17.6
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation method / Forma de instalação
+      options:
+        - Portable ZIP / ZIP portátil
+        - Graphical installer, current user / Instalador gráfico, usuário atual
+        - Graphical installer, all users / Instalador gráfico, todos os usuários
+        - PowerShell 7 installer / Instalador PowerShell 7
+        - Built from source / Compilado da fonte
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / Passos para reproduzir
+      description: Minimal steps with synthetic data. Include the SQL or administrative action if relevant. / Passos mínimos com dados sintéticos. Inclua o SQL ou a ação administrativa se pertinente.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / Comportamento esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior / Comportamento observado
+      description: Include the exact message, SQLSTATE and the Messages tab text when available. / Inclua a mensagem exata, SQLSTATE e o texto da aba Messages quando houver.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation / Confirmação
+      options:
+        - label: This report contains no credentials, real connection details or personal data. / Este relato não contém credenciais, dados reais de conexão ou informações pessoais.
+          required: true

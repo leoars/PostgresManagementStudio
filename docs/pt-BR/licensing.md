@@ -8,7 +8,7 @@ Código e documentação próprios do PGMS usam a [licença MIT](../../LICENSE),
 
 ## Dependências e recursos
 
-As versões seguem os `packages.lock.json` atuais. Textos originais estão em [docs/licenses](../licenses); os [avisos originais](../../THIRD-PARTY-NOTICES.md) foram preservados em português.
+As versões seguem os `packages.lock.json` atuais. Textos originais estão em [docs/licenses](../licenses); os [avisos de terceiros](../../THIRD-PARTY-NOTICES.md) são bilíngues (inglês e português).
 
 | Componente | Versão | Licença / origem |
 | --- | --- | --- |

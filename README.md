@@ -2,6 +2,8 @@
 
 English | [Português (Brasil)](README.pt-BR.md)
 
+[![Build](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml/badge.svg)](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml) [![Pre-release](https://img.shields.io/github/v/release/leoars/PostgresManagementStudio?include_prereleases&label=pre-release)](https://github.com/leoars/PostgresManagementStudio/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A Windows desktop application for querying and administering PostgreSQL, built with C#, WPF, .NET 10 and Npgsql. Its interface takes inspiration from SQL Server Management Studio (SSMS), with PostgreSQL semantics and its own implementation.
 
 **Pre-release: v0.1.0-alpha.1 (Windows x64).** [Download and installation](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1) · [Release notes](docs/en/release-notes.md). Portable ZIP and [graphical installer](docs/en/graphical-installer.md) include .NET/WPF. Setup offers English/pt-BR, current-user or all-users installation and a desktop shortcut. The PowerShell 7 installer remains available. Build label M1008 is an internal identifier. See the [validation guide](docs/en/validation.md) for accepted scope and known limits; full SSMS parity is not claimed.
@@ -47,7 +49,7 @@ The self-contained portable package includes .NET/WPF, but no PostgreSQL server 
 
 ## Contribute and report problems
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). English and Brazilian Portuguese are welcome. Use synthetic data and remove credentials and personal information from reports. For vulnerabilities, follow [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md). English and Brazilian Portuguese are welcome. Issue templates guide bug reports and feature requests; usage questions go to [Discussions](https://github.com/leoars/PostgresManagementStudio/discussions). Use synthetic data and remove credentials and personal information from reports. For vulnerabilities, follow [SECURITY.md](SECURITY.md).
 
 ## License
 

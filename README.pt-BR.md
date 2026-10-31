@@ -2,6 +2,8 @@
 
 [English](README.md) | Português (Brasil)
 
+[![Build](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml/badge.svg)](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml) [![Pré-release](https://img.shields.io/github/v/release/leoars/PostgresManagementStudio?include_prereleases&label=pr%C3%A9-release)](https://github.com/leoars/PostgresManagementStudio/releases) [![Licença: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Aplicativo Windows para consultar e administrar PostgreSQL, desenvolvido em C#, WPF, .NET 10 e Npgsql. A interface tem o SQL Server Management Studio (SSMS) como referência, com semântica PostgreSQL e implementação própria.
 
 **Pré-release: v0.1.0-alpha.1 (Windows x64).** [Download e instalação](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1) · [Notas da versão](docs/pt-BR/release-notes.md). ZIP portátil e [instalador gráfico](docs/pt-BR/graphical-installer.md) incluem .NET/WPF. O assistente oferece inglês/pt-BR, instalação por usuário ou para todos e atalho na área de trabalho. O instalador PowerShell 7 continua disponível. O rótulo M1008 é interno. Veja o [guia de validação](docs/pt-BR/validation.md) para escopo aceito e limites conhecidos; não se declara paridade integral com SSMS.
@@ -47,7 +49,7 @@ O pacote portátil self-contained inclui .NET/WPF, sem servidor ou ferramentas P
 
 ## Contribuir e relatar problemas
 
-Veja [CONTRIBUTING.pt-BR.md](CONTRIBUTING.pt-BR.md). Inglês e português do Brasil são bem-vindos. Use dados sintéticos e remova credenciais e informações pessoais dos relatos. Para vulnerabilidades, siga [SECURITY.pt-BR.md](SECURITY.pt-BR.md).
+Veja [CONTRIBUTING.pt-BR.md](CONTRIBUTING.pt-BR.md) e o [código de conduta](CODE_OF_CONDUCT.pt-BR.md). Os modelos de issue orientam relatos de defeito e pedidos de funcionalidade; dúvidas de uso vão para [Discussions](https://github.com/leoars/PostgresManagementStudio/discussions). Inglês e português do Brasil são bem-vindos. Use dados sintéticos e remova credenciais e informações pessoais dos relatos. Para vulnerabilidades, siga [SECURITY.pt-BR.md](SECURITY.pt-BR.md).
 
 ## Licença
 

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability / Vulnerabilidade de segurança
+    url: https://github.com/leoars/PostgresManagementStudio/security/advisories/new
+    about: Report privately. Never post credentials, dumps or vulnerability details in a public issue. / Relate em privado; nunca publique credenciais, dumps ou detalhes da vulnerabilidade em issue pública.
+  - name: Questions / Perguntas
+    url: https://github.com/leoars/PostgresManagementStudio/discussions
+    about: Usage questions and ideas that are not yet a bug or a concrete request. / Dúvidas de uso e ideias que ainda não são defeito ou pedido concreto.

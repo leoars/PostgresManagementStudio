@@ -1,0 +1,33 @@
+name: Feature request / Pedido de funcionalidade
+description: Propose a change or new capability. / Proponha uma mudança ou nova capacidade.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        PGMS takes SSMS as a UI reference with PostgreSQL semantics. Full SSMS parity is not a goal by itself; explain the PostgreSQL task you need to accomplish.
+
+        O PGMS usa o SSMS como referência de interface com semântica PostgreSQL. Paridade integral com o SSMS não é objetivo por si; explique a tarefa PostgreSQL que você precisa realizar.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or task / Problema ou tarefa
+      description: What are you trying to do and what gets in the way today? / O que você quer fazer e o que atrapalha hoje?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior / Comportamento proposto
+      description: Include the SQL PGMS should generate or the screen it should offer, if you have an idea. / Inclua o SQL que o PGMS deveria gerar ou a tela que deveria oferecer, se tiver uma ideia.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered / Alternativas consideradas
+  - type: input
+    id: postgres
+    attributes:
+      label: PostgreSQL versions involved / Versões PostgreSQL envolvidas
+      placeholder: "17, 18"

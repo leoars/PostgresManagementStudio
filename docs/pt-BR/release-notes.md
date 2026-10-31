@@ -12,9 +12,9 @@ Nesta [release](https://github.com/leoars/PostgresManagementStudio/releases/tag/
 | --- | --- |
 | `PGMS-0.1.0-alpha.1-win-x64.zip` | Aplicativo portátil com runtime .NET/WPF. Extraia toda a pasta e execute PGMS.exe. |
 | `Install-PGMS-0.1.0-alpha.1.ps1` | Instalador opcional PowerShell 7: baixa este ZIP exato, confere SHA256 fixado e instala para o usuário atual. |
-| `SHA256SUMS.txt` | Valores SHA256 do ZIP e instalador. Hash confere correspondência, não é assinatura digital. |
+| `SHA256SUMS.txt` | Valores SHA256 do ZIP, do instalador PowerShell e das notas da versão. O EXE do instalador gráfico, adicionado depois, tem arquivo `.sha256` próprio. Hash confere correspondência, não é assinatura digital. Releases futuras publicarão um único arquivo de checksums cobrindo todos os assets. |
 
-O aplicativo portátil não exige PowerShell 7 ou runtime .NET global. Instalador e scripts gerenciados exigem PowerShell 7 e não alteram a política de execução do sistema. Não há instalador gráfico EXE/MSI. Revise scripts sem assinatura conforme a política da sua organização.
+O aplicativo portátil não exige PowerShell 7 ou runtime .NET global. Instalador e scripts gerenciados exigem PowerShell 7 e não alteram a política de execução do sistema. O instalador gráfico foi adicionado a esta mesma release posteriormente, conforme [instalador gráfico](graphical-installer.md); não há MSI. Revise scripts sem assinatura conforme a política da sua organização.
 
 ```powershell
 Get-FileHash ./PGMS-0.1.0-alpha.1-win-x64.zip -Algorithm SHA256

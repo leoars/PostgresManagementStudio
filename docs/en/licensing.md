@@ -8,7 +8,7 @@ PGMS's original code and documentation are under the [MIT license](../../LICENSE
 
 ## Dependencies and assets
 
-Versions below follow the current `packages.lock.json` files. Original license texts remain under [docs/licenses](../licenses) and the original [notices](../../THIRD-PARTY-NOTICES.md) are preserved in Portuguese.
+Versions below follow the current `packages.lock.json` files. Original license texts remain under [docs/licenses](../licenses) and the [third-party notices](../../THIRD-PARTY-NOTICES.md) are bilingual (English and Portuguese).
 
 | Component | Version | License / source |
 | --- | --- | --- |
