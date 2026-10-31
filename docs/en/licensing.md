@@ -22,6 +22,10 @@ Versions below follow the current `packages.lock.json` files. Original license t
 
 The application artwork includes the PostgreSQL elephant. Copyright permission and trademark conditions are separate. No permission to change/combine marks or imply endorsement is granted by the PGMS MIT license. Keep the original artwork provenance; any public branding redesign must follow the PostgreSQL trademark policy. PGMS is an independent application, without endorsement or affiliation with Microsoft or the PostgreSQL project.
 
+## Installer engine
+
+The optional graphical installer uses [Inno Setup 7.1.1](https://jrsoftware.org/isinfo.php). Its engine retains the vendor credits and its separate [license](https://github.com/jrsoftware/issrc/blob/main/license.txt), also installed as `INNO-SETUP-LICENSE.txt`. PGMS's MIT license does not replace the engine's terms. The compiler is a build tool; the application has no runtime dependency on a globally installed compiler.
+
 ## Reference materials
 
 SSMS is a UI reference, not a redistributed implementation. The tracked artifact inventory contains PGMS source/resources, not SSMS binaries. The public screenshot is of PGMS with synthetic data, with [provenance](../assets/README.md); it does not establish the licensing of vendor screenshots. Do not add proprietary assemblies, icons or copied vendor source.

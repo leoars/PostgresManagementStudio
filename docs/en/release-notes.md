@@ -23,6 +23,10 @@ pwsh -File ./Install-PGMS-0.1.0-alpha.1.ps1
 
 The installer defaults to `%LOCALAPPDATA%/Programs/PGMS`, preserves earlier managed versions and refuses an unmanaged nonempty target. `-InstallRoot` chooses another managed location; `-ArchivePath` uses an already downloaded ZIP with the same required hash. It does not launch PGMS or connect to a database. Launch the executable path printed by the installer, or use Start-Pgms.ps1 from the installed version folder. Rollback and removal scripts are included; local profiles/state are retained. See the [distribution guide](distribution.md).
 
+## Graphical installer added after the original release
+
+`PGMS-0.1.0-alpha.1-Setup-x64.exe` and its separate `.sha256` add a native wizard in English/pt-BR, current-user/all-users selection, default desktop shortcut and native uninstall. Application files, original ZIP/assets and tag are unchanged. This installer passed 17 current-user checks and visual review; elevated all-users execution is still untested. See the [graphical installer guide](graphical-installer.md) for requirements, source, build instructions and limits. The PowerShell installer described above remains available.
+
 ## Scope
 
 SQL editor and independent sessions, Object Explorer, bounded Results/Messages and CSV/JSON export, reviewed PostgreSQL administration, identity/privileges, session monitoring and logical backup/restore. PostgreSQL 17/18 and same-major client tools are required for database operations and backup/restore; server/tools are not bundled. SSMS is neither required nor distributed.

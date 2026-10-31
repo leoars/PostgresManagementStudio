@@ -23,6 +23,10 @@ pwsh -File ./Install-PGMS-0.1.0-alpha.1.ps1
 
 O instalador usa `%LOCALAPPDATA%/Programs/PGMS`, preserva versões gerenciadas anteriores e recusa destino não gerenciado não vazio. `-InstallRoot` escolhe outro local gerenciado; `-ArchivePath` usa ZIP já baixado com o mesmo hash obrigatório. Não abre PGMS nem conecta ao banco. Abra o caminho do executável informado pelo instalador, ou use Start-Pgms.ps1 da pasta da versão instalada. Scripts de rollback/remoção estão incluídos; perfis/estado local são preservados. Veja o [guia de distribuição](distribution.md).
 
+## Instalador gráfico adicionado após a release original
+
+`PGMS-0.1.0-alpha.1-Setup-x64.exe` e seu `.sha256` separado adicionam assistente nativo em inglês/pt-BR, escolha por usuário/para todos, atalho padrão na área de trabalho e desinstalação nativa. Arquivos do aplicativo, ZIP/assets originais e tag permanecem iguais. Este instalador passou em 17 checks por usuário e revisão visual; execução elevada para todos ainda não foi testada. Veja o [guia do instalador gráfico](graphical-installer.md) para requisitos, fonte, compilação e limites. O instalador PowerShell descrito acima continua disponível.
+
 ## Escopo
 
 Editor SQL e sessões independentes, Object Explorer, Results/Messages com limites e exportação CSV/JSON, administração PostgreSQL revisada, identity/privilégios, monitor e backup/restore lógico. PostgreSQL 17/18 e ferramentas da mesma versão principal são necessários para operações com banco e backup/restore; não são incluídos. SSMS não é exigido nem distribuído.

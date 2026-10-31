@@ -2,7 +2,7 @@
 
 [English](../en/getting-started.md) | Português (Brasil)
 
-[Baixar v0.1.0-alpha.1](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1): ZIP portátil ou instalador PowerShell 7 opcional. Veja [notas da versão](release-notes.md).
+[Baixar v0.1.0-alpha.1](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1): [instalador gráfico](graphical-installer.md), ZIP portátil ou instalador PowerShell 7. O instalador gráfico oferece modos por usuário e para todos, dispensando PowerShell. Veja [notas da versão](release-notes.md).
 
 ## Pré-requisitos
 

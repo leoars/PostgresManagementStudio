@@ -22,6 +22,10 @@ As versões seguem os `packages.lock.json` atuais. Textos originais estão em [d
 
 A arte do aplicativo inclui o elefante PostgreSQL. Permissão autoral e condições de marca são distintas. A licença MIT do PGMS não concede permissão para alterar/combinar marcas ou sugerir endosso. Preserve a origem da arte; qualquer redesign público da marca deve seguir a política PostgreSQL. PGMS é independente, sem endosso ou afiliação com Microsoft ou projeto PostgreSQL.
 
+## Mecanismo do instalador
+
+O instalador gráfico opcional usa [Inno Setup 7.1.1](https://jrsoftware.org/isinfo.php). O mecanismo preserva créditos do fornecedor e sua [licença](https://github.com/jrsoftware/issrc/blob/main/license.txt) separada, instalada também como `INNO-SETUP-LICENSE.txt`. A licença MIT do PGMS não substitui esses termos. O compilador é ferramenta de build; o aplicativo não depende dele instalado globalmente para executar.
+
 ## Materiais da referência
 
 SSMS é referência de interface, não implementação redistribuída. O inventário versionado contém fonte/recursos PGMS, sem binários SSMS. A captura pública é do PGMS com dados sintéticos e [origem documentada](../assets/README.md); não estabelece licença para capturas de fornecedores. Não adicione assemblies, ícones proprietários ou fonte copiada de fornecedores.
