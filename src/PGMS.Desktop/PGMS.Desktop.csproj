@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <AssemblyName>PGMS</AssemblyName>
+    <ApplicationIcon>Resources/PGMS.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+    <PackageReference Include="Dirkster.AvalonDock" Version="5.0.1" />
+    <PackageReference Include="Dirkster.AvalonDock.Themes.VS" Version="5.0.1" />
+    <PackageReference Include="Dirkster.AvalonDock.Serializer.Xml" Version="5.0.1" />
+    <ProjectReference Include="../PGMS.PostgreSql/PGMS.PostgreSql.csproj" />
+  </ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="PGMS.DesktopTests" /></ItemGroup>
+  <ItemGroup><Resource Include="Resources/PostgreSQL.xshd" /><Resource Include="Resources/PGMS.ico" /><Resource Include="Resources/PGMS-logo.png" /></ItemGroup>
+</Project>

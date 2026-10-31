@@ -1,0 +1,20 @@
+<Window x:Class="PGMS.Desktop.ObjectPropertiesDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Object Properties" Width="800" Height="600" MinWidth="600" MinHeight="440" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+ <Grid Margin="12">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><ScrollViewer MaxHeight="110" VerticalScrollBarVisibility="Auto"><TextBlock x:Name="Target" TextWrapping="Wrap"/></ScrollViewer></Border>
+  <TabControl x:Name="Details" Grid.Row="1">
+   <TabItem Header="General"><TextBox x:Name="Summary" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="8" AutomationProperties.Name="Object properties"/></TabItem>
+   <TabItem x:Name="DefinitionTab" Header="Definition" Visibility="Collapsed"><DockPanel>
+    <TextBlock x:Name="DefinitionNotice" DockPanel.Dock="Top" TextWrapping="Wrap" Margin="8"/>
+    <TextBox x:Name="Definition" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="8" AutomationProperties.Name="Object definition"/>
+   </DockPanel></TabItem>
+  </TabControl>
+  <ScrollViewer Grid.Row="2" MaxHeight="100" VerticalScrollBarVisibility="Auto" Margin="0,8"><TextBlock x:Name="Feedback" TextWrapping="Wrap"/></ScrollViewer>
+  <WrapPanel Grid.Row="3" HorizontalAlignment="Right">
+   <Button x:Name="InspectButton" Content="_Inspect" AutomationProperties.Name="Inspect object properties" Click="Inspect" Padding="14,5" Margin="0,0,8,0"/>
+   <Button x:Name="CancelInspectionButton" Content="Cancel Ins_pection" AutomationProperties.Name="Cancel property inspection" Click="CancelInspection" IsEnabled="False" Padding="12,5" Margin="0,0,8,0"/>
+   <Button x:Name="CloseButton" Content="_Close" AutomationProperties.Name="Close object properties" IsCancel="True" Padding="16,5"/>
+  </WrapPanel>
+ </Grid>
+</Window>

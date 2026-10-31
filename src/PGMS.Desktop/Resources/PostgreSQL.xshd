@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="PostgreSQL" extensions=".sql" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+ <Color name="Comment" foreground="#008000" />
+ <Color name="String" foreground="#A31515" />
+ <Color name="Keyword" foreground="#0000FF" />
+ <RuleSet name="NestedComment"><Span color="Comment" multiline="true" begin="/\*" end="\*/" ruleSet="NestedComment"/></RuleSet>
+ <RuleSet ignoreCase="true">
+  <Span color="Comment" begin="--" />
+  <Span color="Comment" multiline="true" begin="/\*" end="\*/" ruleSet="NestedComment" />
+  <Span color="String" multiline="true" begin="(?&lt;![\w$\u0080-\uFFFF])E'" end="'">
+   <RuleSet><Span begin="\\" end="."/><Span begin="''" end=""/></RuleSet>
+  </Span>
+  <Span color="String" multiline="true" begin="'" end="'"><RuleSet><Span begin="''" end=""/></RuleSet></Span>
+  <Span color="String" multiline="true" begin="&quot;" end="&quot;"><RuleSet><Span begin="&quot;&quot;" end=""/></RuleSet></Span>
+  <Keywords color="Keyword">
+   <Word>select</Word><Word>from</Word><Word>where</Word><Word>join</Word><Word>left</Word><Word>right</Word><Word>inner</Word><Word>outer</Word><Word>on</Word><Word>as</Word><Word>and</Word><Word>or</Word><Word>not</Word><Word>null</Word><Word>is</Word><Word>distinct</Word><Word>order</Word><Word>by</Word><Word>group</Word><Word>having</Word><Word>limit</Word><Word>offset</Word><Word>asc</Word><Word>desc</Word><Word>insert</Word><Word>into</Word><Word>values</Word><Word>update</Word><Word>set</Word><Word>delete</Word><Word>returning</Word><Word>create</Word><Word>alter</Word><Word>drop</Word><Word>table</Word><Word>view</Word><Word>index</Word><Word>schema</Word><Word>database</Word><Word>role</Word><Word>grant</Word><Word>revoke</Word><Word>begin</Word><Word>commit</Word><Word>rollback</Word><Word>savepoint</Word><Word>with</Word><Word>recursive</Word><Word>union</Word><Word>all</Word><Word>case</Word><Word>when</Word><Word>then</Word><Word>else</Word><Word>end</Word><Word>function</Word><Word>procedure</Word><Word>language</Word><Word>returns</Word><Word>explain</Word><Word>analyze</Word><Word>true</Word><Word>false</Word>
+  </Keywords>
+ </RuleSet>
+</SyntaxDefinition>

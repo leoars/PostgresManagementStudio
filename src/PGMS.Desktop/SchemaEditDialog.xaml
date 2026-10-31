@@ -1,0 +1,14 @@
+<Window x:Class="PGMS.Desktop.SchemaEditDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Schema Operations" Width="700" Height="530" MinWidth="640" MinHeight="500" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,12"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <StackPanel x:Name="Fields" Grid.Row="1">
+   <Label Content="Operation:"/><ComboBox x:Name="Operation" SelectionChanged="Changed"/>
+   <Label Content="Current schema name (exact name):" Target="{Binding ElementName=SchemaName}"/><TextBox x:Name="SchemaName" Padding="4" TextChanged="Changed"/>
+   <Label Content="New schema name (rename only):" Target="{Binding ElementName=NewName}"/><TextBox x:Name="NewName" Padding="4" TextChanged="Changed"/>
+  </StackPanel>
+  <TextBlock Grid.Row="2" Text="DROP uses RESTRICT: a schema containing objects cannot be dropped here. Rename preserves objects but changes their qualified names." TextWrapping="Wrap" Margin="0,12"/>
+  <TextBox Grid.Row="3" x:Name="Preview" IsReadOnly="True" FontFamily="Consolas" Padding="8" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="SQL preview"/>
+  <TextBlock Grid.Row="4" x:Name="Feedback" TextWrapping="Wrap" Margin="0,8"/>
+  <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right"><Button x:Name="ScriptButton" Content="Script" Click="Script" Padding="16,5" ToolTip="Open SQL without executing"/><Button x:Name="ApplyButton" Content="Apply" Click="Apply" Padding="16,5" Margin="8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="16,5"/></StackPanel>
+ </Grid>
+</Window>

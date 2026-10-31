@@ -1,0 +1,47 @@
+<Window x:Class="PGMS.Desktop.BackupDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Width="760" Height="550" MinWidth="680" MinHeight="510" WindowStartupLocation="CenterOwner" Background="#F5F5F5" Closing="OnClosing">
+ <Grid Margin="12">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" BorderBrush="#B5C5D2" BorderThickness="1" Padding="12" Margin="0,0,0,12"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <Grid Grid.Row="1">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+   <Border Background="White" BorderBrush="#B5C5D2" BorderThickness="1" Margin="0,0,12,0"><TextBlock Text="General" Background="#E4EFF6" Padding="10" VerticalAlignment="Top"/></Border>
+   <ScrollViewer x:Name="FormScroller" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+    <TextBlock x:Name="Description" TextWrapping="Wrap" Margin="0,0,0,16"/>
+    <Label Target="{Binding ElementName=FormatSelector}" Content="_Format:" Padding="0,0,0,4"/><ComboBox x:Name="FormatSelector" DisplayMemberPath="Label" SelectedValuePath="Value" SelectionChanged="OptionsChanged" Padding="4" AutomationProperties.Name="Backup or restore format"/>
+    <StackPanel x:Name="BackupScopeFields" Margin="0,10,0,0"><Label Content="_Content:" Target="{Binding ElementName=ScopeSelector}" Padding="0,0,0,4"/><ComboBox x:Name="ScopeSelector" DisplayMemberPath="Label" SelectedValuePath="Value" SelectionChanged="OptionsChanged" Padding="4" AutomationProperties.Name="Backup schema and data scope"/></StackPanel>
+    <StackPanel x:Name="SchemaFilterFields" Margin="0,10,0,0">
+     <CheckBox x:Name="LimitSchema" Content="Limit backup _selection" Checked="OptionsChanged" Unchecked="OptionsChanged" AutomationProperties.Name="Limit backup selection"/>
+     <StackPanel x:Name="SchemaNameFields" Visibility="Collapsed"><Label Content="Selection type:" Target="{Binding ElementName=SelectionKindSelector}"/><ComboBox x:Name="SelectionKindSelector" SelectionChanged="OptionsChanged" Padding="4" AutomationProperties.Name="Backup selection type"><ComboBoxItem Content="Schema"/><ComboBoxItem Content="Table"/></ComboBox><Label Content="Exact schema _name:" Target="{Binding ElementName=SchemaFilterName}" Padding="0,6,0,4"/><TextBox x:Name="SchemaFilterName" Text="public" Padding="4" TextChanged="SchemaFilterChanged" AutomationProperties.Name="Exact backup schema name"/>
+      <StackPanel x:Name="TableNameFields" Visibility="Collapsed"><Label Content="Exact table name:" Target="{Binding ElementName=TableFilterName}"/><TextBox x:Name="TableFilterName" Padding="4" TextChanged="SchemaFilterChanged" AutomationProperties.Name="Exact backup table name"/></StackPanel>
+      <TextBlock x:Name="SelectionHelp" Text="Enter the name without SQL quotes. Wildcards are literal. Dependencies outside this schema and large objects are not included automatically. Names are resolved when backup starts. Restoring schema definitions requires the selected schemas to be absent, including public." TextWrapping="Wrap" Margin="0,6,0,0"/>
+     </StackPanel>
+    </StackPanel>
+    <StackPanel x:Name="LargeObjectsFields" Margin="0,10,0,0"><Label Content="Large _objects:" Target="{Binding ElementName=LargeObjectsSelector}" Padding="0,0,0,4"/><ComboBox x:Name="LargeObjectsSelector" DisplayMemberPath="Label" SelectedValuePath="Value" SelectionChanged="OptionsChanged" Padding="4" AutomationProperties.Name="Backup large objects"/><TextBlock Text="Tool default includes large objects for full backups and excludes them with object filters. Include adds database-wide large objects and requires permission to read them." TextWrapping="Wrap" Margin="0,6,0,0"/></StackPanel>
+    <StackPanel x:Name="CompressionFields" Visibility="Collapsed" Margin="0,10,0,0"><Label Content="Co_mpression:" Target="{Binding ElementName=CompressionSelector}" Padding="0,0,0,4"/><ComboBox x:Name="CompressionSelector" DisplayMemberPath="Label" SelectedValuePath="Value" SelectionChanged="OptionsChanged" Padding="4" AutomationProperties.Name="Archive compression"/><StackPanel x:Name="CompressionLevelFields" Visibility="Collapsed" Margin="0,6,0,0"><Label Content="G_zip level:" Target="{Binding ElementName=CompressionLevelSelector}" Padding="0,0,0,4"/><ComboBox x:Name="CompressionLevelSelector" SelectionChanged="OptionsChanged" Padding="4" AutomationProperties.Name="Gzip compression level"/><TextBlock Text="1 favors speed; 9 favors smaller archives. Actual size depends on the data." TextWrapping="Wrap" Margin="0,6,0,0"/></StackPanel></StackPanel>
+    <StackPanel x:Name="JobsFields" Visibility="Collapsed" Margin="0,10,0,0"><Label Content="Parallel _jobs:" Target="{Binding ElementName=JobsSelector}" Padding="0,0,0,4"/><ComboBox x:Name="JobsSelector" SelectionChanged="OptionsChanged" Padding="4" AutomationProperties.Name="Parallel backup jobs"/><TextBlock Text="Uses jobs + 1 database connections. More jobs increase server load. Restore remains serial in one transaction." TextWrapping="Wrap" Margin="0,6,0,0"/></StackPanel>
+    <TextBlock x:Name="FormatHelp" TextWrapping="Wrap" Margin="0,6,0,12"/>
+    <Label x:Name="FileLabel" Target="{Binding ElementName=ArchivePath}" Content="_Archive file:" Padding="0,0,0,4"/>
+    <DockPanel><Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="Browse…" Click="Browse" Width="80" Margin="6,0,0,0"/><TextBox x:Name="ArchivePath" Padding="4" AutomationProperties.Name="Archive file" TextChanged="FileChanged"/></DockPanel>
+    <Label Target="{Binding ElementName=ToolsPath}" Content="PostgreSQL _bin folder:" Padding="0,14,0,4"/>
+    <DockPanel><Button x:Name="ToolsButton" DockPanel.Dock="Right" Content="Browse…" Click="BrowseTools" Width="80" Margin="6,0,0,0"/><TextBox x:Name="ToolsPath" TextChanged="FileChanged" Padding="4" AutomationProperties.Name="PostgreSQL bin folder"/></DockPanel>
+    <TextBlock Text="Use PostgreSQL tools compatible with the server and dump version." TextWrapping="Wrap" Margin="0,6,0,12" Foreground="#4B5660"/>
+    <StackPanel x:Name="RestoreFields" Visibility="Collapsed" Margin="0,0,0,10">
+     <Label Content="Restore content:" Target="{Binding ElementName=RestoreScopeSelector}"/><ComboBox x:Name="RestoreScopeSelector" DisplayMemberPath="Label" SelectedValuePath="Value" SelectionChanged="OptionsChanged" Padding="4" Margin="0,0,0,8" AutomationProperties.Name="Restore schema and data scope"/><TextBlock x:Name="RestoreScopeHelp" TextWrapping="Wrap" Margin="0,0,0,8"/><CheckBox x:Name="RestoreOwner" Content="Restore _ownership from archive" AutomationProperties.Name="Restore ownership from archive" Checked="OptionsChanged" Unchecked="OptionsChanged" Margin="0,0,0,6"/>
+     <CheckBox x:Name="RestoreAcl" Content="Restore object _privileges from archive" AutomationProperties.Name="Restore object privileges from archive" Checked="OptionsChanged" Unchecked="OptionsChanged" Margin="0,0,0,6"/>
+     <TextBlock Text="Referenced roles must already exist. PostgreSQL checks your authority. Errors before COMMIT roll back the restore." TextWrapping="Wrap" Margin="0,0,0,6"/>
+    </StackPanel>
+    <StackPanel x:Name="SqlBackupFields" Visibility="Collapsed" Margin="0,0,0,10"><CheckBox x:Name="SqlDumpOwner" Content="Include _ownership in SQL" AutomationProperties.Name="Include ownership in SQL backup" Checked="OptionsChanged" Unchecked="OptionsChanged" Margin="0,0,0,6"/><CheckBox x:Name="SqlDumpAcl" Content="Include object _privileges in SQL" AutomationProperties.Name="Include privileges in SQL backup" Checked="OptionsChanged" Unchecked="OptionsChanged" Margin="0,0,0,6"/><TextBlock Text="SQL restore follows the commands saved in the script. Referenced roles must exist and the restore operator needs their authority." TextWrapping="Wrap"/></StackPanel>
+    <CheckBox x:Name="GlobalReviewed" Visibility="Collapsed" Margin="0,0,0,10" AutomationProperties.Name="Global SQL script and destination reviewed"><TextBlock Text="I reviewed this SQL script, existing roles, grantors and tablespace paths for this destination." TextWrapping="Wrap"/></CheckBox>
+    <TextBlock Text="Tool options:" Margin="0,0,0,4"/>
+    <TextBox x:Name="OptionsPreview" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Height="64" AutomationProperties.Name="Backup or restore tool options"/>
+    <ProgressBar x:Name="Progress" Height="5" Visibility="Collapsed" IsIndeterminate="True"/>
+    <TextBox x:Name="Feedback" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Height="115" BorderThickness="0" Background="Transparent" Margin="0,8,0,0" AutomationProperties.Name="Operation status"/>
+   </StackPanel></ScrollViewer>
+  </Grid>
+  <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+   <Button x:Name="RunButton" MinWidth="90" Padding="12,5" Click="Run" IsDefault="True"/>
+   <Button x:Name="CloseButton" Content="Close" MinWidth="90" Padding="12,5" Margin="8,0,0,0" Click="CloseOrCancel"/>
+  </StackPanel>
+ </Grid>
+</Window>

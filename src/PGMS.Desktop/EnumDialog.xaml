@@ -1,0 +1,21 @@
+<Window x:Class="PGMS.Desktop.EnumDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Enum Values" Width="820" Height="700" MinWidth="700" MinHeight="580" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel>
+   <TextBlock x:Name="Observation" TextWrapping="Wrap" Margin="0,0,0,8"/>
+   <Label Content="Ordered _values:" Target="{Binding ElementName=Labels}"/>
+   <ListBox x:Name="Labels" Height="115" DisplayMemberPath="Display" AutomationProperties.Name="Ordered enum values"/>
+   <StackPanel x:Name="Fields">
+    <Label Content="_Operation:" Target="{Binding ElementName=Operation}"/><ComboBox x:Name="Operation" SelectionChanged="Changed" DisplayMemberPath="Label" SelectedValuePath="Value" AutomationProperties.Name="Enum operation"/>
+    <Label Content="_Existing value:" Target="{Binding ElementName=Existing}"/><ComboBox x:Name="Existing" SelectionChanged="Changed" DisplayMemberPath="Display" SelectedValuePath="Value" AutomationProperties.Name="Existing enum value"/>
+    <Label Content="_New value:" Target="{Binding ElementName=NewValue}"/><TextBox x:Name="NewValue" TextChanged="Changed" AutomationProperties.Name="New enum value"/>
+    <CheckBox x:Name="EmptyValue" Content="Use an empty string as the new value" Checked="Changed" Unchecked="Changed" Margin="0,6"/>
+    <TextBlock Text="Renaming changes the text shown for existing stored values. Adding changes the allowed values and ordering. Labels cannot be removed in this flow. Script omits inspection guards." TextWrapping="Wrap" Margin="0,8"/>
+    <CheckBox x:Name="Reviewed" Content="I reviewed the label change and its effect on existing data." Checked="Changed" Unchecked="Changed"/>
+   </StackPanel>
+   <Label Content="SQL preview:" Target="{Binding ElementName=Preview}"/><TextBox x:Name="Preview" IsReadOnly="True" TextWrapping="Wrap" MinHeight="80" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Enum change SQL"/>
+  </StackPanel></ScrollViewer>
+  <TextBlock Grid.Row="2" x:Name="Feedback" TextWrapping="Wrap" Margin="0,10"/>
+  <WrapPanel Grid.Row="3" HorizontalAlignment="Right"><Button x:Name="InspectButton" Content="_Inspect" Click="Inspect" Padding="12,5"/><Button x:Name="CancelButton" Content="Cancel operation" Click="Cancel" Padding="12,5" Margin="8,0"/><Button x:Name="ScriptButton" Content="Script" Click="Script" Padding="12,5"/><Button x:Name="ApplyButton" Content="Apply" Click="Apply" Padding="12,5" Margin="8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="12,5"/></WrapPanel>
+ </Grid>
+</Window>

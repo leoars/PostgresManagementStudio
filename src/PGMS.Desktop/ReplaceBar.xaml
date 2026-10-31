@@ -1,0 +1,27 @@
+<UserControl x:Class="PGMS.Desktop.ReplaceBar"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Border Background="#E4EFF6" BorderBrush="#B5C5D2" BorderThickness="0,0,0,1" Padding="8">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+   <StackPanel>
+    <Grid>
+     <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition/></Grid.ColumnDefinitions>
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <Label Content="_Find what:" Target="{Binding ElementName=FindText}"/>
+     <TextBox x:Name="FindText" Grid.Column="1" MinHeight="25" MaxHeight="56" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Padding="4,2" AutomationProperties.Name="Find what"/>
+     <Label Grid.Row="1" Content="_Replace with:" Target="{Binding ElementName=ReplacementText}"/>
+     <TextBox x:Name="ReplacementText" Grid.Row="1" Grid.Column="1" MinHeight="25" MaxHeight="56" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Padding="4,2" AutomationProperties.Name="Replace with"/>
+    </Grid>
+    <WrapPanel Margin="0,6,0,0"><CheckBox x:Name="MatchCase" Content="Match _case" IsChecked="True" Margin="0,0,12,4"/><CheckBox x:Name="WholeWords" Content="Whole _words" Margin="0,0,12,4"/></WrapPanel>
+    <WrapPanel Margin="0,2,0,0"><CheckBox x:Name="SelectionOnly" Content="_Selection only" Checked="ScopeChanged" Unchecked="ScopeChanged" Margin="0,0,12,4"/><Button x:Name="UseSelectionButton" Content="_Use current selection" Click="CaptureSelection" IsEnabled="False" Padding="6,2" Margin="0,0,6,4"/></WrapPanel>
+    <WrapPanel Margin="0,2,0,0">
+     <Button x:Name="NextButton" Content="Find _Next" Click="Next" Padding="8,3" Margin="0,0,6,4"/>
+     <Button x:Name="ReplaceButton" Content="Re_place" Click="ReplaceOne" Padding="8,3" Margin="0,0,6,4"/>
+     <Button x:Name="ReplaceAllButton" Content="Replace _All" Click="ReplaceAll" Padding="8,3" Margin="0,0,6,4"/>
+     <Button x:Name="CloseButton" Content="Cl_ose" Click="Close" Padding="8,3" Margin="0,0,6,4"/>
+    </WrapPanel>
+    <TextBlock x:Name="Feedback" Text="Literal text in the current document. Changes do not execute SQL." TextWrapping="Wrap"/>
+   </StackPanel>
+  </ScrollViewer>
+ </Border>
+</UserControl>

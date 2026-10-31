@@ -1,0 +1,24 @@
+<Window x:Class="PGMS.Desktop.DomainDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Domain Constraints" Width="860" Height="760" MinWidth="720" MinHeight="600" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel>
+   <TextBlock x:Name="Observation" TextWrapping="Wrap" Margin="0,0,0,8"/>
+   <Label Content="Observed constraints:" Target="{Binding ElementName=Constraints}"/><TextBox x:Name="Constraints" IsReadOnly="True" Height="100" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Observed domain constraints"/>
+   <StackPanel x:Name="Fields">
+    <Label Content="_Operation:" Target="{Binding ElementName=Operation}"/><ComboBox x:Name="Operation" SelectionChanged="Changed" AutomationProperties.Name="Domain constraint operation"/>
+    <Label Content="_Existing constraint:" Target="{Binding ElementName=Existing}"/><ComboBox x:Name="Existing" SelectionChanged="Changed" DisplayMemberPath="Name" SelectedValuePath="Name" AutomationProperties.Name="Existing domain constraint"/>
+    <StackPanel x:Name="AddFields">
+     <Label Content="Constraint _name:" Target="{Binding ElementName=ConstraintName}"/><TextBox x:Name="ConstraintName" TextChanged="Changed" AutomationProperties.Name="New domain constraint name"/>
+     <Label Content="_Comparison of VALUE:" Target="{Binding ElementName=Comparison}"/><ComboBox x:Name="Comparison" SelectionChanged="Changed" DisplayMemberPath="Label" SelectedValuePath="Value" AutomationProperties.Name="Domain value comparison"/>
+     <Label Content="_Literal value:" Target="{Binding ElementName=Literal}"/><TextBox x:Name="Literal" TextChanged="Changed" AutomationProperties.Name="Domain comparison literal"/>
+     <CheckBox x:Name="NotValid" Content="NOT VALID — do not check existing rows yet" IsChecked="True" Checked="Changed" Unchecked="Changed" Margin="0,6"/>
+    </StackPanel>
+    <TextBlock Text="NOT VALID still checks new values. Before validating, wait for transactions started before the constraint was committed to finish; this dialog does not wait for them. Drop weakens the domain rules. Container types may prevent validation." TextWrapping="Wrap" Margin="0,8"/>
+    <CheckBox x:Name="Reviewed" Content="I reviewed the constraint, affected data and validation timing." Checked="Changed" Unchecked="Changed"/>
+   </StackPanel>
+   <Label Content="SQL preview:" Target="{Binding ElementName=Preview}"/><TextBox x:Name="Preview" IsReadOnly="True" TextWrapping="Wrap" MinHeight="85" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Domain change SQL"/>
+  </StackPanel></ScrollViewer>
+  <TextBlock Grid.Row="2" x:Name="Feedback" TextWrapping="Wrap" Margin="0,10"/>
+  <WrapPanel Grid.Row="3" HorizontalAlignment="Right"><Button x:Name="InspectButton" Content="_Inspect" Click="Inspect" Padding="12,5"/><Button x:Name="CancelButton" Content="Cancel operation" Click="Cancel" Padding="12,5" Margin="8,0"/><Button x:Name="ScriptButton" Content="Script" Click="Script" Padding="12,5"/><Button x:Name="ApplyButton" Content="Apply" Click="Apply" Padding="12,5" Margin="8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="12,5"/></WrapPanel>
+ </Grid>
+</Window>

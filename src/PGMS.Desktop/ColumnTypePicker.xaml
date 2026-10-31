@@ -1,0 +1,17 @@
+<Window x:Class="PGMS.Desktop.ColumnTypePicker" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Column Type" Width="720" Height="490" MinWidth="620" MinHeight="440" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock Text="Choose a type from this database. The type identity and definition will be checked again when applying the table change." TextWrapping="Wrap"/></Border>
+  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel>
+   <Label Content="_Type:" Target="{Binding ElementName=Types}"/><ComboBox x:Name="Types" DisplayMemberPath="DisplayName" SelectionChanged="Changed" AutomationProperties.Name="Inspected column type"/>
+   <TextBlock x:Name="Help" TextWrapping="Wrap" Margin="0,10"/>
+   <Grid x:Name="Modifiers"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+    <StackPanel><Label Content="_Length:" Target="{Binding ElementName=Length}"/><TextBox x:Name="Length" TextChanged="Changed" Margin="0,0,8,0" AutomationProperties.Name="Character length"/></StackPanel>
+    <StackPanel Grid.Column="1"><Label Content="_Precision:" Target="{Binding ElementName=Precision}"/><TextBox x:Name="Precision" TextChanged="Changed" Margin="0,0,8,0" AutomationProperties.Name="Numeric or time precision"/></StackPanel>
+    <StackPanel Grid.Column="2"><Label Content="_Scale:" Target="{Binding ElementName=Scale}"/><TextBox x:Name="Scale" TextChanged="Changed" AutomationProperties.Name="Numeric scale"/></StackPanel>
+   </Grid>
+   <Label Content="SQL type:" Target="{Binding ElementName=Preview}"/><TextBox x:Name="Preview" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" AutomationProperties.Name="Column type SQL"/>
+  </StackPanel></ScrollViewer>
+  <TextBlock Grid.Row="2" x:Name="Feedback" TextWrapping="Wrap" Margin="0,10"/>
+  <WrapPanel Grid.Row="3" HorizontalAlignment="Right"><Button x:Name="InspectButton" Content="_Load types" Click="Load" Padding="12,5"/><Button x:Name="CancelButton" Content="Cancel load" Click="Cancel" Padding="12,5" Margin="8,0"/><Button x:Name="ChooseButton" Content="Use type" Click="Choose" Padding="12,5"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="12,5" Margin="8,0,0,0"/></WrapPanel>
+ </Grid>
+</Window>

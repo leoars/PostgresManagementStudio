@@ -1,0 +1,16 @@
+<Window x:Class="PGMS.Desktop.RangeExclusionDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Range Exclusion Constraint" Width="800" Height="730" MinWidth="700" MinHeight="610" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="2*" MinHeight="180"/><RowDefinition MinHeight="95"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <ScrollViewer Grid.Row="1" x:Name="FormScroller" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="Fields">
+   <Label Content="Constraint _name:" Target="{Binding ElementName=ConstraintName}"/><TextBox x:Name="ConstraintName" TextChanged="Changed" Padding="4" AutomationProperties.Name="Exclusion constraint name"/>
+   <Label Content="_Range columns (select one or more):" Target="{Binding ElementName=Columns}"/><ListBox x:Name="Columns" Height="120" SelectionMode="Multiple" SelectionChanged="Changed" AutomationProperties.Name="Inspected built-in range columns"/>
+   <Label Content="Conflict _operator for selected columns:" Target="{Binding ElementName=Operator}"/><ComboBox x:Name="Operator" SelectionChanged="Changed" AutomationProperties.Name="Range conflict operator"/>
+   <CheckBox x:Name="Deferrable" Content="DEFERRABLE (checking may be deferred within a transaction)" Checked="Changed" Unchecked="Changed" Margin="0,10"/>
+   <CheckBox x:Name="InitiallyDeferred" Content="INITIALLY DEFERRED (check at commit unless changed explicitly)" Checked="Changed" Unchecked="Changed"/>
+   <TextBlock Text="Creates a GiST exclusion constraint on built-in range columns. A conflicting pair must match on every selected column. Overlap permits adjacent and empty ranges; NULL comparisons do not conflict. Existing rows are checked. No extension is installed." TextWrapping="Wrap" Margin="0,10"/>
+  </StackPanel></ScrollViewer>
+  <TextBox Grid.Row="2" x:Name="Preview" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="8" AutomationProperties.Name="Range exclusion SQL preview"/>
+  <TextBlock Grid.Row="3" x:Name="Feedback" TextWrapping="Wrap" Margin="0,8"/>
+  <DockPanel Grid.Row="4" LastChildFill="False"><Button x:Name="InspectButton" Content="_Inspect" Click="Inspect" Padding="12,5"/><Button x:Name="CancelButton" Content="Cancel operation" Click="Cancel" Margin="8,0" Visibility="Collapsed" Padding="12,5"/><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button x:Name="ScriptButton" Content="_Script" Click="Script" Padding="12,5"/><Button x:Name="ApplyButton" Content="_Create" Click="Apply" Padding="12,5" Margin="8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="12,5"/></StackPanel></DockPanel>
+ </Grid>
+</Window>

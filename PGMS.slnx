@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PGMS.Desktop/PGMS.Desktop.csproj" />
+    <Project Path="src/PGMS.PostgreSql/PGMS.PostgreSql.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PGMS.DesktopTests/PGMS.DesktopTests.csproj" />
+    <Project Path="tests/PGMS.IntegrationTests/PGMS.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

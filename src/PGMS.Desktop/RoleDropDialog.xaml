@@ -1,0 +1,10 @@
+<Window x:Class="PGMS.Desktop.RoleDropDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Drop Role" Width="680" Height="470" MinWidth="620" MinHeight="420" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <StackPanel x:Name="Fields" Grid.Row="1"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><Label Content="Role name (exact):"/><TextBox x:Name="RoleName" TextChanged="Changed" Padding="4"/></StackPanel><Button x:Name="InspectButton" Grid.Column="2" Content="Inspect roles" Click="Inspect" VerticalAlignment="Bottom" Padding="12,5"/></Grid></StackPanel>
+  <TextBlock Grid.Row="2" Text="This does not revoke ownership or privileges automatically. PostgreSQL refuses DROP ROLE while dependencies remain; resolve them deliberately, then inspect and retry." TextWrapping="Wrap" Margin="0,10"/>
+  <TextBox Grid.Row="3" x:Name="Preview" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" Padding="8" AutomationProperties.Name="SQL preview"/>
+  <TextBlock Grid.Row="4" x:Name="Feedback" TextWrapping="Wrap" Margin="0,8"/>
+  <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right"><Button x:Name="ScriptButton" Content="Script" Click="Script" Padding="16,5"/><Button x:Name="ApplyButton" Content="Apply" Click="Apply" Padding="16,5" Margin="8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="16,5"/></StackPanel>
+ </Grid>
+</Window>

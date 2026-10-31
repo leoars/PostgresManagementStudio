@@ -1,0 +1,18 @@
+<Window x:Class="PGMS.Desktop.ColumnTypeDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Change Column Type" Width="820" Height="660" MinWidth="700" MinHeight="560" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel>
+   <TextBlock x:Name="Observation" TextWrapping="Wrap" Margin="0,0,0,10"/>
+   <StackPanel x:Name="Fields">
+    <StackPanel x:Name="NewColumnFields"><Label Content="New column _name:" Target="{Binding ElementName=NewColumnName}"/><TextBox x:Name="NewColumnName" TextChanged="Changed" AutomationProperties.Name="New catalog column name"/><CheckBox x:Name="AllowNull" Content="Allow NULL" IsChecked="True" Checked="Changed" Unchecked="Changed" Margin="0,6"/></StackPanel>
+    <DockPanel><Button x:Name="ChooseTypeButton" Content="Choose type…" Click="ChooseType" Padding="10,4" DockPanel.Dock="Left"/><TextBlock x:Name="SelectedTypeText" Margin="10,0,0,0" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.Name="Selected destination type"/></DockPanel>
+    <StackPanel x:Name="ConversionFields"><Label Content="_Conversion:" Target="{Binding ElementName=Conversion}"/><ComboBox x:Name="Conversion" SelectionChanged="Changed" DisplayMemberPath="Label" SelectedValuePath="Value" AutomationProperties.Name="Column value conversion"/></StackPanel>
+    <TextBlock x:Name="OperationHelp" TextWrapping="Wrap" Margin="0,10"/>
+    <CheckBox x:Name="Reviewed" Content="I reviewed the conversion and possible changes to stored values." Checked="Changed" Unchecked="Changed"/>
+   </StackPanel>
+   <Label Content="SQL preview:" Target="{Binding ElementName=Preview}"/><TextBox x:Name="Preview" IsReadOnly="True" TextWrapping="Wrap" MinHeight="110" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Column conversion SQL"/>
+  </StackPanel></ScrollViewer>
+  <TextBlock Grid.Row="2" x:Name="Feedback" TextWrapping="Wrap" Margin="0,10"/>
+  <WrapPanel Grid.Row="3" HorizontalAlignment="Right"><Button x:Name="InspectButton" Content="_Inspect" Click="Inspect" Padding="12,5"/><Button x:Name="CancelButton" Content="Cancel operation" Click="Cancel" Padding="12,5" Margin="8,0"/><Button x:Name="ScriptButton" Content="Script" Click="Script" Padding="12,5"/><Button x:Name="ApplyButton" Content="Apply" Click="Apply" Padding="12,5" Margin="8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="12,5"/></WrapPanel>
+ </Grid>
+</Window>

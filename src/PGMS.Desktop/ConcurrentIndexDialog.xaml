@@ -1,0 +1,13 @@
+<Window x:Class="PGMS.Desktop.ConcurrentIndexDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Concurrent Index" Width="800" Height="620" MinWidth="700" MinHeight="520" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*" MinHeight="160"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel>
+   <TextBlock x:Name="Intro" Text="Concurrent creation allows writes while the index is built. Failure or cancellation can leave an invalid index. A pending operation is saved on this computer and must be inspected before another creation." TextWrapping="Wrap" Margin="0,0,0,10"/>
+   <ComboBox x:Name="Operation" DisplayMemberPath="Label" SelectedValuePath="Value" Visibility="Collapsed" SelectionChanged="OperationChanged" Margin="0,0,0,10" AutomationProperties.Name="Index maintenance operation"/>
+   <CheckBox x:Name="Review" Checked="Changed" Unchecked="Changed" Margin="0,0,0,10"><TextBlock Text="I reviewed the SQL and understand that schema or object names can change after inspection." TextWrapping="Wrap"/></CheckBox>
+   <TextBox x:Name="Preview" IsReadOnly="True" Height="180" FontFamily="Consolas" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="8" AutomationProperties.Name="Concurrent index SQL"/>
+   <TextBlock x:Name="Feedback" TextWrapping="Wrap" Margin="0,10" AutomationProperties.Name="Concurrent index operation status"/>
+  </StackPanel></ScrollViewer>
+  <WrapPanel Grid.Row="2" Margin="0,10,0,0"><Button x:Name="InspectButton" Content="Inspect _pending" Click="Inspect" Padding="10,5" Margin="0,0,8,0"/><Button x:Name="ArchiveButton" Content="Archive _reviewed receipt" Click="Archive" Padding="10,5" Margin="0,0,8,0" Visibility="Collapsed"/><Button x:Name="CancelButton" Content="Cancel operation" Click="Cancel" Padding="10,5" Margin="0,0,8,0" Visibility="Collapsed"/><Button x:Name="ApplyButton" Content="Create _concurrently" Click="Apply" Padding="10,5" Margin="0,0,8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="10,5"/></WrapPanel>
+ </Grid>
+</Window>

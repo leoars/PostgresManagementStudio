@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0-windows7.0": {
+      "AvalonEdit": {
+        "type": "Transitive",
+        "resolved": "6.3.1.120",
+        "contentHash": "6ASBKPzAg64BLDlFOJo4Ypr1sA/6hB5+TfHLJaZYUSTE0jgxvKlVqKeo/ISTG9qEMxu604qUu6BGugmJkfdrNw=="
+      },
+      "Dirkster.AvalonDock": {
+        "type": "Transitive",
+        "resolved": "5.0.1",
+        "contentHash": "xDEEVUGMB5qJ53DPIEnUbctWMeSke2JamHL3NEia4t8L5ApwioCx3UzUTk8JAoEkiXJPHnHBZJiCk8xQXfa2Iw==",
+        "dependencies": {
+          "Dirkster.AvalonDock.Core": "5.0.1"
+        }
+      },
+      "Dirkster.AvalonDock.Core": {
+        "type": "Transitive",
+        "resolved": "5.0.1",
+        "contentHash": "ZDuRCunKD8WEWExa5SkCXYfr3A6V93cpLyqNbUgE3i1o20zs9VU5QzGVyH/uXLnxeH4fVuMyn/YiZUD/ypyMOA=="
+      },
+      "Dirkster.AvalonDock.Serializer.Xml": {
+        "type": "Transitive",
+        "resolved": "5.0.1",
+        "contentHash": "HzUO0wXvQmVmxQVRoW2qPGmWuuCDqBCQDQszBgqLqOuwKbUAcoWGzf0Qw/2VvfLcNyxPbHipQhx3IzbawE4EdA==",
+        "dependencies": {
+          "Dirkster.AvalonDock.Core": "5.0.1"
+        }
+      },
+      "Dirkster.AvalonDock.Themes.VS": {
+        "type": "Transitive",
+        "resolved": "5.0.1",
+        "contentHash": "tCjPWl40GBrXaWh5wsueV4+ow/tugZA6ERz5bVRqAfjvr6qN/gBQ6kMwrorSp7esYDOTi20JDGt2m3AMvOOpfA==",
+        "dependencies": {
+          "Dirkster.AvalonDock": "5.0.1"
+        }
+      },
+      "Microsoft.Extensions.DependencyInjection.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "L3AdmZ1WOK4XXT5YFPEwyt0ep6l8lGIPs7F5OOBZc77Zqeo01Of7XXICy47628sdVl0v/owxYJTe86DTgFwKCA=="
+      },
+      "Microsoft.Extensions.Logging.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "FU/IfjDfwaMuKr414SSQNTIti/69bHEMb+QKrskRb26oVqpx3lNFXMjs/RC9ZUuhBhcwDM2BwOgoMw+PZ+beqQ==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0"
+        }
+      },
+      "Npgsql": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "7nb5YzXuvWWJxB0J8DiyL3we+X4FOctZrt0fIBnucOIaIevFEEwGQVZKtiu9olXdlNAK1eNgqSral6r/jlhI4w==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
+        }
+      },
+      "PGMS": {
+        "type": "Project",
+        "dependencies": {
+          "AvalonEdit": "[6.3.1.120, )",
+          "Dirkster.AvalonDock": "[5.0.1, )",
+          "Dirkster.AvalonDock.Serializer.Xml": "[5.0.1, )",
+          "Dirkster.AvalonDock.Themes.VS": "[5.0.1, )",
+          "PGMS.PostgreSql": "[1.0.0, )"
+        }
+      },
+      "pgms.postgresql": {
+        "type": "Project",
+        "dependencies": {
+          "Npgsql": "[10.0.3, )"
+        }
+      }
+    },
+    "net10.0-windows7.0/win-x64": {}
+  }
+}

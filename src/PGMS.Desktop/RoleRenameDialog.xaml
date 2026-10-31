@@ -1,0 +1,9 @@
+<Window x:Class="PGMS.Desktop.RoleRenameDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Rename Role" Width="680" Height="480" MinWidth="620" MinHeight="420" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <StackPanel x:Name="Fields" Grid.Row="1"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><Label Content="Current role:"/><TextBox x:Name="RoleName" TextChanged="Changed" Padding="4"/></StackPanel><StackPanel Grid.Column="2"><Label Content="New role name:"/><TextBox x:Name="NewName" TextChanged="Changed" Padding="4"/></StackPanel></Grid></StackPanel>
+  <TextBox Grid.Row="2" x:Name="Preview" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" Padding="8" AutomationProperties.Name="SQL preview"/>
+  <TextBlock Grid.Row="3" x:Name="Feedback" TextWrapping="Wrap" Margin="0,8"/>
+  <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right"><Button x:Name="ScriptButton" Content="Script" Click="Script" Padding="16,5"/><Button x:Name="ApplyButton" Content="Apply" Click="Apply" Padding="16,5" Margin="8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="16,5"/></StackPanel>
+ </Grid>
+</Window>

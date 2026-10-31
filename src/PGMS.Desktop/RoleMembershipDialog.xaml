@@ -1,0 +1,23 @@
+<Window x:Class="PGMS.Desktop.RoleMembershipDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Role Memberships" Width="760" Height="580" MinWidth="680" MinHeight="540" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <ScrollViewer x:Name="ContentScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+  <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="130"/><RowDefinition Height="Auto"/><RowDefinition MinHeight="150"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,12"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <StackPanel x:Name="Fields" Grid.Row="1">
+   <Label Content="_Member role (receives membership):" Target="{Binding ElementName=MemberRole}"/>
+   <DockPanel><Button x:Name="InspectButton" Content="Inspect Memberships" Click="Inspect" DockPanel.Dock="Right" Padding="12,3" Margin="8,0,0,0"/><TextBox x:Name="MemberRole" AutomationProperties.Name="Member role" Padding="4" TextChanged="Changed"/></DockPanel>
+   <Label Content="_Granted role (group):" Target="{Binding ElementName=GrantedRole}"/><TextBox x:Name="GrantedRole" AutomationProperties.Name="Granted role" Padding="4" TextChanged="Changed"/>
+   <Label Content="Membership _option" Target="{Binding ElementName=OptionChoice}"/>
+   <ComboBox x:Name="OptionChoice" AutomationProperties.Name="Membership option" SelectionChanged="Changed"/>
+   <CheckBox x:Name="OptionEnabled" Content="_Enabled (TRUE)" AutomationProperties.Name="Membership option enabled" IsChecked="True" Margin="0,6" Checked="Changed" Unchecked="Changed"/>
+   <TextBlock Text="ADMIN: delegate membership. INHERIT: use group privileges automatically. SET: allow SET ROLE. Omitted options keep existing values; new memberships use server defaults." TextWrapping="Wrap" AutomationProperties.Name="Membership option semantics"/>
+   <CheckBox x:Name="Revoke" Content="Revo_ke direct membership (RESTRICT)" Margin="0,10" Checked="Changed" Unchecked="Changed"/>
+  </StackPanel>
+  <TextBox Grid.Row="2" x:Name="Inspection" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="6" AutomationProperties.Name="Current direct memberships"/>
+  <TextBlock Grid.Row="3" Text="Inspect lists direct grants and their grantor/options. Revoke can leave access through other roles or grantors." TextWrapping="Wrap" Margin="0,10"/>
+  <TextBox Grid.Row="4" x:Name="Preview" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Padding="8" AutomationProperties.Name="SQL preview"/>
+  </Grid></ScrollViewer>
+  <TextBlock Grid.Row="1" x:Name="Feedback" TextWrapping="Wrap" Margin="0,8"/>
+  <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"><Button x:Name="ScriptButton" Content="_Script" Click="Script" Padding="16,5"/><Button x:Name="ApplyButton" Content="_Apply" Click="Apply" Padding="16,5" Margin="8,0"/><Button x:Name="CloseButton" Content="C_lose" IsCancel="True" Padding="16,5"/></StackPanel>
+ </Grid>
+</Window>

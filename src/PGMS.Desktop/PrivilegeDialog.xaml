@@ -1,0 +1,95 @@
+<Window x:Class="PGMS.Desktop.PrivilegeDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Object Permissions" Width="760" Height="760" MinWidth="650" MinHeight="540" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+ <Window.Resources>
+  <Style x:Key="AclCellText" TargetType="TextBlock">
+   <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+   <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+  </Style>
+ </Window.Resources>
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <ScrollViewer x:Name="ContentScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+   <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*" MinHeight="220"/></Grid.RowDefinitions>
+    <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,12"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+    <StackPanel x:Name="Fields" Grid.Row="1">
+     <Label Content="_Object type" Target="{Binding ElementName=ObjectType}"/><ComboBox x:Name="ObjectType" AutomationProperties.Name="Object type" SelectionChanged="TypeChanged"/>
+     <Label Content="Sc_hema" Target="{Binding ElementName=SchemaName}"/><TextBox x:Name="SchemaName" AutomationProperties.Name="Schema" Text="public" TextChanged="Changed"/>
+     <Label Content="Object _name" Target="{Binding ElementName=ObjectName}"/><TextBox x:Name="ObjectName" AutomationProperties.Name="Object name" TextChanged="Changed"/>
+     <TextBlock x:Name="RoutineHelp" Visibility="Collapsed" TextWrapping="Wrap" Margin="0,6,0,8" AutomationProperties.Name="Selected routine overload"/>
+     <StackPanel x:Name="TableColumnScope" Visibility="Collapsed" Margin="0,6,0,0">
+      <CheckBox x:Name="ColumnScope" Content="Limit to one _column" AutomationProperties.Name="Limit permission to one column" Checked="ColumnScopeChanged" Unchecked="ColumnScopeChanged"/>
+      <StackPanel x:Name="ColumnFields" Visibility="Collapsed">
+       <Label Content="Column na_me (exact name)" Target="{Binding ElementName=ColumnName}"/>
+       <TextBox x:Name="ColumnName" AutomationProperties.Name="Permission column name" TextChanged="Changed"/>
+       <TextBlock Text="One exact column name. Inspect still shows table and column access; other grants may also allow access." AutomationProperties.Name="Column permission scope" TextWrapping="Wrap" Margin="0,4,0,6"/>
+      </StackPanel>
+     </StackPanel>
+     <Label Content="_Role name (exact name)" Target="{Binding ElementName=RoleName}"/><TextBox x:Name="RoleName" AutomationProperties.Name="Grant or revoke recipient" TextChanged="Changed"/>
+     <CheckBox x:Name="PublicRecipient" Content="All roles (_PUBLIC)" AutomationProperties.Name="All roles PUBLIC recipient" ToolTip="Includes every current and future role. Does not inspect a different connected role." Margin="0,6,0,0" Checked="Changed" Unchecked="Changed"/>
+     <DockPanel Margin="0,10"><CheckBox x:Name="Revoke" Content="Revo_ke" DockPanel.Dock="Right" Margin="16,0,0,0" Checked="Changed" Unchecked="Changed"/><ComboBox x:Name="Privilege" AutomationProperties.Name="Privilege" SelectionChanged="Changed"/></DockPanel>
+     <CheckBox x:Name="GrantOption" Content="With _grant option" AutomationProperties.Name="With grant option" Margin="0,0,0,8" Checked="Changed" Unchecked="Changed" ToolTip="Grant: allow delegation. Revoke: remove only delegation, preserving the base privilege. PUBLIC cannot receive grant options. RESTRICT refuses dependent grants."/>
+     <Expander Header="Grantor and dependent grants" Margin="0,0,0,8" x:Name="DelegationPanel">
+      <StackPanel Margin="6">
+       <TextBlock Text="Choose an inspected role to control the grant's origin. SET membership is required; inherited authority can record another origin and will be refused." TextWrapping="Wrap"/>
+       <Button x:Name="LoadGrantorsButton" Content="Load grant_ors" Click="LoadGrantors" HorizontalAlignment="Left" Padding="10,4" Margin="0,6" AutomationProperties.Name="Load grantor roles"/>
+       <Label Content="Grantor _role (optional)" Target="{Binding ElementName=GrantorRoles}"/>
+       <ComboBox x:Name="GrantorRoles" DisplayMemberPath="Name" SelectionChanged="GrantorChanged" AutomationProperties.Name="Explicit grantor role"/>
+       <Button Content="Use session origin" Click="ClearGrantor" HorizontalAlignment="Left" Margin="0,4" Padding="10,4"/>
+       <TextBlock x:Name="GrantorInfo" Text="No explicit grantor selected. PostgreSQL resolves the grant origin." TextWrapping="Wrap"/>
+       <CheckBox x:Name="CascadeRevoke" Content="Revoke dependent grants (CASCADE)" Checked="CascadeChanged" Unchecked="CascadeChanged" Margin="0,8,0,4" AutomationProperties.Name="Revoke dependent grants CASCADE"/>
+       <Button x:Name="ReviewRevokeButton" Content="Review dependent grants" Click="ReviewRevoke" HorizontalAlignment="Left" Padding="10,4" AutomationProperties.Name="Review potentially affected grants"/>
+       <TextBlock Text="The review lists potentially affected grants. Independent paths may preserve them; removal does not imply loss of all access. Script exports SQL without these inspection guards." TextWrapping="Wrap" Margin="0,6"/>
+       <TextBox x:Name="RevokeImpact" Text="No dependency review loaded." IsReadOnly="True" TextWrapping="Wrap" MaxHeight="150" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Potentially affected grants"/>
+      </StackPanel>
+     </Expander>
+     <TextBlock x:Name="SequencePrivilegeHelp" Visibility="Collapsed" Text="USAGE: nextval/currval. SELECT: currval/last_value. UPDATE: nextval/setval. Inspect reads permissions only." AutomationProperties.Name="Sequence privilege semantics" TextWrapping="Wrap" Margin="0,0,0,8"/>
+    </StackPanel>
+    <TabControl Grid.Row="2" x:Name="PermissionTabs">
+     <TabItem Header="SQL preview"><TextBox x:Name="Preview" IsReadOnly="True" FontFamily="Consolas" Padding="8" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="SQL preview"/></TabItem>
+     <TabItem Header="Effective access" x:Name="EffectiveAccessTab">
+      <StackPanel Margin="6">
+       <TextBlock Text="Inspect checks the connected role in a separate session. The recipient above is used only for GRANT/REVOKE." TextWrapping="Wrap" Margin="0,0,0,6"/>
+       <TextBox x:Name="AccessSummary" Text="No snapshot loaded. Inspect to read effective privileges." IsReadOnly="True" TextWrapping="Wrap" MaxHeight="110" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Effective access context"/>
+       <TabControl x:Name="AccessLists" Margin="0,6">
+        <TabItem Header="Effective privileges">
+       <DataGrid x:Name="AccessRows" Margin="0,6" Height="180" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="Effective privileges">
+        <DataGrid.Columns>
+         <DataGridTextColumn Header="Scope" Binding="{Binding Scope}"/>
+         <DataGridTextColumn Header="Column" Binding="{Binding Column}"/>
+         <DataGridTextColumn Header="Privilege" Binding="{Binding Privilege}"/>
+         <DataGridCheckBoxColumn Header="Allowed" Binding="{Binding Allowed}"/>
+         <DataGridCheckBoxColumn Header="Grant option" Binding="{Binding GrantOption}"/>
+        </DataGrid.Columns>
+       </DataGrid>
+        </TabItem>
+        <TabItem x:Name="AclTab" Header="ACL _entries" AutomationProperties.Name="ACL entries">
+         <StackPanel>
+          <TextBlock x:Name="AclNotice" AutomationProperties.Name="ACL snapshot scope" Text="No ACL snapshot loaded." TextWrapping="Wrap" Margin="4"/>
+          <DataGrid x:Name="AclRows" Height="180" SelectionMode="Single" SelectionChanged="AclSelectionChanged" AutomationProperties.HelpText="{Binding Text, ElementName=AclNotice}" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="ACL grant entries">
+           <DataGrid.Columns>
+            <DataGridTextColumn Header="Scope" Binding="{Binding Scope}"/>
+            <DataGridTextColumn Header="Column" Binding="{Binding Column}" MaxWidth="120" ElementStyle="{StaticResource AclCellText}"/>
+            <DataGridTextColumn Header="Privilege" Binding="{Binding Privilege}"/>
+            <DataGridTextColumn Header="Grantor" Binding="{Binding Grantor}" MaxWidth="160" ElementStyle="{StaticResource AclCellText}"/>
+            <DataGridTextColumn Header="Grantee" Binding="{Binding Grantee}" MaxWidth="160" ElementStyle="{StaticResource AclCellText}"/>
+            <DataGridCheckBoxColumn Header="ACL grant option" Binding="{Binding GrantOption}"/>
+            <DataGridTextColumn Binding="{Binding SourceText}"><DataGridTextColumn.Header><TextBlock Text="Source" ToolTip="Built-in default is used for a NULL catalog ACL. Stored ACL is the catalog value; default-privilege templates are not listed."/></DataGridTextColumn.Header></DataGridTextColumn>
+            <DataGridCheckBoxColumn Binding="{Binding RoleAvailable}"><DataGridCheckBoxColumn.Header><TextBlock Text="Role available" ToolTip="PUBLIC or role privileges available to this connection according to PostgreSQL. This does not reconstruct membership paths; superusers may see all roles as available."/></DataGridCheckBoxColumn.Header></DataGridCheckBoxColumn>
+           </DataGrid.Columns>
+          </DataGrid>
+          <TextBox x:Name="AclDetails" Text="Select an ACL row to read complete names and OIDs." IsReadOnly="True" TextWrapping="Wrap" Height="64" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Selected ACL grant details"/>
+         </StackPanel>
+        </TabItem>
+       </TabControl>
+       <TextBlock Text="ACL entries identify catalog grantors and recipients. Ownership, superuser, memberships, schema permissions and RLS can also affect authority; this is not a complete explanation of row access." TextWrapping="Wrap"/>
+      </StackPanel>
+     </TabItem>
+    </TabControl>
+   </Grid>
+  </ScrollViewer>
+  <TextBlock Grid.Row="1" x:Name="Feedback" TextWrapping="Wrap" Margin="0,8"/>
+  <DockPanel Grid.Row="2" LastChildFill="False">
+   <Button x:Name="InspectButton" Content="_Inspect access" AutomationProperties.Name="Inspect connected role access" Click="Inspect" Padding="10,5" Margin="0,0,8,0"/>
+   <Button x:Name="CancelInspectionButton" Visibility="Collapsed" Content="_Cancel inspection" AutomationProperties.Name="Cancel access inspection" Click="CancelInspection" IsEnabled="False" Padding="10,5"/>
+   <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button x:Name="ScriptButton" Content="_Script" Click="Script" Padding="16,5"/><Button x:Name="ApplyButton" Content="_Apply" Click="Apply" Padding="16,5" Margin="8,0"/><Button x:Name="CloseButton" Content="C_lose" IsCancel="True" Padding="16,5"/></StackPanel>
+  </DockPanel>
+ </Grid>
+</Window>

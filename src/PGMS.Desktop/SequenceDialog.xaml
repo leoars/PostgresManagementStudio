@@ -1,0 +1,74 @@
+<Window x:Class="PGMS.Desktop.SequenceDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Sequence Operations" Width="780" Height="820" MinWidth="600" MinHeight="480" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+ <Window.Resources>
+  <DataTemplate x:Key="WrappingAccessText"><AccessText Text="{Binding}" TextWrapping="Wrap"/></DataTemplate>
+  <Style TargetType="Label"><Setter Property="ContentTemplate" Value="{StaticResource WrappingAccessText}"/></Style>
+  <Style TargetType="CheckBox"><Setter Property="ContentTemplate" Value="{StaticResource WrappingAccessText}"/></Style>
+ </Window.Resources>
+ <Grid Margin="12">
+  <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <ScrollViewer x:Name="ContentScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalContentAlignment="Stretch" Focusable="False">
+  <Grid>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*" MinHeight="100"/><RowDefinition x:Name="PreviewRow" Height="*" MinHeight="80"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <StackPanel x:Name="Fields" AutomationProperties.HelpText="{Binding Text, ElementName=Feedback}" Grid.Row="1">
+   <Label Content="_Operation:" Target="{Binding ElementName=Operation}"/><ComboBox x:Name="Operation" AutomationProperties.Name="Operation" Padding="4" SelectionChanged="Changed"/>
+   <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+    <StackPanel><Label Content="Sc_hema:" Target="{Binding ElementName=SchemaName}"/><TextBox x:Name="SchemaName" AutomationProperties.Name="Schema" Padding="4" TextChanged="Changed"/></StackPanel>
+    <StackPanel Grid.Column="2"><Label Content="Sequence _name:" Target="{Binding ElementName=SequenceName}"/><TextBox x:Name="SequenceName" AutomationProperties.Name="Sequence name" Padding="4" TextChanged="Changed"/></StackPanel>
+   </Grid>
+   <StackPanel x:Name="CreateFields" Visibility="Collapsed" Margin="0,6,0,0">
+    <TextBlock Text="Blank start/minimum/maximum use PostgreSQL defaults for the type and direction." TextWrapping="Wrap"/>
+    <UniformGrid Columns="3">
+     <StackPanel Margin="0,0,8,0"><Label Content="Type:" Target="{Binding ElementName=DataType}"/><ComboBox x:Name="DataType" AutomationProperties.Name="Sequence data type" Padding="4" SelectionChanged="Changed"/></StackPanel>
+     <StackPanel Margin="0,0,8,0"><Label Content="Increment:" Target="{Binding ElementName=Increment}"/><TextBox x:Name="Increment" AutomationProperties.Name="Increment" Text="1" Padding="4" TextChanged="Changed"/></StackPanel>
+     <StackPanel><Label Content="Start (optional):" Target="{Binding ElementName=StartValue}"/><TextBox x:Name="StartValue" AutomationProperties.Name="Start (optional)" Padding="4" TextChanged="Changed"/></StackPanel>
+     <StackPanel Margin="0,0,8,0"><Label Content="Minimum (optional):" Target="{Binding ElementName=Minimum}"/><TextBox x:Name="Minimum" AutomationProperties.Name="Minimum (optional)" Padding="4" TextChanged="Changed"/></StackPanel>
+     <StackPanel Margin="0,0,8,0"><Label Content="Maximum (optional):" Target="{Binding ElementName=Maximum}"/><TextBox x:Name="Maximum" AutomationProperties.Name="Maximum (optional)" Padding="4" TextChanged="Changed"/></StackPanel>
+     <StackPanel><Label Content="Cache:" Target="{Binding ElementName=Cache}"/><TextBox x:Name="Cache" AutomationProperties.Name="Cache" Text="1" Padding="4" TextChanged="Changed"/></StackPanel>
+    </UniformGrid>
+    <CheckBox x:Name="Cycle" Content="Cycle after reaching the limit (values may repeat)" Margin="0,8,0,0" Checked="Changed" Unchecked="Changed"/>
+   </StackPanel>
+   <StackPanel x:Name="ParameterFields" Visibility="Collapsed" Margin="0,6,0,0">
+    <Label x:Name="ParameterLabel" Content="New increment:" Target="{Binding ElementName=ParameterValue}"/>
+    <TextBox x:Name="ParameterValue" AutomationProperties.Name="{Binding Content, ElementName=ParameterLabel}" Padding="4" TextChanged="Changed"/>
+    <StackPanel x:Name="ParameterMaximumFields" Visibility="Collapsed">
+     <Label Content="New maximum:" Target="{Binding ElementName=ParameterMaximum}"/>
+     <TextBox x:Name="ParameterMaximum" AutomationProperties.Name="New maximum" Padding="4" TextChanged="Changed"/>
+    </StackPanel>
+    <StackPanel x:Name="ParameterTypeFields" Visibility="Collapsed">
+     <Label Content="New data _type:" Target="{Binding ElementName=ParameterType}"/>
+     <ComboBox x:Name="ParameterType" AutomationProperties.Name="New sequence data type" AutomationProperties.AccessKey="Alt+T" Padding="4" SelectionChanged="Changed"/>
+    </StackPanel>
+    <CheckBox x:Name="ParameterCycle" Content="Cycle after reaching the limit (values may repeat)" Margin="0,6,0,0" Checked="Changed" Unchecked="Changed"/>
+    <Button x:Name="LoadParameterButton" Content="_Load inspected value" Click="LoadParameter" HorizontalAlignment="Left" Padding="8,3" Margin="0,6,0,0"/>
+   </StackPanel>
+   <StackPanel x:Name="OwnerFields" Visibility="Collapsed" Margin="0,6,0,0">
+    <TextBlock Text="Destination must be in the sequence schema and have the same owner. Common columns of permanent ordinary tables only." TextWrapping="Wrap"/>
+    <Label Content="_Destination table:" Target="{Binding ElementName=OwnerTable}"/>
+    <TextBox x:Name="OwnerTable" AutomationProperties.Name="Destination table" Padding="4" TextChanged="Changed"/>
+    <Button x:Name="ReadOwnerButton" Click="ReadOwner" Content="_Read destination columns" HorizontalAlignment="Left" Padding="8,3" Margin="0,6,0,0"/>
+    <Label Content="Destination col_umn:" Target="{Binding ElementName=OwnerColumn}"/>
+    <ComboBox x:Name="OwnerColumn" AutomationProperties.Name="Destination column" DisplayMemberPath="Column" Padding="4" SelectionChanged="Changed"/>
+    <TextBlock x:Name="OwnerSummary" TextWrapping="Wrap" Margin="0,6,0,0"/>
+   </StackPanel>
+   <StackPanel x:Name="RenameFields" Visibility="Collapsed" Margin="0,6,0,0"><Label Content="New sequence name:" Target="{Binding ElementName=NewName}"/><TextBox x:Name="NewName" AutomationProperties.Name="New sequence name" Padding="4" TextChanged="Changed"/></StackPanel>
+   <StackPanel x:Name="CommentFields" Visibility="Collapsed" Margin="0,6,0,0">
+    <Label Content="Comment (replaces current text):" Target="{Binding ElementName=CommentText}"/><TextBox x:Name="CommentText" AutomationProperties.Name="Comment (replaces current text)" Height="64" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="4" TextChanged="Changed"/>
+    <WrapPanel Orientation="Horizontal" Margin="0,6,0,0"><CheckBox x:Name="RemoveComment" Content="Remove existing comment" VerticalAlignment="Center" Checked="Changed" Unchecked="Changed"/><Button x:Name="LoadCommentButton" Content="_Load inspected comment" Click="LoadComment" Padding="8,3" Margin="16,0,0,0"/></WrapPanel>
+   </StackPanel>
+   <Button x:Name="InspectButton" Content="_Inspect sequence" Click="Inspect" HorizontalAlignment="Left" Padding="12,5" Margin="0,8"/>
+  </StackPanel>
+  <GroupBox Grid.Row="2" Header="Inspected configuration"><TextBox x:Name="Summary" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="8" AutomationProperties.Name="Inspected sequence configuration"/></GroupBox>
+  <TextBox x:Name="Preview" Grid.Row="3" Margin="0,8,0,0" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="8" AutomationProperties.Name="Sequence SQL preview"/>
+  <TextBlock x:Name="Feedback" Grid.Row="4" TextWrapping="Wrap" Margin="0,8" Text="Inspect reads configuration only; it never calls nextval or setval. Current/next values are not shown."/>
+  </Grid>
+  </ScrollViewer>
+  <WrapPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+   <Button x:Name="CancelApplyButton" Content="Cancel A_pply" AutomationProperties.Name="Cancel sequence operation" Click="CancelApply" Visibility="Collapsed" Padding="12,5" Margin="0,0,12,0"/>
+   <Button x:Name="CancelInspectionButton" Content="Cancel _Inspection" Click="CancelInspection" IsEnabled="False" Padding="12,5" Margin="0,0,12,0"/>
+   <Button x:Name="ScriptButton" Content="_Script" Click="Script" Padding="16,5"/><Button x:Name="ApplyButton" Content="_Apply" Click="Apply" Padding="16,5" Margin="8,0"/>
+   <Button x:Name="CloseButton" Content="_Close" IsCancel="True" Padding="16,5"/>
+  </WrapPanel>
+ </Grid>
+</Window>

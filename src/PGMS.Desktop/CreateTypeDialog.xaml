@@ -1,0 +1,28 @@
+<Window x:Class="PGMS.Desktop.CreateTypeDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="New Enum / Domain" Width="840" Height="760" MinWidth="720" MinHeight="600" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock Text="New Enum / Domain"/></Border>
+  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel>
+   <TextBlock x:Name="Observation" TextWrapping="Wrap" Margin="0,0,0,8"/>
+   <StackPanel x:Name="Fields">
+    <Label Content="_Schema:" Target="{Binding ElementName=SchemaName}"/><TextBox x:Name="SchemaName" TextChanged="Changed" AutomationProperties.Name="Type schema"/>
+    <Label Content="_Name:" Target="{Binding ElementName=TypeName}"/><TextBox x:Name="TypeName" TextChanged="Changed" AutomationProperties.Name="New type name"/>
+    <Label Content="_Kind:" Target="{Binding ElementName=Kind}"/><ComboBox x:Name="Kind" SelectionChanged="Changed" AutomationProperties.Name="New type kind"/>
+    <StackPanel x:Name="EnumFields">
+     <Label Content="Ordered _labels (one per line):" Target="{Binding ElementName=Labels}"/><TextBox x:Name="Labels" AcceptsReturn="True" Height="110" TextChanged="Changed" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="New enum labels"/>
+     <CheckBox x:Name="AllowEmptyLabels" Content="Treat blank lines as empty labels" Checked="Changed" Unchecked="Changed" Margin="0,6"/>
+     <TextBlock Text="Spaces are preserved. Each label may contain up to 63 UTF-8 bytes. Labels must be distinct; line breaks within a label are not offered here." TextWrapping="Wrap"/>
+    </StackPanel>
+    <StackPanel x:Name="DomainFields">
+     <DockPanel Margin="0,8"><Button x:Name="ChooseBaseButton" Content="Choose base type…" Click="ChooseBase" Padding="10,4" DockPanel.Dock="Left"/><TextBlock x:Name="BaseTypeText" Margin="8,0" TextWrapping="Wrap" VerticalAlignment="Center"/></DockPanel>
+     <CheckBox x:Name="UseDefault" Content="Use a literal default" Checked="Changed" Unchecked="Changed"/><TextBox x:Name="DefaultValue" TextChanged="Changed" AutomationProperties.Name="Domain default literal"/>
+     <CheckBox x:Name="NotNull" Content="NOT NULL" Checked="Changed" Unchecked="Changed" Margin="0,6"/>
+     <TextBlock Text="The base domain may already impose defaults or constraints. An empty enabled default is an empty string. Create the domain first, then use Domain Constraints to add or review rules." TextWrapping="Wrap"/>
+    </StackPanel>
+    <CheckBox x:Name="Reviewed" Content="I reviewed the new type and its definition." Checked="Changed" Unchecked="Changed" Margin="0,10"/>
+   </StackPanel>
+   <Label Content="SQL preview:" Target="{Binding ElementName=Preview}"/><TextBox x:Name="Preview" IsReadOnly="True" TextWrapping="Wrap" MinHeight="100" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Create type SQL"/>
+  </StackPanel></ScrollViewer>
+  <TextBlock Grid.Row="2" x:Name="Feedback" TextWrapping="Wrap" Margin="0,10"/>
+  <WrapPanel Grid.Row="3" HorizontalAlignment="Right"><Button x:Name="InspectButton" Content="_Inspect schema" Click="Inspect" Padding="12,5"/><Button x:Name="CancelButton" Content="Cancel operation" Click="Cancel" Padding="12,5" Margin="8,0"/><Button x:Name="ScriptButton" Content="Script" Click="Script" Padding="12,5"/><Button x:Name="ApplyButton" Content="Create" Click="Apply" Padding="12,5" Margin="8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="12,5"/></WrapPanel>
+ </Grid>
+</Window>

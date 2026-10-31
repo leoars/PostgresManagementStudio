@@ -1,0 +1,31 @@
+<Window x:Class="PGMS.Desktop.PartitionDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop" Title="Partitions" Width="900" Height="800" MinWidth="760" MinHeight="650" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnKey">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="2*" MinHeight="180"/><RowDefinition MinHeight="95"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <ScrollViewer Grid.Row="1" x:Name="FormScroller" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="Fields">
+   <TextBox x:Name="Observation" IsReadOnly="True" TextWrapping="Wrap" Padding="5" AutomationProperties.Name="Partition parent definition"/>
+   <Label Content="_Operation:" Target="{Binding ElementName=Operation}"/><ComboBox x:Name="Operation" SelectionChanged="Changed" AutomationProperties.Name="Partition operation"/>
+   <StackPanel x:Name="ChildFields"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><Label Content="Child _schema:" Target="{Binding ElementName=ChildSchema}"/><TextBox x:Name="ChildSchema" TextChanged="ChildChanged" Padding="4" AutomationProperties.Name="Child schema"/></StackPanel><StackPanel Grid.Column="1" Margin="10,0,0,0"><Label Content="Child _name:" Target="{Binding ElementName=ChildName}"/><TextBox x:Name="ChildName" TextChanged="ChildChanged" Padding="4" AutomationProperties.Name="Child table name"/></StackPanel></Grid>
+    <Button x:Name="CandidateButton" Content="Inspect existing _child" Click="InspectCandidate" HorizontalAlignment="Left" Margin="0,6" Padding="10,4"/>
+   </StackPanel>
+   <StackPanel x:Name="DetachFields"><Label Content="Attached partition to _detach:" Target="{Binding ElementName=Children}"/><ComboBox x:Name="Children" DisplayMemberPath="Name" SelectionChanged="Changed" AutomationProperties.Name="Attached partition"/><TextBox x:Name="ChildObservation" IsReadOnly="True" TextWrapping="Wrap" Margin="0,5" AutomationProperties.Name="Inspected partition bound"/></StackPanel>
+   <StackPanel x:Name="BoundFields">
+    <CheckBox x:Name="DefaultBound" Content="Use DEFAULT partition" Checked="Changed" Unchecked="Changed" Margin="0,8"/>
+    <StackPanel x:Name="LiteralFields"><TextBlock Text="RANGE uses one row per key in inspected order; LIST uses one row per value. Literal text is quoted, never executed as SQL. Empty Literal means empty text. Use ISO dates and explicit time zones." TextWrapping="Wrap" Margin="0,5"/>
+     <DataGrid x:Name="ValuesGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" CanUserAddRows="False" Height="145" AutomationProperties.Name="Partition bound values"><DataGrid.Columns>
+      <DataGridTextColumn Header="Key / value" Binding="{Binding Label}" IsReadOnly="True" Width="85"/>
+      <DataGridComboBoxColumn Header="Lower / LIST kind" ItemsSource="{x:Static local:PartitionInput.Kinds}" SelectedItemBinding="{Binding LowerKind,UpdateSourceTrigger=PropertyChanged}" Width="135"/>
+      <DataGridTextColumn Header="Lower / LIST literal" Binding="{Binding LowerText,UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+      <DataGridComboBoxColumn x:Name="UpperKindColumn" Header="Upper kind" ItemsSource="{x:Static local:PartitionInput.Kinds}" SelectedItemBinding="{Binding UpperKind,UpdateSourceTrigger=PropertyChanged}" Width="110"/>
+      <DataGridTextColumn x:Name="UpperTextColumn" Header="Upper literal" Binding="{Binding UpperText,UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+     </DataGrid.Columns></DataGrid>
+     <StackPanel x:Name="ListButtons" Orientation="Horizontal" Margin="0,5"><Button Content="Add value" Click="AddValue" Padding="10,3"/><Button Content="Remove selected value" Click="RemoveValue" Padding="10,3" Margin="8,0"/></StackPanel>
+    </StackPanel>
+    <StackPanel x:Name="HashFields"><Label Content="_Modulus:" Target="{Binding ElementName=Modulus}"/><TextBox x:Name="Modulus" Text="2" TextChanged="Changed" Padding="4" AutomationProperties.Name="Hash modulus"/><Label Content="_Remainder:" Target="{Binding ElementName=Remainder}"/><TextBox x:Name="Remainder" Text="0" TextChanged="Changed" Padding="4" AutomationProperties.Name="Hash remainder"/></StackPanel>
+   </StackPanel>
+   <TextBlock x:Name="Help" TextWrapping="Wrap" Margin="0,8"/>
+  </StackPanel></ScrollViewer>
+  <TextBox Grid.Row="2" x:Name="Preview" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Padding="8" AutomationProperties.Name="Partition SQL preview"/>
+  <TextBlock Grid.Row="3" x:Name="Feedback" Text="Inspect the selected parent before preparing changes." TextWrapping="Wrap" Margin="0,8"/>
+  <DockPanel Grid.Row="4" LastChildFill="False"><Button x:Name="InspectButton" Content="_Inspect parent" Click="Inspect" Padding="10,5"/><Button x:Name="CancelButton" Content="Cancel operation" Click="Cancel" Margin="8,0" Visibility="Collapsed" Padding="10,5"/><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button x:Name="ScriptButton" Content="_Script" Click="Script" Padding="12,5"/><Button x:Name="ApplyButton" Content="_Apply" Click="Apply" Padding="12,5" Margin="8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="12,5"/></StackPanel></DockPanel>
+ </Grid>
+</Window>
