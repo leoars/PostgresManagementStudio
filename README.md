@@ -4,13 +4,21 @@ English | [Português (Brasil)](README.pt-BR.md)
 
 [![Build](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml/badge.svg)](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml) [![Pre-release](https://img.shields.io/github/v/release/leoars/PostgresManagementStudio?include_prereleases&label=pre-release)](https://github.com/leoars/PostgresManagementStudio/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A Windows desktop application for querying and administering PostgreSQL, built with C#, WPF, .NET 10 and Npgsql. Its interface takes inspiration from SQL Server Management Studio (SSMS), with PostgreSQL semantics and its own implementation.
+**The SQL Server Management Studio experience, for PostgreSQL.** A native Windows client with Object Explorer, F5 to run, execution plans, session monitoring and backup/restore, built for people who already think in SSMS.
 
-**Pre-release: v0.1.0-alpha.1 (Windows x64).** [Download and installation](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1) · [Release notes](docs/en/release-notes.md). Portable ZIP and [graphical installer](docs/en/graphical-installer.md) include .NET/WPF. Setup offers English/pt-BR, current-user or all-users installation and a desktop shortcut. The PowerShell 7 installer remains available. Build label M1008 is an internal identifier. See the [validation guide](docs/en/validation.md) for accepted scope and known limits; full SSMS parity is not claimed.
+**[Download v0.1.0-alpha.1 for Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1)** · Graphical installer (EN/pt-BR) or portable ZIP, .NET runtime included · Works with PostgreSQL 17 and 18
 
-![PGMS editor, Object Explorer and synthetic results](docs/assets/pgms-results-m959.jpg)
+![PGMS editor, Object Explorer and query results](docs/assets/pgms-results-m959.jpg)
 
-Historical M957 preview captured during M959 using the isolated test cluster and synthetic data. This illustrates the interface, not the current release package. [Image provenance](docs/assets/README.md).
+> Early pre-release. Querying, browsing and monitoring are the core of this alpha; administration and backup run through reviewable SQL and the official PostgreSQL tools. Full SSMS parity is not claimed. See [known limits](docs/en/validation.md) and [release notes](docs/en/release-notes.md).
+
+## Why PGMS
+
+- **Feels like SSMS.** Object Explorer, query tabs with their own sessions, Results/Messages, F5 and the shortcuts you already use.
+- **Review before you apply.** Administrative changes are shown as SQL first, so nothing touches the server without you reading it.
+- **Know what's running.** Session and blocker monitor that distinguishes cancelling a query from terminating a session.
+- **Native and fast.** C#/WPF on .NET 10, no browser and no JVM.
+- **Your drafts survive.** Unsaved query tabs are checkpointed and recovered after a crash or forced close, encrypted per Windows user.
 
 ## Features
 
@@ -22,6 +30,12 @@ Historical M957 preview captured during M959 using the isolated test cluster and
 - Logical backup/restore through external PostgreSQL tools: custom, tar, SQL and directory formats, plus reviewed global operations.
 
 ## Get started
+
+### Install
+
+Download the installer or the ZIP from the [latest release](https://github.com/leoars/PostgresManagementStudio/releases), run it, then use **Connect** and **New Query**. Backup/restore needs the PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`) of the same major version as the server. Details: [setup guide](docs/en/getting-started.md).
+
+### Build from source
 
 For development: Windows x64, PowerShell 7 and the .NET SDK selected by [global.json](global.json) (`10.0.400`, latest installed patch in that feature band). PostgreSQL 17/18 and matching-major tools are needed for database tests and backup/restore.
 

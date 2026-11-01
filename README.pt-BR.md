@@ -4,13 +4,21 @@
 
 [![Build](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml/badge.svg)](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml) [![Pré-release](https://img.shields.io/github/v/release/leoars/PostgresManagementStudio?include_prereleases&label=pr%C3%A9-release)](https://github.com/leoars/PostgresManagementStudio/releases) [![Licença: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Aplicativo Windows para consultar e administrar PostgreSQL, desenvolvido em C#, WPF, .NET 10 e Npgsql. A interface tem o SQL Server Management Studio (SSMS) como referência, com semântica PostgreSQL e implementação própria.
+**A experiência do SQL Server Management Studio, para PostgreSQL.** Cliente nativo Windows com Object Explorer, F5 para executar, planos de execução, monitor de sessões e backup/restore, feito para quem já pensa em SSMS.
 
-**Pré-release: v0.1.0-alpha.1 (Windows x64).** [Download e instalação](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1) · [Notas da versão](docs/pt-BR/release-notes.md). ZIP portátil e [instalador gráfico](docs/pt-BR/graphical-installer.md) incluem .NET/WPF. O assistente oferece inglês/pt-BR, instalação por usuário ou para todos e atalho na área de trabalho. O instalador PowerShell 7 continua disponível. O rótulo M1008 é interno. Veja o [guia de validação](docs/pt-BR/validation.md) para escopo aceito e limites conhecidos; não se declara paridade integral com SSMS.
+**[Baixar v0.1.0-alpha.1 para Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1)** · Instalador gráfico (EN/pt-BR) ou ZIP portátil, runtime .NET incluído · Funciona com PostgreSQL 17 e 18
 
-![Editor, Object Explorer e resultados sintéticos do PGMS](docs/assets/pgms-results-m959.jpg)
+![Editor, Object Explorer e resultados do PGMS](docs/assets/pgms-results-m959.jpg)
 
-Prévia histórica M957 capturada na M959, com cluster isolado e dados sintéticos. A imagem ilustra a interface, não o pacote atual. [Origem da imagem](docs/assets/README.md).
+> Pré-release inicial. Consultas, navegação e monitoramento são o núcleo desta alpha; administração e backup usam SQL revisável e as ferramentas oficiais do PostgreSQL. Não se declara paridade integral com SSMS. Veja os [limites conhecidos](docs/pt-BR/validation.md) e as [notas da versão](docs/pt-BR/release-notes.md).
+
+## Por que o PGMS
+
+- **Parece o SSMS.** Object Explorer, abas de consulta com sessão própria, Results/Messages, F5 e os atalhos que você já usa.
+- **Revise antes de aplicar.** Mudanças administrativas aparecem primeiro como SQL; nada chega ao servidor sem você ler.
+- **Saiba o que está rodando.** Monitor de sessões e bloqueios que distingue cancelar a consulta de encerrar a sessão.
+- **Nativo e rápido.** C#/WPF em .NET 10, sem navegador e sem JVM.
+- **Seus rascunhos sobrevivem.** Abas não salvas têm checkpoint periódico e são recuperadas após falha ou fechamento forçado, criptografadas por usuário do Windows.
 
 ## Funcionalidades
 
@@ -22,6 +30,12 @@ Prévia histórica M957 capturada na M959, com cluster isolado e dados sintétic
 - Backup/restore lógico por ferramentas externas PostgreSQL: custom, tar, SQL e diretório, além de operações globais revisadas.
 
 ## Começar
+
+### Instalar
+
+Baixe o instalador ou o ZIP na [release mais recente](https://github.com/leoars/PostgresManagementStudio/releases), execute e use **Connect** e **New Query**. Backup/restore exige as ferramentas cliente do PostgreSQL (`pg_dump`, `pg_restore`, `psql`) da mesma versão principal do servidor. Detalhes: [guia de preparação](docs/pt-BR/getting-started.md).
+
+### Compilar a partir do código
 
 Para desenvolvimento: Windows x64, PowerShell 7 e SDK .NET selecionado por [global.json](global.json) (`10.0.400`, com o patch mais recente instalado nessa faixa). PostgreSQL 17/18 e ferramentas da mesma versão principal são necessários para testes com banco e backup/restore.
 
