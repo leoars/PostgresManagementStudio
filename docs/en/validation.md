@@ -2,7 +2,7 @@
 
 English | [Português (Brasil)](../pt-BR/validation.md)
 
-Current pre-release: v0.1.0-alpha.1, build label M1008. Milestone labels are internal identifiers, not guarantees that a local rebuild has the same binary identity. The initial public source import used M1002. The private operational history and raw acceptance evidence are intentionally not included.
+Current pre-release: v0.1.0-alpha.2, build label M1008 (same application source as v0.1.0-alpha.1, rebuilt by the release workflow on GitHub Actions with a build provenance attestation). Milestone labels are internal identifiers, not guarantees that a local rebuild has the same binary identity. The initial public source import used M1002. The private operational history and raw acceptance evidence are intentionally not included.
 
 The imported implementation previously passed 5,187 automated checks (2,115 PostgreSQL integration and 3,072 WPF), plus package opening, installed profile preservation and three-draft recovery through rollback/restart. Those are historical observations, not newly executed tests for every source revision. Reproduce current behavior with the public build and test scripts; report your actual environment and results. The clean-import checks for the initial public revision are recorded below after execution.
 

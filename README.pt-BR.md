@@ -6,7 +6,7 @@
 
 **A experiência do SQL Server Management Studio, para PostgreSQL.** Cliente nativo Windows com Object Explorer, F5 para executar, planos de execução, monitor de sessões e backup/restore, feito para quem já pensa em SSMS.
 
-**[Baixar v0.1.0-alpha.1 para Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1)** · Instalador gráfico (EN/pt-BR) ou ZIP portátil, runtime .NET incluído · Funciona com PostgreSQL 17 e 18
+**[Baixar v0.1.0-alpha.2 para Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.2)** · Instalador gráfico (EN/pt-BR) ou ZIP portátil, runtime .NET incluído · Funciona com PostgreSQL 17 e 18
 
 ![Editor, Object Explorer e resultados do PGMS](docs/assets/pgms-results-m959.jpg)
 
@@ -43,7 +43,13 @@ As releases do PGMS ainda não são assinadas digitalmente, então o Windows pod
 Get-FileHash .\PGMS-* -Algorithm SHA256
 ```
 
-Compare os hashes com o `SHA256SUMS.txt` e com o arquivo `.sha256` do instalador na release. A v0.1.0-alpha.1 foi compilada na máquina do mantenedor, então tem checksums mas não tem atestado de proveniência de build; releases geradas pelo [workflow de release](.github/workflows/release.yml) podem ser verificadas também com `gh attestation verify`. A assinatura de código pelo programa open source da SignPath Foundation está planejada.
+Compare os hashes com o `SHA256SUMS.txt` da release. A partir da v0.1.0-alpha.2 os assets são compilados pelo [workflow de release](.github/workflows/release.yml) no GitHub Actions e trazem atestado de proveniência de build, então você também pode confirmar que o ZIP ou o instalador saiu desse workflow e deste repositório (exige o [GitHub CLI](https://cli.github.com/)):
+
+```powershell
+gh attestation verify .\PGMS-0.1.0-alpha.2-Setup-x64.exe --repo leoars/PostgresManagementStudio
+```
+
+A v0.1.0-alpha.1 foi compilada na máquina do mantenedor e tem apenas checksums. A assinatura de código pelo programa open source da SignPath Foundation está planejada.
 
 ### Compilar a partir do código
 

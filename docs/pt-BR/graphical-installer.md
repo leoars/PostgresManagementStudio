@@ -2,7 +2,7 @@
 
 [English](../en/graphical-installer.md) | Português (Brasil)
 
-Baixe `PGMS-0.1.0-alpha.1-Setup-x64.exe` e seu arquivo `.sha256` na [release alpha.1](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1). Este instalador adicional inclui exatamente o aplicativo M1008 existente; o ZIP portátil, os checksums originais e a tag permanecem inalterados. O instalador dispensa PowerShell e runtime .NET instalado separadamente.
+Baixe `PGMS-0.1.0-alpha.2-Setup-x64.exe` na [release alpha.2](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.2) e confira contra o `SHA256SUMS.txt` (e, opcionalmente, com `gh attestation verify`). Desde a v0.1.0-alpha.2 o instalador é compilado pelo workflow de release a partir do mesmo payload do ZIP portátil daquela release; na v0.1.0-alpha.1 ele foi adicionado depois, embrulhando o payload M1008 existente. O instalador dispensa PowerShell e runtime .NET instalado separadamente.
 
 ## Opções de instalação
 

@@ -2,7 +2,7 @@
 
 [English](../en/validation.md) | Português (Brasil)
 
-Pré-release atual: v0.1.0-alpha.1, rótulo M1008. Marcos são identificadores internos, não garantia de identidade binária de uma recompilação local. A importação pública inicial usou M1002. Histórico operacional e provas brutas privados não são incluídos intencionalmente.
+Pré-release atual: v0.1.0-alpha.2, rótulo M1008 (mesma fonte do aplicativo da v0.1.0-alpha.1, recompilada pelo workflow de release no GitHub Actions com atestado de proveniência de build). Marcos são identificadores internos, não garantia de identidade binária de uma recompilação local. A importação pública inicial usou M1002. Histórico operacional e provas brutas privados não são incluídos intencionalmente.
 
 A implementação importada passou anteriormente em 5.187 checks automatizados (2.115 integração PostgreSQL e 3.072 WPF), além de abertura de pacote, preservação de perfil instalado e recuperação de três rascunhos entre rollback/reinício. São observações históricas, não testes novos a cada revisão. Reproduza o comportamento atual pelos scripts públicos e informe ambiente/resultados reais. As verificações da revisão pública inicial são registradas abaixo após execução.
 

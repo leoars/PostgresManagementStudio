@@ -6,7 +6,7 @@ English | [Português (Brasil)](README.pt-BR.md)
 
 **The SQL Server Management Studio experience, for PostgreSQL.** A native Windows client with Object Explorer, F5 to run, execution plans, session monitoring and backup/restore, built for people who already think in SSMS.
 
-**[Download v0.1.0-alpha.1 for Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1)** · Graphical installer (EN/pt-BR) or portable ZIP, .NET runtime included · Works with PostgreSQL 17 and 18
+**[Download v0.1.0-alpha.2 for Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.2)** · Graphical installer (EN/pt-BR) or portable ZIP, .NET runtime included · Works with PostgreSQL 17 and 18
 
 ![PGMS editor, Object Explorer and query results](docs/assets/pgms-results-m959.jpg)
 
@@ -43,7 +43,13 @@ PGMS releases are not code-signed yet, so Windows may show "Windows protected yo
 Get-FileHash .\PGMS-* -Algorithm SHA256
 ```
 
-Compare the hashes with `SHA256SUMS.txt` and the installer's `.sha256` file in the release. v0.1.0-alpha.1 was built on the maintainer's machine, so it has checksums but no build provenance attestation; releases produced by the [release workflow](.github/workflows/release.yml) can additionally be verified with `gh attestation verify`. Code signing through the SignPath Foundation open source program is planned.
+Compare the hashes with `SHA256SUMS.txt` in the release. Starting with v0.1.0-alpha.2 the assets are built by the [release workflow](.github/workflows/release.yml) on GitHub Actions and carry a build provenance attestation, so you can also confirm that the ZIP or installer came from that workflow and this repository (requires the [GitHub CLI](https://cli.github.com/)):
+
+```powershell
+gh attestation verify .\PGMS-0.1.0-alpha.2-Setup-x64.exe --repo leoars/PostgresManagementStudio
+```
+
+v0.1.0-alpha.1 was built on the maintainer's machine and has checksums only. Code signing through the SignPath Foundation open source program is planned.
 
 ### Build from source
 
