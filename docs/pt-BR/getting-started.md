@@ -4,6 +4,16 @@
 
 [Baixar v0.1.0-alpha.1](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1): [instalador gráfico](graphical-installer.md), ZIP portátil ou instalador PowerShell 7. O instalador gráfico oferece modos por usuário e para todos, dispensando PowerShell. Veja [notas da versão](release-notes.md).
 
+### Aviso do SmartScreen do Windows
+
+As releases do PGMS ainda não são assinadas digitalmente, então o Windows pode mostrar "O Windows protegeu o computador" na primeira execução do instalador ou do `PGMS.exe`. Clique em **Mais informações** e depois em **Executar assim mesmo**. Antes disso, confirme que o download corresponde aos checksums publicados com a release:
+
+```powershell
+Get-FileHash .\PGMS-* -Algorithm SHA256
+```
+
+Compare os hashes com o `SHA256SUMS.txt` e com o arquivo `.sha256` do instalador na release. A v0.1.0-alpha.1 foi compilada na máquina do mantenedor, então tem checksums mas não tem atestado de proveniência de build; releases geradas pelo [workflow de release](../../.github/workflows/release.yml) podem ser verificadas também com `gh attestation verify` (veja [desenvolvimento](development.md)). A assinatura de código pelo programa open source da SignPath Foundation está planejada.
+
 ## Pré-requisitos
 
 O PGMS é destinado a Windows x64. Compilar exige PowerShell 7 e SDK.NET10 compatível com [global.json](../../global.json): 10.0.400 com roll-forward para o patch mais recente. Dependências são fixadas nos lockfiles NuGet. O pacote M1008 foi compilado com SDK 10.0.403 e inclui .NET/WPF 10.0.14; recompilar pode usar outros runtime packs instalados.

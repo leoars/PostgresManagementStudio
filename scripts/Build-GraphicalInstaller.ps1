@@ -1,7 +1,10 @@
 param(
     [Parameter(Mandatory)][string]$PackagePath,
     [Parameter(Mandatory)][string]$CompilerPath,
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    # CI builds the payload from the tagged source, so its manifest hash is not known before the build;
+    # the switch skips only the frozen-hash comparison and keeps milestone and product version checks.
+    [switch]$SkipFrozenManifest
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'PackageTools.ps1')
@@ -10,7 +13,8 @@ $release = Get-Content (Join-Path $root 'installer/release.json') -Raw | Convert
 $verified = Test-PgmsPackage $PackagePath
 $package = (Get-Item -LiteralPath $PackagePath).FullName
 if ($verified.Mode -ne 'SelfContained' -or $verified.Milestone -cne $release.Milestone) { throw 'Wrong release package.' }
-if ((Get-FileHash (Join-Path $package 'package-manifest.json')).Hash -cne $release.ManifestSha256) { throw 'Release manifest does not match the frozen payload.' }
+$manifestHash = (Get-FileHash (Join-Path $package 'package-manifest.json')).Hash
+if (!$SkipFrozenManifest -and $manifestHash -cne $release.ManifestSha256) { throw 'Release manifest does not match the frozen payload.' }
 if ([Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $package 'PGMS.dll')).ProductVersion -cne $release.Version) { throw 'Wrong product version.' }
 $compiler = (Get-Item -LiteralPath $CompilerPath).FullName
 if ((Get-AuthenticodeSignature -LiteralPath $compiler).Status -ne 'Valid') { throw 'Compiler signature is not valid.' }
@@ -34,4 +38,4 @@ if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE. Fail
 $exe = Join-Path $output "PGMS-$($release.Version)-Setup-x64.exe"
 $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
 "$hash  $([IO.Path]::GetFileName($exe))" | Set-Content -LiteralPath "$exe.sha256" -Encoding ascii
-[pscustomobject]@{ Installer = $exe; Sha256 = $hash; CompilerVersion = $compilerVersion; PayloadManifest = $release.ManifestSha256 }
+[pscustomobject]@{ Installer = $exe; Sha256 = $hash; CompilerVersion = $compilerVersion; PayloadManifest = $manifestHash; FrozenManifestChecked = !$SkipFrozenManifest }

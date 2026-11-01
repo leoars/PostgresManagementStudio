@@ -23,7 +23,7 @@ The executable is unsigned; SmartScreen reputation and a clean Windows VM have n
 
 ## Build and test
 
-Use the official [Inno Setup 7.1.1 x64 compiler](https://jrsoftware.org/isdl.php), retaining its license. Extract the existing release ZIP into `artifacts/M1008-win-x64`. The builder checks every payload file, the frozen manifest and application version, and refuses an existing output directory. A local application rebuild may have a different manifest and is intentionally refused by this release-specific builder. Update the release configuration for a future frozen release.
+Use the official [Inno Setup 7.1.1 x64 compiler](https://jrsoftware.org/isdl.php), retaining its license. Extract the existing release ZIP into `artifacts/M1008-win-x64`. The builder checks every payload file, the frozen manifest and application version, and refuses an existing output directory. A local application rebuild may have a different manifest and is intentionally refused by this release-specific builder. Update the release configuration for a future frozen release. The [release workflow](../../.github/workflows/release.yml) passes `-SkipFrozenManifest` because it builds the payload itself; milestone and product version are still enforced, and the frozen hash remains required for local builds.
 
 ```powershell
 ./scripts/Build-GraphicalInstaller.ps1 -PackagePath artifacts/M1008-win-x64 -CompilerPath 'C:\Tools\Inno Setup 7\ISCC.exe'
