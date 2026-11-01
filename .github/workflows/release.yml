@@ -4,10 +4,11 @@
 # touched. Code signing jobs are reserved for the SignPath Foundation program and
 # stay skipped until the repository variable SIGNPATH_ENABLED is 'true'.
 #
-# Triggers: a pushed tag `v*`, or workflow_dispatch with the tag name. A dispatch tag
-# may carry semver build metadata (`v0.1.0-alpha.1+ci.7`) to produce a test draft that
-# does not collide with a real tag; the version before `+` must still match
-# installer/release.json. Ordinary pushes to main never run this workflow.
+# Triggers: a pushed tag `v*`, or workflow_dispatch with the tag name (dispatch only
+# works once the workflow exists on the default branch). A tag that carries semver
+# build metadata (`v0.1.0-alpha.1+ci.7`) produces a TEST draft that never collides with
+# a real version tag; the version before `+` must still match installer/release.json.
+# Ordinary pushes to main never run this workflow.
 name: Release
 
 on:
@@ -64,7 +65,6 @@ jobs:
           $tag = if ($env:EVENT_NAME -eq 'workflow_dispatch') { $env:INPUT_TAG.Trim() } else { $env:REF_NAME }
           if ($tag -cnotmatch '^v(?<version>[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)(\+(?<meta>[0-9A-Za-z.-]+))?$') { throw "Tag '$tag' is not a semver release tag (vMAJOR.MINOR.PATCH[-prerelease][+metadata])." }
           $version = $Matches['version']; $meta = $Matches['meta']
-          if ($meta -and $env:EVENT_NAME -ne 'workflow_dispatch') { throw 'Build metadata in a pushed tag is not allowed; use workflow_dispatch for test drafts.' }
           $release = Get-Content -LiteralPath 'installer/release.json' -Raw | ConvertFrom-Json
           $buildInfo = Get-Content -LiteralPath 'src/PGMS.Desktop/BuildInfo.cs' -Raw
           if ($buildInfo -notmatch 'Milestone = "(M[0-9]+)"') { throw 'BuildInfo.cs milestone missing.' }
