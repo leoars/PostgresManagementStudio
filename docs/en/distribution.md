@@ -1,4 +1,4 @@
-# PGMS v0.1.0-alpha.1 — portable distribution (M1008)
+# PGMS v0.1.0-alpha.2 — portable distribution (M1008)
 
 English | Português (Brasil): LEIA-ME.md in the package, or docs/pt-BR/distribution.md in the source repository.
 
@@ -14,4 +14,4 @@ Verify integrity with ./Verify-Package.ps1 -PackagePath . in PowerShell 7; manif
 
 Source, bilingual guides and reporting: https://github.com/leoars/PostgresManagementStudio . Original work is MIT; third-party licenses and trademark terms remain separate. PGMS is independent and does not claim full SSMS parity or endorsement.
 
-Optional release installer: Install-PGMS-0.1.0-alpha.1.ps1 requires PowerShell 7, downloads the fixed release ZIP and verifies its pinned SHA256 before invoking managed installation. Use -ArchivePath for an already downloaded archive and -InstallRoot for another managed target. It does not launch the application, change execution policy or install PostgreSQL. Source and checksums are available on the release page.
+Release assets are built by GitHub Actions from a version tag and published as a draft that the maintainer reviews. The release page provides a single SHA256SUMS.txt covering every asset and a build provenance attestation, verifiable with the GitHub CLI: gh attestation verify <asset> --repo leoars/PostgresManagementStudio. A graphical installer EXE (English/pt-BR, current user or all users) is published alongside this ZIP; the v0.1.0-alpha.1 PowerShell download installer is not part of this release.

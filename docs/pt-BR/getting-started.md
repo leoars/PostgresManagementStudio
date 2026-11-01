@@ -2,7 +2,7 @@
 
 [English](../en/getting-started.md) | Português (Brasil)
 
-[Baixar v0.1.0-alpha.1](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.1): [instalador gráfico](graphical-installer.md), ZIP portátil ou instalador PowerShell 7. O instalador gráfico oferece modos por usuário e para todos, dispensando PowerShell. Veja [notas da versão](release-notes.md).
+[Baixar v0.1.0-alpha.2](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.2): [instalador gráfico](graphical-installer.md), ZIP portátil ou instalador PowerShell 7. O instalador gráfico oferece modos por usuário e para todos, dispensando PowerShell. Veja [notas da versão](release-notes.md).
 
 ### Aviso do SmartScreen do Windows
 
@@ -12,7 +12,13 @@ As releases do PGMS ainda não são assinadas digitalmente, então o Windows pod
 Get-FileHash .\PGMS-* -Algorithm SHA256
 ```
 
-Compare os hashes com o `SHA256SUMS.txt` e com o arquivo `.sha256` do instalador na release. A v0.1.0-alpha.1 foi compilada na máquina do mantenedor, então tem checksums mas não tem atestado de proveniência de build; releases geradas pelo [workflow de release](../../.github/workflows/release.yml) podem ser verificadas também com `gh attestation verify` (veja [desenvolvimento](development.md)). A assinatura de código pelo programa open source da SignPath Foundation está planejada.
+Compare os hashes com o `SHA256SUMS.txt` da release. A partir da v0.1.0-alpha.2 os assets são compilados pelo [workflow de release](../../.github/workflows/release.yml) no GitHub Actions e trazem atestado de proveniência de build, então você também pode confirmar que o ZIP ou o instalador saiu desse workflow e deste repositório (exige o [GitHub CLI](https://cli.github.com/); veja [desenvolvimento](development.md)):
+
+```powershell
+gh attestation verify .\PGMS-0.1.0-alpha.2-Setup-x64.exe --repo leoars/PostgresManagementStudio
+```
+
+A v0.1.0-alpha.1 foi compilada na máquina do mantenedor e tem apenas checksums. A assinatura de código pelo programa open source da SignPath Foundation está planejada.
 
 ## Pré-requisitos
 
