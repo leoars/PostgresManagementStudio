@@ -1,0 +1,398 @@
+# Release: build the portable package and the graphical installer on a GitHub-hosted
+# Windows runner from a version tag, attest their provenance and open a DRAFT
+# pre-release. Nothing is published automatically and existing releases are never
+# touched. Code signing jobs are reserved for the SignPath Foundation program and
+# stay skipped until the repository variable SIGNPATH_ENABLED is 'true'.
+#
+# Triggers: a pushed tag `v*`, or workflow_dispatch with the tag name (dispatch only
+# works once the workflow exists on the default branch). A tag that carries semver
+# build metadata (`v0.1.0-alpha.1+ci.7`) produces a TEST draft that never collides with
+# a real version tag; the version before `+` must still match installer/release.json.
+# Ordinary pushes to main never run this workflow.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. v0.1.0-alpha.2. Add +ci.N for a test draft.'
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  # Deterministic, path-independent compilation so a rebuild of the same source is comparable.
+  ContinuousIntegrationBuild: 'true'
+  Deterministic: 'true'
+  INNO_SETUP_VERSION: '7.1.1'
+  INNO_SETUP_URL: 'https://github.com/jrsoftware/issrc/releases/download/is-7_1_1/innosetup-7.1.1-x64.exe'
+  INNO_SETUP_SHA256: '8A5A6711C3766A6E5FB74F280BA0E3551E719CE94538D901FDBD1F8F9920B3F0'
+
+jobs:
+  validate:
+    name: Validate tag and declared version
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      version: ${{ steps.check.outputs.version }}
+      milestone: ${{ steps.check.outputs.milestone }}
+      test_draft: ${{ steps.check.outputs.test_draft }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Compare tag with installer/release.json, BuildInfo.cs and Directory.Build.props
+        id: check
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = if ($env:EVENT_NAME -eq 'workflow_dispatch') { $env:INPUT_TAG.Trim() } else { $env:REF_NAME }
+          if ($tag -cnotmatch '^v(?<version>[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)(\+(?<meta>[0-9A-Za-z.-]+))?$') { throw "Tag '$tag' is not a semver release tag (vMAJOR.MINOR.PATCH[-prerelease][+metadata])." }
+          $version = $Matches['version']; $meta = $Matches['meta']
+          $release = Get-Content -LiteralPath 'installer/release.json' -Raw | ConvertFrom-Json
+          $buildInfo = Get-Content -LiteralPath 'src/PGMS.Desktop/BuildInfo.cs' -Raw
+          if ($buildInfo -notmatch 'Milestone = "(M[0-9]+)"') { throw 'BuildInfo.cs milestone missing.' }
+          $milestone = $Matches[1]
+          [xml]$props = Get-Content -LiteralPath 'Directory.Build.props' -Raw
+          $propsVersion = ($props.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ } | Select-Object -First 1)
+          $problems = @()
+          if ($version -cne $release.Version) { $problems += "tag version '$version' differs from installer/release.json Version '$($release.Version)'" }
+          if ($propsVersion -cne $release.Version) { $problems += "Directory.Build.props Version '$propsVersion' differs from installer/release.json Version '$($release.Version)'" }
+          if ($milestone -cne $release.Milestone) { $problems += "BuildInfo.cs milestone '$milestone' differs from installer/release.json Milestone '$($release.Milestone)'" }
+          if ($problems) { throw ("Version declaration mismatch: " + ($problems -join '; ')) }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "milestone=$milestone" >> $env:GITHUB_OUTPUT
+          "test_draft=$([string]::IsNullOrEmpty($meta) ? 'false' : 'true')" >> $env:GITHUB_OUTPUT
+          "Tag $tag matches version $version, milestone $milestone (test draft: $([bool]$meta))." >> $env:GITHUB_STEP_SUMMARY
+
+  build:
+    name: Build self-contained payload
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET SDK from global.json
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Publish portable package (Release, locked restore, ReadyToRun)
+        shell: pwsh
+        run: ./scripts/Publish.ps1 -SelfContained
+
+      - name: Verify manifest, package fixtures and bundled guides
+        shell: pwsh
+        env:
+          MILESTONE: ${{ needs.validate.outputs.milestone }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $package = "artifacts/$env:MILESTONE-win-x64"
+          ./scripts/Verify-Package.ps1 -PackagePath $package | Format-List | Out-String | Write-Host
+          ./scripts/Test-Package.ps1
+          ./scripts/Test-PackageGuides.ps1 -PackagePath $package | Format-List | Out-String | Write-Host
+          "Payload manifest SHA256: $((Get-FileHash "$package/package-manifest.json" -Algorithm SHA256).Hash)" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload unsigned payload
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: payload-unsigned
+          path: artifacts/${{ needs.validate.outputs.milestone }}-win-x64
+          if-no-files-found: error
+          retention-days: 7
+
+  # Reserved for SignPath Foundation: signs PGMS.exe and the project's own DLLs before
+  # they enter the ZIP and the installer. Skipped until SIGNPATH_ENABLED is 'true'.
+  sign-binaries:
+    name: Sign application binaries (SignPath)
+    needs: [validate, build]
+    if: vars.SIGNPATH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Submit payload to SignPath
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ needs.build.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-payload
+
+      - name: Upload signed payload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: payload-signed
+          path: signed-payload
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    name: Package ZIP and graphical installer
+    needs: [validate, build, sign-binaries]
+    if: always() && needs.build.result == 'success' && (needs.sign-binaries.result == 'success' || needs.sign-binaries.result == 'skipped')
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      installer-artifact-id: ${{ steps.upload-installer.outputs.artifact-id }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download payload
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.sign-binaries.result == 'success' && 'payload-signed' || 'payload-unsigned' }}
+          path: artifacts/${{ needs.validate.outputs.milestone }}-win-x64
+
+      - name: Refresh manifest after signing
+        if: needs.sign-binaries.result == 'success'
+        shell: pwsh
+        env:
+          MILESTONE: ${{ needs.validate.outputs.milestone }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . ./scripts/PackageTools.ps1
+          # Signatures change the hashes of the signed files; the manifest must describe the final bytes.
+          Remove-Item -LiteralPath "artifacts/$env:MILESTONE-win-x64/package-manifest.json"
+          New-PgmsPackageManifest "artifacts/$env:MILESTONE-win-x64" $env:MILESTONE $true | Out-Null
+
+      - name: Verify payload and create ZIP with checksum
+        shell: pwsh
+        env:
+          MILESTONE: ${{ needs.validate.outputs.milestone }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $package = "artifacts/$env:MILESTONE-win-x64"
+          ./scripts/Verify-Package.ps1 -PackagePath $package | Format-List | Out-String | Write-Host
+          ./scripts/New-PackageArchive.ps1 -PackagePath $package | Format-List | Out-String | Write-Host
+
+      - name: Install Inno Setup ${{ env.INNO_SETUP_VERSION }} (pinned, hash-verified, portable)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $download = Join-Path $env:RUNNER_TEMP 'innosetup-download'
+          New-Item -ItemType Directory -Path $download -Force | Out-Null
+          $setup = Join-Path $download 'innosetup-x64.exe'
+          Invoke-WebRequest -Uri $env:INNO_SETUP_URL -OutFile $setup
+          $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash
+          if ($hash -cne $env:INNO_SETUP_SHA256) { throw "Inno Setup download hash $hash does not match the pinned $env:INNO_SETUP_SHA256." }
+          $tools = Join-Path $env:RUNNER_TEMP 'inno-setup'
+          $process = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/PORTABLE=1', "/DIR=`"$tools`"") -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Inno Setup installer exited with $($process.ExitCode)." }
+          $compiler = Join-Path $tools 'ISCC.exe'
+          if (!(Test-Path -LiteralPath $compiler)) { throw 'ISCC.exe not found after portable installation.' }
+          "INNO_SETUP_COMPILER=$compiler" >> $env:GITHUB_ENV
+
+      - name: Build graphical installer from the CI payload
+        shell: pwsh
+        env:
+          MILESTONE: ${{ needs.validate.outputs.milestone }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The frozen manifest hash in installer/release.json belongs to the payload that was built locally;
+          # here the payload comes from this very run, so only milestone and product version are compared.
+          ./scripts/Build-GraphicalInstaller.ps1 -PackagePath "artifacts/$env:MILESTONE-win-x64" -CompilerPath $env:INNO_SETUP_COMPILER -OutputDirectory "artifacts/graphical-installer/$env:VERSION" -SkipFrozenManifest | Format-List | Out-String | Write-Host
+
+      - name: Smoke-open the packaged application (informational)
+        id: smoke
+        continue-on-error: true
+        shell: pwsh
+        env:
+          MILESTONE: ${{ needs.validate.outputs.milestone }}
+        run: ./scripts/Test-PackageLaunch.ps1 -PackagePath "artifacts/$env:MILESTONE-win-x64" | Format-List | Out-String | Write-Host
+
+      - name: Record smoke outcome
+        shell: pwsh
+        env:
+          SMOKE: ${{ steps.smoke.outcome }}
+        run: '"Launch smoke on the hosted runner: $env:SMOKE (informational; the runner session is not a certified desktop)." >> $env:GITHUB_STEP_SUMMARY'
+
+      - name: Collect release assets
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MILESTONE: ${{ needs.validate.outputs.milestone }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path release-assets | Out-Null
+          Copy-Item -LiteralPath "artifacts/distribution/PGMS-$env:MILESTONE-win-x64.zip" -Destination "release-assets/PGMS-$env:VERSION-win-x64.zip"
+          Copy-Item -LiteralPath "artifacts/$env:MILESTONE-win-x64/package-manifest.json" -Destination "release-assets/package-manifest.json"
+          Get-ChildItem release-assets | Format-Table Name, Length | Out-String | Write-Host
+
+      - name: Upload ZIP and manifest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-zip
+          path: release-assets
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload unsigned installer
+        id: upload-installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-unsigned
+          path: artifacts/graphical-installer/${{ needs.validate.outputs.version }}/PGMS-${{ needs.validate.outputs.version }}-Setup-x64.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  # Reserved for SignPath Foundation: signs the installer EXE last, after the signed
+  # application binaries were packaged. Skipped until SIGNPATH_ENABLED is 'true'.
+  sign-installer:
+    name: Sign installer (SignPath)
+    needs: [validate, package]
+    if: always() && needs.package.result == 'success' && vars.SIGNPATH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Submit installer to SignPath
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ needs.package.outputs.installer-artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-installer
+
+      - name: Upload signed installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-signed
+          path: signed-installer
+          if-no-files-found: error
+          retention-days: 7
+
+  attest:
+    name: Attest build provenance
+    needs: [validate, package, sign-installer]
+    if: always() && needs.package.result == 'success' && (needs.sign-installer.result == 'success' || needs.sign-installer.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
+    steps:
+      - name: Download ZIP
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-zip
+          path: final
+
+      - name: Download installer
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.sign-installer.result == 'success' && 'installer-signed' || 'installer-unsigned' }}
+          path: final
+
+      - name: Attest ZIP and installer
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            final/*.zip
+            final/*.exe
+
+  release:
+    name: Create draft pre-release
+    needs: [validate, package, sign-installer, attest]
+    if: always() && needs.package.result == 'success' && needs.attest.result == 'success' && (needs.sign-installer.result == 'success' || needs.sign-installer.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out (release notes)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download ZIP
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-zip
+          path: final
+
+      - name: Download installer
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.sign-installer.result == 'success' && 'installer-signed' || 'installer-unsigned' }}
+          path: final
+
+      - name: Assemble checksums and notes
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          TEST_DRAFT: ${{ needs.validate.outputs.test_draft }}
+          SIGNED: ${{ needs.sign-installer.result == 'success' }}
+        run: |
+          set -euo pipefail
+          cp docs/en/release-notes.md final/RELEASE-NOTES.md
+          cp docs/pt-BR/release-notes.md final/RELEASE-NOTES.pt-BR.md
+          (cd final && sha256sum PGMS-*.zip PGMS-*.exe RELEASE-NOTES.md RELEASE-NOTES.pt-BR.md package-manifest.json > SHA256SUMS.txt)
+          cat final/SHA256SUMS.txt
+          {
+            echo "Draft generated by GitHub Actions run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} from commit ${GITHUB_SHA}."
+            if [ "$TEST_DRAFT" = "true" ]; then echo; echo "**Test draft (tag carries build metadata).** Delete after review; do not publish."; fi
+            echo
+            if [ "$SIGNED" = "true" ]; then echo "Binaries and installer signed through SignPath. Free code signing provided by SignPath.io, certificate by SignPath Foundation."; else echo "Binaries and installer are not code-signed; Windows SmartScreen may warn. Verify \`SHA256SUMS.txt\` and the build provenance attestation (\`gh attestation verify <file> --repo ${GITHUB_REPOSITORY}\`)."; fi
+            echo
+            echo "Release notes: see the attached RELEASE-NOTES.md (English) and RELEASE-NOTES.pt-BR.md (Português do Brasil). Review them before publishing; they must describe version ${VERSION}."
+          } > body.md
+          cat body.md
+
+      - name: Create DRAFT pre-release (never published automatically)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          TEST_DRAFT: ${{ needs.validate.outputs.test_draft }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "A release for tag $TAG already exists; it will not be modified." >&2
+            exit 1
+          fi
+          title="PGMS $VERSION"
+          if [ "$TEST_DRAFT" = "true" ]; then title="$title (CI test draft, do not publish)"; fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --prerelease --target "$GITHUB_SHA" --title "$title" --notes-file body.md \
+            final/PGMS-*.zip final/PGMS-*.exe final/SHA256SUMS.txt final/RELEASE-NOTES.md final/RELEASE-NOTES.pt-BR.md final/package-manifest.json
+          url=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)
+          echo "Draft pre-release created: $url" >> "$GITHUB_STEP_SUMMARY"

@@ -23,7 +23,7 @@ O executável não tem assinatura digital; reputação SmartScreen e VM Windows 
 
 ## Compilar e testar
 
-Use o [compilador oficial Inno Setup 7.1.1 x64](https://jrsoftware.org/isdl.php), preservando sua licença. Extraia o ZIP existente da release em `artifacts/M1008-win-x64`. O builder confere cada arquivo, o manifesto congelado e a versão do aplicativo, recusando diretório de saída existente. Uma recompilação local pode produzir outro manifesto e é intencionalmente recusada por este builder específico da release. Atualize a configuração para uma futura release congelada.
+Use o [compilador oficial Inno Setup 7.1.1 x64](https://jrsoftware.org/isdl.php), preservando sua licença. Extraia o ZIP existente da release em `artifacts/M1008-win-x64`. O builder confere cada arquivo, o manifesto congelado e a versão do aplicativo, recusando diretório de saída existente. Uma recompilação local pode produzir outro manifesto e é intencionalmente recusada por este builder específico da release. Atualize a configuração para uma futura release congelada. O [workflow de release](../../.github/workflows/release.yml) passa `-SkipFrozenManifest` porque compila o próprio payload; marco e versão do produto continuam exigidos, e o hash congelado segue obrigatório em builds locais.
 
 ```powershell
 ./scripts/Build-GraphicalInstaller.ps1 -PackagePath artifacts/M1008-win-x64 -CompilerPath 'C:\Tools\Inno Setup 7\ISCC.exe'

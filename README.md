@@ -35,6 +35,16 @@ English | [Português (Brasil)](README.pt-BR.md)
 
 Download the installer or the ZIP from the [latest release](https://github.com/leoars/PostgresManagementStudio/releases), run it, then use **Connect** and **New Query**. Backup/restore needs the PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`) of the same major version as the server. Details: [setup guide](docs/en/getting-started.md).
 
+#### Windows SmartScreen warning
+
+PGMS releases are not code-signed yet, so Windows may show "Windows protected your PC" the first time you run the installer or `PGMS.exe`. Choose **More info** and then **Run anyway**. Before doing so, confirm the download matches the checksums published with the release:
+
+```powershell
+Get-FileHash .\PGMS-* -Algorithm SHA256
+```
+
+Compare the hashes with `SHA256SUMS.txt` and the installer's `.sha256` file in the release. v0.1.0-alpha.1 was built on the maintainer's machine, so it has checksums but no build provenance attestation; releases produced by the [release workflow](.github/workflows/release.yml) can additionally be verified with `gh attestation verify`. Code signing through the SignPath Foundation open source program is planned.
+
 ### Build from source
 
 For development: Windows x64, PowerShell 7 and the .NET SDK selected by [global.json](global.json) (`10.0.400`, latest installed patch in that feature band). PostgreSQL 17/18 and matching-major tools are needed for database tests and backup/restore.

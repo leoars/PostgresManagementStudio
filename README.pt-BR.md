@@ -35,6 +35,16 @@
 
 Baixe o instalador ou o ZIP na [release mais recente](https://github.com/leoars/PostgresManagementStudio/releases), execute e use **Connect** e **New Query**. Backup/restore exige as ferramentas cliente do PostgreSQL (`pg_dump`, `pg_restore`, `psql`) da mesma versão principal do servidor. Detalhes: [guia de preparação](docs/pt-BR/getting-started.md).
 
+#### Aviso do SmartScreen do Windows
+
+As releases do PGMS ainda não são assinadas digitalmente, então o Windows pode mostrar "O Windows protegeu o computador" na primeira execução do instalador ou do `PGMS.exe`. Clique em **Mais informações** e depois em **Executar assim mesmo**. Antes disso, confirme que o download corresponde aos checksums publicados com a release:
+
+```powershell
+Get-FileHash .\PGMS-* -Algorithm SHA256
+```
+
+Compare os hashes com o `SHA256SUMS.txt` e com o arquivo `.sha256` do instalador na release. A v0.1.0-alpha.1 foi compilada na máquina do mantenedor, então tem checksums mas não tem atestado de proveniência de build; releases geradas pelo [workflow de release](.github/workflows/release.yml) podem ser verificadas também com `gh attestation verify`. A assinatura de código pelo programa open source da SignPath Foundation está planejada.
+
 ### Compilar a partir do código
 
 Para desenvolvimento: Windows x64, PowerShell 7 e SDK .NET selecionado por [global.json](global.json) (`10.0.400`, com o patch mais recente instalado nessa faixa). PostgreSQL 17/18 e ferramentas da mesma versão principal são necessários para testes com banco e backup/restore.
