@@ -34,7 +34,8 @@ New-Item -ItemType Junction -Path $linked -Target $unmanaged | Out-Null
 Assert ((Run-Setup $linked 'junction') -ne 0) 'Refuses linked target'
 Assert ((Run-Setup $target 'install') -eq 0) 'Current-user installation succeeds'
 Assert (Test-Path -LiteralPath $key) 'Registers native uninstaller'
-$payload = Join-Path $target 'versions/M1008'
+$milestone = (Get-Content (Join-Path $root 'installer/release.json') -Raw | ConvertFrom-Json).Milestone
+$payload = Join-Path $target "versions/$milestone"
 & (Join-Path $PSScriptRoot 'Verify-Package.ps1') -PackagePath $payload | Out-Null
 Assert $true 'Installed payload matches complete frozen manifest'
 $shell = New-Object -ComObject WScript.Shell
