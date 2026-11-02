@@ -38,7 +38,9 @@ public partial class QueryView
         => PlanStale.Visibility=currentPlan is not null && planRevision!=EditRevision?Visibility.Visible:Visibility.Collapsed;
     private async void ExplainPlan(object sender,RoutedEventArgs e)=>await ExplainPlanAsync();
     public Task ExplainPlanAsync(){ClearAnalysisReview();return LoadPlanAsync(false);}
-    private async Task LoadPlanAsync(bool analyze,string? reviewedSql=null)
+    /// <summary>Generic estimated plan of the whole document, for SQL with unbound $n parameters (Query Statistics → Show Plan).</summary>
+    public Task ExplainGenericPlanAsync(){ClearAnalysisReview();return LoadPlanAsync(false,generic:true);}
+    private async Task LoadPlanAsync(bool analyze,string? reviewedSql=null,bool generic=false)
     {
         if(IsBusy || session?.IsConnected!=true)return;
         string sql=reviewedSql ?? (Editor.SelectionLength>0?Editor.SelectedText:Editor.Text);
@@ -47,9 +49,22 @@ public partial class QueryView
         if(string.IsNullOrWhiteSpace(sql))return;
         if(!int.TryParse(QueryTimeout.Text,NumberStyles.None,CultureInfo.InvariantCulture,out int timeout) || timeout is <0 or >86400)
         {QueryStatus.Text="Enter a read timeout from 0 to 86400 seconds.";QueryTimeout.Focus();return;}
+        bool switchedToGeneric=false;
+        if(!generic && QueryPlaceholders.Find(sql) is { } unbound)
+        {
+            if(analyze)
+            {
+                if(reviewedSql is null)MarkUnboundParameter(unbound,Editor.SelectionLength>0?Editor.SelectionStart:0,revision);
+                currentPlan=null;PlanTree.ItemsSource=null;PlanProperties.ItemsSource=null;RefreshPlanRevision();UpdateExport();
+                PlanStatus.Text=$"Not executed: the SQL contains parameter placeholder {unbound.Description}, which has no value. An analyzed plan runs the statement, so replace each $n with a literal value first. Estimated Plan shows the generic plan without values.\nNothing was sent to the server and the session stays open.";
+                OutputTabs.SelectedItem=PlanTab;QueryStatus.Text=$"Not executed | {Database} | Unbound parameter ${unbound.Number}";
+                return;
+            }
+            generic=switchedToGeneric=true;
+        }
         var notices=new QueryNotices();var options=new QueryExecutionOptions(timeout,notices);
         IsBusy=executingQuery=true;cancellation=new();QueryTimeout.IsEnabled=false;
-        currentPlan=null;PlanTree.ItemsSource=null;PlanProperties.ItemsSource=null;RefreshPlanRevision();PlanStatus.Text=analyze?"Executing SQL for analyzed plan…":"Reading estimated plan…";
+        currentPlan=null;PlanTree.ItemsSource=null;PlanProperties.ItemsSource=null;RefreshPlanRevision();PlanStatus.Text=analyze?"Executing SQL for analyzed plan…":generic?"Reading generic plan…":"Reading estimated plan…";
         OutputTabs.SelectedItem=PlanTab;QueryStatus.Text=PlanStatus.Text;
         UpdateExport();StateChanged?.Invoke(this,EventArgs.Empty);
         try
@@ -57,15 +72,16 @@ public partial class QueryView
             var capturedSession=session;var token=cancellation.Token;
             var loaded=await Task.Run(async()=>
             {
-                var plan=await (analyze?capturedSession.AnalyzeAsync(sql,options,token):capturedSession.ExplainAsync(sql,options,token)).ConfigureAwait(false);
+                var plan=await (analyze?capturedSession.AnalyzeAsync(sql,options,token):generic?capturedSession.ExplainGenericAsync(sql,options,token):capturedSession.ExplainAsync(sql,options,token)).ConfigureAwait(false);
                 return (Plan:plan,Root:QueryPlanTree.Parse(plan,token),Timings:QueryPlanTimings.Read(plan));
             },token);
             currentPlan=loaded.Plan;planRevision=revision;RefreshPlanRevision();PlanTree.ItemsSource=new[]{loaded.Root};
-            PlanStatus.Text=analyze?"Analyzed plan · SQL executed. Effects follow the current transaction; no automatic rollback.":"Estimated plan · costs are planner units, not milliseconds. Query rows were not executed.";
+            PlanStatus.Text=analyze?"Analyzed plan · SQL executed. Effects follow the current transaction; no automatic rollback.":generic?"Generic plan · $n parameters are not bound, so the planner cannot use their values; costs are planner units. Query rows were not executed.":"Estimated plan · costs are planner units, not milliseconds. Query rows were not executed.";
             PlanStatus.Text+="\n"+scope+" snapshot.";
+            if(switchedToGeneric)PlanStatus.Text+=" The SQL contains $n placeholders, so Estimated Plan used GENERIC_PLAN instead of sending them unbound.";
             if(loaded.Timings.PlanningMilliseconds is double planning)PlanStatus.Text+=" Planning: "+planning.ToString("0.###",CultureInfo.InvariantCulture)+" ms.";
             if(loaded.Timings.ExecutionMilliseconds is double elapsed)PlanStatus.Text+=" Execution: "+elapsed.ToString("0.###",CultureInfo.InvariantCulture)+" ms (server).";
-            QueryStatus.Text=(analyze?"Analyzed":"Estimated")+" plan loaded | "+Database;
+            QueryStatus.Text=(analyze?"Analyzed":generic?"Generic":"Estimated")+" plan loaded | "+Database;
         }
         catch(Exception ex) when(ex is NpgsqlException or OperationCanceledException or ArgumentException or InvalidOperationException or IOException or JsonException)
         {

@@ -1,4 +1,4 @@
-# PGMS v0.1.0-alpha.2 — distribuição portátil (M1008)
+# PGMS v0.1.0-alpha.3 — distribuição portátil (M1022)
 
 [English]: READ-ME.md no pacote, ou docs/en/distribution.md no repositório. Português (Brasil).
 

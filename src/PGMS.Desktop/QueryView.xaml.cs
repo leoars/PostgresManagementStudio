@@ -118,6 +118,15 @@ public partial class QueryView : UserControl, IAsyncDisposable
             QueryStatus.Text="Enter a read timeout from 0 to 86400 seconds (0 = no timeout).";
             QueryTimeout.Focus(); QueryTimeout.SelectAll(); return;
         }
+        if (QueryPlaceholders.Find(sql) is { } unbound)
+        {
+            // Sending a bare $n breaks the session (08P01 and Npgsql closes the connection), so refuse before anything is sent.
+            MarkUnboundParameter(unbound, submittedStart, submittedRevision);
+            Messages.Text = $"Not sent: the SQL contains parameter placeholder {unbound.Description}, which has no value. Placeholders like $1 come from prepared statements or pg_stat_statements; replace each one with a literal value before executing. Estimated Plan shows the generic plan without values.\nNothing was sent to the server and the session stays open. Go to Error selects the first placeholder.";
+            QueryStatus.Text = $"Not sent | {Database} | Unbound parameter ${unbound.Number}";
+            OutputTabs.SelectedIndex = 1;
+            return;
+        }
         var notices=new QueryNotices();
         ClearAnalysisReview();
         errorOffset=null;ErrorLocation.IsEnabled=false;
@@ -199,6 +208,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
             grid.Columns.Add(new DataGridTextColumn { Header = column.Caption, SortMemberPath = column.ColumnName,
                 Binding = new Binding($"[{column.ColumnName}]") { Converter = new DatabaseValueConverter() } });
         grid.ItemsSource = table.DefaultView;
+        DataGridRowNames.SetEnabled(grid, true);
         grid.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy,
             (_, e) => { CopyResultSelection(grid, true); e.Handled = true; },
             (_, e) => { e.CanExecute = !IsBusy && grid.SelectedCells.Count > 0; e.Handled = true; }));

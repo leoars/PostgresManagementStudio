@@ -1,0 +1,72 @@
+<Window x:Class="PGMS.Desktop.QueryStatisticsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop" Title="Query Statistics" Width="1100" Height="680" MinWidth="850" MinHeight="540" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Loaded="OnLoaded" Closing="OnClosing">
+ <DockPanel Margin="12">
+  <Border DockPanel.Dock="Top" Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <Border x:Name="AvailabilityBanner" DockPanel.Dock="Top" Background="#FFF4CE" BorderBrush="#E0C068" BorderThickness="1" Padding="10" Margin="0,0,0,10" Visibility="Collapsed"><TextBlock x:Name="AvailabilityText" TextWrapping="Wrap" AutomationProperties.Name="Query statistics availability"/></Border>
+  <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+   <Button x:Name="RefreshButton" Content="_Refresh" Click="Refresh" Padding="12,5"/>
+   <Button x:Name="CancelRefreshButton" Content="Cancel Refresh" Click="CancelRefresh" Padding="12,5" Margin="8,0,0,0" Visibility="Collapsed" AutomationProperties.Name="Cancel statistics refresh"/>
+   <Button x:Name="ShowPlanButton" Content="Show _Plan" Click="ShowPlan" Padding="12,5" Margin="8,0,0,0" IsEnabled="False" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="Show generic plan of the selected statement" ToolTip="Opens the selected statement in a new query tab connected to its database and loads its generic plan (EXPLAIN GENERIC_PLAN, parameters unbound). Nothing is executed. Available for SELECT, INSERT, UPDATE, DELETE, MERGE, VALUES, TABLE and WITH statements whose text is visible."/>
+   <Button x:Name="ResetSelectedButton" Content="Reset Selected…" Click="ResetSelected" Padding="12,5" Margin="8,0,0,0" IsEnabled="False" AutomationProperties.Name="Reset statistics of the selected statement"/>
+   <Button x:Name="ResetButton" Content="Reset All…" Click="ResetStatistics" Padding="12,5" Margin="8,0,0,0" IsEnabled="False" AutomationProperties.Name="Reset all server query statistics"/>
+  </StackPanel>
+  <Grid x:Name="FilterFields" DockPanel.Dock="Top" Margin="0,0,0,8">
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions>
+   <StackPanel><Label Content="_Database contains:" Target="{Binding ElementName=DatabaseFilter}" Padding="0,0,0,2"/><TextBox x:Name="DatabaseFilter" AutomationProperties.Name="Database contains" Padding="3"/></StackPanel>
+   <StackPanel Grid.Column="2"><Label Content="_User contains:" Target="{Binding ElementName=UserFilter}" Padding="0,0,0,2"/><TextBox x:Name="UserFilter" AutomationProperties.Name="User contains" Padding="3"/></StackPanel>
+   <StackPanel Grid.Column="4"><Label Content="_Query text contains:" Target="{Binding ElementName=QueryFilter}" Padding="0,0,0,2"/><TextBox x:Name="QueryFilter" AutomationProperties.Name="Query text contains" Padding="3"/></StackPanel>
+   <StackPanel Grid.Column="6"><Label Content="_Min calls:" Target="{Binding ElementName=MinCallsFilter}" Padding="0,0,0,2"/><TextBox x:Name="MinCallsFilter" AutomationProperties.Name="Minimum calls" Padding="3"/></StackPanel>
+   <WrapPanel Grid.Row="1" Grid.ColumnSpan="7" Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
+    <TextBlock Text="Order by:" VerticalAlignment="Center" Margin="0,0,6,0"/><ComboBox x:Name="OrderSelector" AutomationProperties.Name="Statistics ordering" Width="180" SelectedIndex="0"><ComboBoxItem Content="Total execution time" Tag="TotalExecTime"/><ComboBoxItem Content="Mean execution time" Tag="MeanExecTime"/><ComboBoxItem Content="Max execution time" Tag="MaxExecTime"/><ComboBoxItem Content="Calls" Tag="Calls"/><ComboBoxItem Content="Rows" Tag="Rows"/><ComboBoxItem Content="Std dev execution time" Tag="StddevExecTime"/><ComboBoxItem Content="Shared blocks (hit + read)" Tag="SharedBlocks"/><ComboBoxItem Content="Blocks read" Tag="SharedBlocksRead"/><ComboBoxItem Content="Temp blocks" Tag="TempBlocks"/><ComboBoxItem Content="I/O time" Tag="IoTime"/><ComboBoxItem Content="WAL bytes" Tag="WalBytes"/></ComboBox>
+    <Button x:Name="ApplyFiltersButton" Content="_Apply Filters" Click="ApplyFilters" Padding="12,4" Margin="8,0,0,0"/>
+    <CheckBox x:Name="AutoRefreshCheck" Content="Auto-refresh" VerticalAlignment="Center" Margin="16,0,4,0" Checked="AutoRefreshChanged" Unchecked="AutoRefreshChanged" AutomationProperties.Name="Auto-refresh statistics"/>
+    <ComboBox x:Name="AutoRefreshIntervalSelector" Width="90" SelectedIndex="0" SelectionChanged="AutoRefreshIntervalChanged" AutomationProperties.Name="Auto-refresh interval"><ComboBoxItem Content="5 sec" Tag="5"/><ComboBoxItem Content="10 sec" Tag="10"/><ComboBoxItem Content="30 sec" Tag="30"/><ComboBoxItem Content="60 sec" Tag="60"/></ComboBox>
+    <CheckBox x:Name="ShowChartCheck" Content="Show _chart" IsChecked="True" VerticalAlignment="Center" Margin="16,0,4,0" Checked="ChartOptionsChanged" Unchecked="ChartOptionsChanged" AutomationProperties.Name="Show top statements chart"/>
+    <Label Content="_Top:" Target="{Binding ElementName=ChartCountSelector}" VerticalAlignment="Center" Padding="4,0,4,0"/><ComboBox x:Name="ChartCountSelector" Width="60" SelectedIndex="1" SelectionChanged="ChartOptionsChanged" AutomationProperties.Name="Statements in the top chart"><ComboBoxItem Content="10" Tag="10"/><ComboBoxItem Content="25" Tag="25"/><ComboBoxItem Content="50" Tag="50"/></ComboBox>
+   </WrapPanel>
+   <WrapPanel Grid.Row="2" Grid.ColumnSpan="7" Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
+    <Label Content="_Window:" Target="{Binding ElementName=WindowSelector}" VerticalAlignment="Center" Padding="0,0,6,0"/>
+    <ComboBox x:Name="WindowSelector" Width="180" SelectedIndex="0" SelectionChanged="WindowChanged" AutomationProperties.Name="Statistics time window" ToolTip="Cumulative shows counters since the last reset. Since baseline and Last N minutes show only the activity after an earlier read, computed by PGMS as the difference of two reads of pg_stat_statements."><ComboBoxItem Content="Cumulative (since reset)" Tag="Cumulative"/><ComboBoxItem Content="Since baseline" Tag="SinceBaseline"/><ComboBoxItem Content="Last 5 minutes" Tag="Last5Minutes"/><ComboBoxItem Content="Last 15 minutes" Tag="Last15Minutes"/><ComboBoxItem Content="Last 60 minutes" Tag="Last60Minutes"/></ComboBox>
+    <Button x:Name="SetBaselineButton" Content="Set _Baseline" Click="SetBaseline" Padding="12,4" Margin="8,0,0,0" AutomationProperties.Name="Set statistics baseline now" ToolTip="Reads the current counters of every statement visible to this role (without SQL text) and saves them for this connection target. Since baseline then shows only what ran afterwards."/>
+    <TextBlock x:Name="WindowInfo" VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis" Text="No baseline set." AutomationProperties.Name="Statistics window information"/>
+   </WrapPanel>
+  </Grid>
+  <TextBlock x:Name="ScopeNote" DockPanel.Dock="Top" Text="Cumulative since the last reset, per statement/database/user. Times are server ms; Hit % = shared hits / (hits + reads). Snapshot, not live." ToolTip="Each row aggregates one normalised statement for one database and user. Execution times are reported by the server in milliseconds. Hit % divides shared-buffer hits by hits plus reads; — means the statement touched no shared blocks. Shared blocks counts buffer requests (hits plus reads, like logical reads); Blocks read counts blocks not found in shared buffers (they may still come from the OS cache). Temp blocks counts temporary file blocks read and written. I/O ms sums shared, local and temp block read/write time and stays 0 unless track_io_timing was on. WAL bytes is the write-ahead log generated. PostgreSQL does not report CPU time per statement. Refresh to take a new snapshot." TextWrapping="Wrap" Margin="0,0,0,8"/>
+  <TextBox x:Name="Status" DockPanel.Dock="Bottom" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" Margin="0,8,0,0" Height="48" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Query statistics status"/>
+  <TextBox DockPanel.Dock="Bottom" Text="{Binding SelectedItem.Query, ElementName=Statements}" IsReadOnly="True" FontFamily="Consolas" Height="80" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0" AutomationProperties.Name="Selected statement SQL"/>
+  <Grid x:Name="ResultsArea">
+   <Grid.ColumnDefinitions><ColumnDefinition x:Name="ChartColumn" Width="280" MinWidth="180"/><ColumnDefinition x:Name="ChartSplitterColumn" Width="6"/><ColumnDefinition Width="*" MinWidth="380"/></Grid.ColumnDefinitions>
+   <DockPanel x:Name="ChartPanel">
+    <TextBlock x:Name="ChartTitle" DockPanel.Dock="Top" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" Margin="0,0,0,4" Text="Top statements" ToolTip="Bars follow the server order of the loaded snapshot for the applied Order by metric, scaled to the largest bar. A local header sort reorders only the grid. The chart never reads the server; Refresh takes a new snapshot."/>
+    <ListBox x:Name="ChartBars" SelectionMode="Single" SelectionChanged="ChartSelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True" AutomationProperties.Name="Top statements chart" AutomationProperties.HelpText="One bar per statement, in server order for the applied Order by metric. Selecting a bar selects the statement in the grid.">
+     <ListBox.ItemContainerStyle>
+      <Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="2,2,4,3"/><Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}"/><Setter Property="ToolTip" Value="{Binding Detail}"/></Style>
+     </ListBox.ItemContainerStyle>
+     <ListBox.ItemTemplate>
+      <DataTemplate>
+       <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="12"/></Grid.RowDefinitions>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <TextBlock Text="{Binding Caption}" TextTrimming="CharacterEllipsis" FontSize="11"/>
+        <TextBlock Grid.Column="1" Text="{Binding ValueLabel}" FontSize="11" Margin="6,0,0,0" FontFamily="Consolas"/>
+        <Border Grid.Row="1" Grid.ColumnSpan="2" Background="#DCE6EE"/>
+        <Border Grid.Row="1" Grid.ColumnSpan="2" Background="#3D78AE" HorizontalAlignment="Stretch" RenderTransformOrigin="0,0.5"><Border.RenderTransform><ScaleTransform ScaleX="{Binding Fraction}"/></Border.RenderTransform></Border>
+       </Grid>
+      </DataTemplate>
+     </ListBox.ItemTemplate>
+    </ListBox>
+   </DockPanel>
+   <GridSplitter x:Name="ChartSplitter" Grid.Column="1" Width="6" HorizontalAlignment="Stretch" Background="Transparent" Focusable="False" ResizeBehavior="PreviousAndNext"/>
+   <DataGrid Grid.Column="2" local:DataGridRowNames.Enabled="True" local:DataGridRowNames.ColumnCount="4" x:Name="Statements" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" SelectionChanged="SelectionChanged" Sorting="StatementsSorting" EnableRowVirtualization="True" AutomationProperties.Name="Query statistics" AutomationProperties.HelpText="Metric headers (times except Min, Calls, Rows, blocks, I/O and WAL) reload in that server order; Query ID, Database, User, Min ms, Hit % and Stats since sort only the loaded snapshot.">
+    <DataGrid.Columns>
+     <DataGridTextColumn Header="Query ID" Binding="{Binding QueryId}" Width="140"/><DataGridTextColumn Header="Database" Binding="{Binding Database}" Width="100"/><DataGridTextColumn Header="User" Binding="{Binding User}" Width="90"/>
+     <DataGridTextColumn Header="Calls" Binding="{Binding Calls}" SortMemberPath="Calls" Width="70"/><DataGridTextColumn Header="Total ms" Binding="{Binding TotalExecLabel}" SortMemberPath="TotalExecMs" Width="95"/><DataGridTextColumn Header="Mean ms" Binding="{Binding MeanExecLabel}" SortMemberPath="MeanExecMs" Width="90"/>
+     <DataGridTextColumn Header="Min ms" Binding="{Binding MinExecLabel}" SortMemberPath="MinExecMs" Width="80"/><DataGridTextColumn Header="Max ms" Binding="{Binding MaxExecLabel}" SortMemberPath="MaxExecMs" Width="80"/><DataGridTextColumn Header="Rows" Binding="{Binding Rows}" SortMemberPath="Rows" Width="70"/>
+     <DataGridTextColumn Header="Std dev ms" Binding="{Binding StddevExecLabel}" SortMemberPath="StddevExecMs" Width="85"/><DataGridTextColumn Header="Hit %" Binding="{Binding HitRatioLabel}" SortMemberPath="HitRatio" Width="65"/>
+     <DataGridTextColumn Header="Shared blocks" Binding="{Binding SharedBlocks}" SortMemberPath="SharedBlocks" Width="95"/><DataGridTextColumn Header="Blocks read" Binding="{Binding SharedBlocksRead}" SortMemberPath="SharedBlocksRead" Width="85"/><DataGridTextColumn Header="Temp blocks" Binding="{Binding TempBlocks}" SortMemberPath="TempBlocks" Width="85"/>
+     <DataGridTextColumn Header="I/O ms" Binding="{Binding IoTimeLabel}" SortMemberPath="IoTimeMs" Width="80"/><DataGridTextColumn Header="WAL bytes" Binding="{Binding WalBytes}" SortMemberPath="WalBytes" Width="90"/><DataGridTextColumn Header="Stats since" Binding="{Binding StatsSinceLabel}" SortMemberPath="StatsSince" Width="150"/>
+    </DataGrid.Columns>
+   </DataGrid>
+  </Grid>
+ </DockPanel>
+</Window>

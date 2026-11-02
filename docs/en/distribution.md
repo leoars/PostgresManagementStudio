@@ -1,4 +1,4 @@
-# PGMS v0.1.0-alpha.2 — portable distribution (M1008)
+# PGMS v0.1.0-alpha.3 — portable distribution (M1022)
 
 English | Português (Brasil): LEIA-ME.md in the package, or docs/pt-BR/distribution.md in the source repository.
 

@@ -64,14 +64,14 @@
      <TreeView.ItemTemplate><HierarchicalDataTemplate ItemsSource="{Binding Children}"><TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" MaxWidth="800" ToolTip="{Binding Label}"/></HierarchicalDataTemplate></TreeView.ItemTemplate>
     </TreeView>
     <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#D6E3ED"/>
-    <DataGrid x:Name="PlanProperties" Grid.Column="2" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" RowHeight="23" HeadersVisibility="Column" AutomationProperties.Name="Selected plan node properties">
+    <DataGrid local:DataGridRowNames.Enabled="True" x:Name="PlanProperties" Grid.Column="2" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" RowHeight="23" HeadersVisibility="Column" AutomationProperties.Name="Selected plan node properties">
      <DataGrid.Columns><DataGridTextColumn Header="Property" Binding="{Binding Key}" Width="130"/><DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/></DataGrid.Columns>
     </DataGrid></Grid>
    </DockPanel></TabItem>
    <TabItem Header="Session" x:Name="SessionTab"><DockPanel>
     <WrapPanel DockPanel.Dock="Top" Background="#D5E5EF"><Button x:Name="SessionRefreshButton" Content="Inspect Session" Click="InspectSession" IsEnabled="False" Padding="8,3" Margin="4,3"/><Button x:Name="SessionEditButton" Content="Edit setting…" Click="EditSessionSettings" IsEnabled="False" Padding="8,3" Margin="4,3"/><Button x:Name="SessionCancelButton" Content="Cancel operation" Click="CancelQuery" Visibility="Collapsed" Padding="8,3" Margin="4,3"/></WrapPanel>
     <ScrollViewer DockPanel.Dock="Top" MaxHeight="75" VerticalScrollBarVisibility="Auto"><TextBlock x:Name="SessionStatus" Text="Inspect the connection owned by this query. No passwords are displayed." TextWrapping="Wrap" Margin="6"/></ScrollViewer>
-    <DataGrid x:Name="SessionProperties" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" RowHeight="23" HeadersVisibility="Column" AutomationProperties.Name="Current query session snapshot">
+    <DataGrid local:DataGridRowNames.Enabled="True" x:Name="SessionProperties" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" RowHeight="23" HeadersVisibility="Column" AutomationProperties.Name="Current query session snapshot">
      <DataGrid.Columns><DataGridTextColumn Header="Property" Binding="{Binding Key}" Width="190"/><DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/></DataGrid.Columns>
     </DataGrid>
    </DockPanel></TabItem>

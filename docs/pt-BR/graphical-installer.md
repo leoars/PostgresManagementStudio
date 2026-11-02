@@ -2,7 +2,7 @@
 
 [English](../en/graphical-installer.md) | Português (Brasil)
 
-Baixe `PGMS-0.1.0-alpha.2-Setup-x64.exe` na [release alpha.2](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.2) e confira contra o `SHA256SUMS.txt` (e, opcionalmente, com `gh attestation verify`). Desde a v0.1.0-alpha.2 o instalador é compilado pelo workflow de release a partir do mesmo payload do ZIP portátil daquela release; na v0.1.0-alpha.1 ele foi adicionado depois, embrulhando o payload M1008 existente. O instalador dispensa PowerShell e runtime .NET instalado separadamente.
+Baixe `PGMS-0.1.0-alpha.3-Setup-x64.exe` na [release alpha.3](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.3) e confira contra o `SHA256SUMS.txt` (e, opcionalmente, com `gh attestation verify`). Desde a v0.1.0-alpha.3 o instalador é compilado pelo workflow de release a partir do mesmo payload do ZIP portátil daquela release; na v0.1.0-alpha.1 ele foi adicionado depois, embrulhando o payload M1022 existente. O instalador dispensa PowerShell e runtime .NET instalado separadamente.
 
 ## Opções de instalação
 
@@ -23,10 +23,10 @@ O executável não tem assinatura digital; reputação SmartScreen e VM Windows 
 
 ## Compilar e testar
 
-Use o [compilador oficial Inno Setup 7.1.1 x64](https://jrsoftware.org/isdl.php), preservando sua licença. Extraia o ZIP existente da release em `artifacts/M1008-win-x64`. O builder confere cada arquivo, o manifesto congelado e a versão do aplicativo, recusando diretório de saída existente. Uma recompilação local pode produzir outro manifesto e é intencionalmente recusada por este builder específico da release. Atualize a configuração para uma futura release congelada. O [workflow de release](../../.github/workflows/release.yml) passa `-SkipFrozenManifest` porque compila o próprio payload; marco e versão do produto continuam exigidos, e o hash congelado segue obrigatório em builds locais.
+Use o [compilador oficial Inno Setup 7.1.1 x64](https://jrsoftware.org/isdl.php), preservando sua licença. Extraia o ZIP existente da release em `artifacts/M1022-win-x64`. O builder confere cada arquivo, o manifesto congelado e a versão do aplicativo, recusando diretório de saída existente. Uma recompilação local pode produzir outro manifesto e é intencionalmente recusada por este builder específico da release. Atualize a configuração para uma futura release congelada. O [workflow de release](../../.github/workflows/release.yml) passa `-SkipFrozenManifest` porque compila o próprio payload; marco e versão do produto continuam exigidos, e o hash congelado segue obrigatório em builds locais.
 
 ```powershell
-./scripts/Build-GraphicalInstaller.ps1 -PackagePath artifacts/M1008-win-x64 -CompilerPath 'C:\Tools\Inno Setup 7\ISCC.exe'
+./scripts/Build-GraphicalInstaller.ps1 -PackagePath artifacts/M1022-win-x64 -CompilerPath 'C:\Tools\Inno Setup 7\ISCC.exe'
 ./scripts/Test-GraphicalInstaller.ps1 -InstallerPath artifacts/graphical-installer/0.1.0-alpha.1/PGMS-0.1.0-alpha.1-Setup-x64.exe
 ```
 

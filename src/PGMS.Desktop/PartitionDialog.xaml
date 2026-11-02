@@ -11,7 +11,7 @@
    <StackPanel x:Name="BoundFields">
     <CheckBox x:Name="DefaultBound" Content="Use DEFAULT partition" Checked="Changed" Unchecked="Changed" Margin="0,8"/>
     <StackPanel x:Name="LiteralFields"><TextBlock Text="RANGE uses one row per key in inspected order; LIST uses one row per value. Literal text is quoted, never executed as SQL. Empty Literal means empty text. Use ISO dates and explicit time zones." TextWrapping="Wrap" Margin="0,5"/>
-     <DataGrid x:Name="ValuesGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" CanUserAddRows="False" Height="145" AutomationProperties.Name="Partition bound values"><DataGrid.Columns>
+     <DataGrid local:DataGridRowNames.Enabled="True" x:Name="ValuesGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" CanUserAddRows="False" Height="145" AutomationProperties.Name="Partition bound values"><DataGrid.Columns>
       <DataGridTextColumn Header="Key / value" Binding="{Binding Label}" IsReadOnly="True" Width="85"/>
       <DataGridComboBoxColumn Header="Lower / LIST kind" ItemsSource="{x:Static local:PartitionInput.Kinds}" SelectedItemBinding="{Binding LowerKind,UpdateSourceTrigger=PropertyChanged}" Width="135"/>
       <DataGridTextColumn Header="Lower / LIST literal" Binding="{Binding LowerText,UpdateSourceTrigger=PropertyChanged}" Width="*"/>

@@ -522,6 +522,19 @@ public partial class MainWindow : Window
         if (SelectedConnection is not { } connection) { Status.Text = "Connect before opening Activity Monitor."; return; }
         new ActivityWindow(connection) { Owner = this }.Show();
     }
+    private void ShowQueryStatistics(object sender, RoutedEventArgs e)
+    {
+        if (SelectedConnection is not { } connection) { Status.Text = "Connect before opening Query Statistics."; return; }
+        new QueryStatisticsWindow(connection, OpenGenericPlanAsync) { Owner = this }.Show();
+    }
+    // Query Statistics → Show Plan: a new tab connected to the statement's database with its normalised SQL and generic plan.
+    internal async Task<QueryView> OpenGenericPlanAsync(string connection, string sql)
+    {
+        var query = NewQuery(sql);
+        try { await query.ConnectAsync(connection); await query.ExplainGenericPlanAsync(); }
+        catch (Exception ex) when (ex is Npgsql.NpgsqlException or IOException or OperationCanceledException) { ShowError(ex); }
+        return query;
+    }
     private async void RoutinePermissionsFromExplorer(object sender, RoutedEventArgs e)
     {
         if (catalogService is null || ExplorerTree.SelectedItem is not CatalogNode { Entry.CanManageRoutinePermissions: true } node) return;
