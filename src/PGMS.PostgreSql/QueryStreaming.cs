@@ -23,6 +23,7 @@ public sealed partial class QuerySession
     {
         ArgumentNullException.ThrowIfNull(consume);
         ArgumentNullException.ThrowIfNull(options);
+        QueryPlaceholders.ThrowIfUnbound(sql);
         await execution.WaitAsync(token).ConfigureAwait(false);
         void Notice(object sender,NpgsqlNoticeEventArgs args) => options.Notices?.Add(args.Notice.InvariantSeverity,args.Notice.SqlState,args.Notice.MessageText);
         if(options.Notices is not null)connection.Notice+=Notice;

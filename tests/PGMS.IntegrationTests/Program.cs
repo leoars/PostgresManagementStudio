@@ -31,6 +31,8 @@ if(args.Contains("--export")){await ResultExportChecks.RunAsync(Check);Console.W
 if(args.Length==0)await ResultExportChecks.RunAsync(Check);
 if(args.Contains("--activity")){await ActivityTimingChecks.RunAsync(connection,Check);Console.WriteLine($"{passed} activity checks passed.");return;}
 if(args.Length==0)await ActivityTimingChecks.RunAsync(connection,Check);
+if(args.Contains("--query-statistics")){await QueryStatisticsChecks.RunAsync(connection,Check);Console.WriteLine($"{passed} query statistics checks passed.");return;}
+if(args.Length==0)await QueryStatisticsChecks.RunAsync(connection,Check);
 if(args.Contains("--global-backup")){await GlobalBackupChecks.RunAsync(connection,Check);Console.WriteLine($"{passed} global backup checks passed.");return;}
 if(args.Length==0)await GlobalBackupChecks.RunAsync(connection,Check);
 if(args.Contains("--column-types")){await ColumnTypeChecks.RunAsync(connection,Check);await EnumEditChecks.RunAsync(connection,Check);await DomainEditChecks.RunAsync(connection,Check);await CreateUserTypeChecks.RunAsync(connection,Check);Console.WriteLine($"{passed} column type checks passed.");return;}

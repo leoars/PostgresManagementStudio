@@ -1,4 +1,5 @@
 using System.Windows;
+using PGMS.PostgreSql;
 
 namespace PGMS.Desktop;
 
@@ -20,6 +21,11 @@ public partial class QueryView
         if(offset>sql.Length)return;
         errorOffset=selectionStart+offset;errorRevision=revision;
         ErrorLocation.IsEnabled=true;
+    }
+    private void MarkUnboundParameter(UnboundParameters unbound,int selectionStart,long revision)
+    {
+        if(revision!=EditRevision)return;
+        errorOffset=selectionStart+unbound.Offset;errorRevision=revision;ErrorLocation.IsEnabled=true;
     }
     private void NavigateError(object sender,RoutedEventArgs e)
     {

@@ -1,4 +1,4 @@
-<Window x:Class="PGMS.Desktop.PrivilegeDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Object Permissions" Width="760" Height="760" MinWidth="650" MinHeight="540" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+<Window x:Class="PGMS.Desktop.PrivilegeDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop" Title="Object Permissions" Width="760" Height="760" MinWidth="650" MinHeight="540" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
  <Window.Resources>
   <Style x:Key="AclCellText" TargetType="TextBlock">
    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
@@ -50,7 +50,7 @@
        <TextBox x:Name="AccessSummary" Text="No snapshot loaded. Inspect to read effective privileges." IsReadOnly="True" TextWrapping="Wrap" MaxHeight="110" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Effective access context"/>
        <TabControl x:Name="AccessLists" Margin="0,6">
         <TabItem Header="Effective privileges">
-       <DataGrid x:Name="AccessRows" Margin="0,6" Height="180" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="Effective privileges">
+       <DataGrid local:DataGridRowNames.Enabled="True" x:Name="AccessRows" Margin="0,6" Height="180" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="Effective privileges">
         <DataGrid.Columns>
          <DataGridTextColumn Header="Scope" Binding="{Binding Scope}"/>
          <DataGridTextColumn Header="Column" Binding="{Binding Column}"/>
@@ -63,7 +63,7 @@
         <TabItem x:Name="AclTab" Header="ACL _entries" AutomationProperties.Name="ACL entries">
          <StackPanel>
           <TextBlock x:Name="AclNotice" AutomationProperties.Name="ACL snapshot scope" Text="No ACL snapshot loaded." TextWrapping="Wrap" Margin="4"/>
-          <DataGrid x:Name="AclRows" Height="180" SelectionMode="Single" SelectionChanged="AclSelectionChanged" AutomationProperties.HelpText="{Binding Text, ElementName=AclNotice}" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="ACL grant entries">
+          <DataGrid local:DataGridRowNames.Enabled="True" x:Name="AclRows" Height="180" SelectionMode="Single" SelectionChanged="AclSelectionChanged" AutomationProperties.HelpText="{Binding Text, ElementName=AclNotice}" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="ACL grant entries">
            <DataGrid.Columns>
             <DataGridTextColumn Header="Scope" Binding="{Binding Scope}"/>
             <DataGridTextColumn Header="Column" Binding="{Binding Column}" MaxWidth="120" ElementStyle="{StaticResource AclCellText}"/>

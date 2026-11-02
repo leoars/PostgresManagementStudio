@@ -2,7 +2,7 @@
 
 English | [Português (Brasil)](../pt-BR/graphical-installer.md)
 
-Download `PGMS-0.1.0-alpha.2-Setup-x64.exe` from the [alpha.2 release](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.2) and check it against `SHA256SUMS.txt` (and, optionally, `gh attestation verify`). Since v0.1.0-alpha.2 the installer is built by the release workflow from the same payload as the portable ZIP of that release; in v0.1.0-alpha.1 it was added later to wrap the existing M1008 payload. The installer does not require PowerShell or a separately installed .NET runtime.
+Download `PGMS-0.1.0-alpha.3-Setup-x64.exe` from the [alpha.3 release](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.3) and check it against `SHA256SUMS.txt` (and, optionally, `gh attestation verify`). Since v0.1.0-alpha.3 the installer is built by the release workflow from the same payload as the portable ZIP of that release; in v0.1.0-alpha.1 it was added later to wrap the existing M1022 payload. The installer does not require PowerShell or a separately installed .NET runtime.
 
 ## Installation choices
 
@@ -23,10 +23,10 @@ The executable is unsigned; SmartScreen reputation and a clean Windows VM have n
 
 ## Build and test
 
-Use the official [Inno Setup 7.1.1 x64 compiler](https://jrsoftware.org/isdl.php), retaining its license. Extract the existing release ZIP into `artifacts/M1008-win-x64`. The builder checks every payload file, the frozen manifest and application version, and refuses an existing output directory. A local application rebuild may have a different manifest and is intentionally refused by this release-specific builder. Update the release configuration for a future frozen release. The [release workflow](../../.github/workflows/release.yml) passes `-SkipFrozenManifest` because it builds the payload itself; milestone and product version are still enforced, and the frozen hash remains required for local builds.
+Use the official [Inno Setup 7.1.1 x64 compiler](https://jrsoftware.org/isdl.php), retaining its license. Extract the existing release ZIP into `artifacts/M1022-win-x64`. The builder checks every payload file, the frozen manifest and application version, and refuses an existing output directory. A local application rebuild may have a different manifest and is intentionally refused by this release-specific builder. Update the release configuration for a future frozen release. The [release workflow](../../.github/workflows/release.yml) passes `-SkipFrozenManifest` because it builds the payload itself; milestone and product version are still enforced, and the frozen hash remains required for local builds.
 
 ```powershell
-./scripts/Build-GraphicalInstaller.ps1 -PackagePath artifacts/M1008-win-x64 -CompilerPath 'C:\Tools\Inno Setup 7\ISCC.exe'
+./scripts/Build-GraphicalInstaller.ps1 -PackagePath artifacts/M1022-win-x64 -CompilerPath 'C:\Tools\Inno Setup 7\ISCC.exe'
 ./scripts/Test-GraphicalInstaller.ps1 -InstallerPath artifacts/graphical-installer/0.1.0-alpha.1/PGMS-0.1.0-alpha.1-Setup-x64.exe
 ```
 

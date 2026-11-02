@@ -5,6 +5,7 @@ internal static class QueryPlanChecks
 {
     internal static async Task RunAsync(string connection,Action<bool,string> check)
     {
+        await QueryPlaceholderChecks.RunAsync(connection,check);
         QueryPlanTreeChecks.Run(check);
         await QueryPlanFileChecks.RunAsync(check);
         await QueryPlanLimitChecks.RunAsync(connection,check);
