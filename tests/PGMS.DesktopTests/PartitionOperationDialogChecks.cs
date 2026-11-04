@@ -58,6 +58,20 @@ internal static class PartitionOperationDialogChecks
                 }
                 finally{w.CancelCurrentOperation();await tx.RollbackAsync();if(pending is not null)await pending;}
                 check((bool)(await Scalar($"SELECT to_regclass('{qs}.cancelled') IS NULL"))!,"Canceled blocked partition creation leaves no child");
+                await w.InspectAsync();Find<ComboBox>(w,"Operation").SelectedIndex=2;var children=Find<ComboBox>(w,"Children");
+                children.SelectedItem=children.Items.Cast<PartitionChild>().Single(c=>c.Name=="created");Find<CheckBox>(w,"ConcurrentDetach").IsChecked=true;
+                check(Find<TextBox>(w,"Preview").Text.Contains("CONCURRENTLY;") && !Find<TextBox>(w,"Preview").Text.Contains("BEGIN") && Find<TextBlock>(w,"Help").Text.Contains("pending detach"),"Concurrent detach previews a standalone statement and explains pending state");
+                await CascadePrivilegeDialogChecks.Capture(w,"detach-concurrent-minimum",760,650,check,"m1023");
+                var holder=await blocker.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
+                await using(var read=new NpgsqlCommand($"SELECT count(*) FROM {qs}.parent",blocker,holder))await read.ExecuteScalarAsync();
+                var detaching=SequenceConfirmationChecks.RespondAsync(w,w.ApplyAsync,true,check);
+                try{await SequenceApplyCancellationChecks.WaitForLock(connection,schema);w.CancelCurrentOperation();await detaching.WaitAsync(TimeSpan.FromSeconds(8));}
+                finally{w.CancelCurrentOperation();await holder.RollbackAsync();await detaching;}
+                check(Find<TextBlock>(w,"Feedback").Text.Contains("pending detach") && !Find<Button>(w,"ApplyButton").IsEnabled,"Canceled concurrent detach reports the pending link and requires reinspection");
+                await w.InspectAsync();Find<ComboBox>(w,"Operation").SelectedIndex=2;children.SelectedItem=children.Items.Cast<PartitionChild>().Single(c=>c.Name=="created");
+                check(Find<TextBox>(w,"Preview").Text.Contains("FINALIZE;") && !Find<CheckBox>(w,"ConcurrentDetach").IsEnabled && Find<TextBox>(w,"ChildObservation").Text.Contains("Detach pending"),"Pending link offers FINALIZE");
+                await SequenceConfirmationChecks.RespondAsync(w,w.ApplyAsync,true,check);
+                check(w.WasApplied && (await catalog.InspectAsync(schema,"parent")).Children.Count==0 && Convert.ToInt64(await Scalar($"SELECT count(*) FROM {qs}.created"))==1,"WPF FINALIZE completes detach and preserves data");
             }
             finally{w.Close();}
             foreach(var item in new[]{("list_parent",PartitionStrategy.List),("hash_parent",PartitionStrategy.Hash)})
@@ -72,6 +86,33 @@ internal static class PartitionOperationDialogChecks
                 }
                 finally{dialog.Close();}
             }
+            var sub=new PartitionDialog(limited,schema,"parent",parent.Oid){ShowInTaskbar=false};sub.Show();
+            try
+            {
+                void Click(string name)=>Find<Button>(sub,name).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                await sub.InspectAsync();Find<TextBox>(sub,"ChildName").Text="sub";
+                var row=Find<DataGrid>(sub,"ValuesGrid").Items.Cast<PartitionInput>().Single();row.LowerText="60";row.UpperText="70";
+                check(Find<FrameworkElement>(sub,"SubPartitionFields").IsVisible && !Find<FrameworkElement>(sub,"SubKeyFields").IsEnabled && !Find<TextBox>(sub,"Preview").Text.Contains("PARTITION BY"),"Create mode offers sub-partitioning, off by default");
+                Find<ComboBox>(sub,"SubStrategy").SelectedIndex=2;
+                check(!Find<Button>(sub,"ApplyButton").IsEnabled && Find<TextBlock>(sub,"Feedback").Text.Contains("LIST requires one key"),"Sub-partitioning requires a key column");
+                Find<ComboBox>(sub,"SubColumn").SelectedItem="id";Click("AddSubKeyButton");Click("AddSubKeyButton");
+                check(Find<ListBox>(sub,"SubKeys").Items.Count==1 && Find<TextBox>(sub,"Preview").Text.Contains("FOR VALUES FROM (E'60') TO (E'70') PARTITION BY LIST (\"id\");") && Find<TextBlock>(sub,"Help").Text.Contains("stores no rows"),"Inspected parent columns build the sub-partition key without duplicates");
+                Find<ScrollViewer>(sub,"FormScroller").ScrollToVerticalOffset(120);await CascadePrivilegeDialogChecks.Capture(sub,"create-subpartition-minimum",760,650,check,"m1024");
+                await sub.ApplyAsync();
+                var created=(await catalog.InspectAsync(schema,"parent")).Children.Single(c=>c.Name=="sub");
+                check(sub.WasApplied && created.Kind=="p" && (await catalog.InspectAsync(schema,"sub")).Parent.Strategy==PartitionStrategy.List,"WPF creates a partitioned partition");
+                await sub.InspectAsync();Find<ComboBox>(sub,"Operation").SelectedIndex=2;var children=Find<ComboBox>(sub,"Children");children.SelectedItem=children.Items.Cast<PartitionChild>().Single(c=>c.Name=="sub");
+                check(!Find<FrameworkElement>(sub,"SubPartitionFields").IsVisible && Find<TextBox>(sub,"ChildObservation").Text.Contains("Partitioned table") && Find<Button>(sub,"ApplyButton").IsEnabled,"Detach offers partitioned partitions and explains their sub-partitions");
+                await SequenceConfirmationChecks.RespondAsync(sub,sub.ApplyAsync,true,check);
+                check(sub.WasApplied && (await catalog.InspectAsync(schema,"parent")).Children.All(c=>c.Name!="sub"),"WPF detaches a partitioned partition");
+                await sub.InspectAsync();Find<ComboBox>(sub,"Operation").SelectedIndex=1;Find<TextBox>(sub,"ChildName").Text="sub";
+                row=Find<DataGrid>(sub,"ValuesGrid").Items.Cast<PartitionInput>().Single();row.LowerText="60";row.UpperText="70";
+                await sub.InspectCandidateAsync();
+                check(Find<TextBlock>(sub,"Feedback").Text.Contains("partitioned table") && Find<Button>(sub,"ApplyButton").IsEnabled,"Attach inspects a partitioned table as candidate");
+                await sub.ApplyAsync();
+                check((await catalog.InspectAsync(schema,"parent")).Children.Any(c=>c.Name=="sub" && c.Kind=="p"),"WPF attaches a partitioned table as partition");
+            }
+            finally{sub.Close();}
             var stale=new PartitionDialog(limited,schema,"parent",parent.Oid+1){ShowInTaskbar=false};stale.Show();
             try{await stale.InspectAsync();check(!Find<Button>(stale,"ApplyButton").IsEnabled && Find<TextBlock>(stale,"Feedback").Text.Contains("replaced"),"Explorer identity mismatch refuses new parent binding");}finally{stale.Close();}
             check(new CatalogEntry(CatalogKind.Relation,"p"){RelationType="p"}.CanManagePartitions && !new CatalogEntry(CatalogKind.Relation,"r"){RelationType="r"}.CanManagePartitions,"Explorer partition command is limited to partitioned parents");

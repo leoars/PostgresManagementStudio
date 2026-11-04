@@ -28,7 +28,10 @@ public sealed class TablePartitioning
         var names = declaredColumns.Select(c => c.Name).ToHashSet(StringComparer.Ordinal);
         if (Columns.Any(c => !names.Contains(c)))
             throw new ArgumentException("Every partition key must exactly match a declared column.", nameof(declaredColumns));
-        return "PARTITION BY " + Strategy.ToString().ToUpperInvariant() + " (" +
-            string.Join(", ", Columns.Select(SqlIdentifier.Quote)) + ")";
+        return KeySql();
     }
+
+    /// <summary>Renders the clause without checking declared columns; the server resolves names against an existing parent.</summary>
+    public string KeySql() => "PARTITION BY " + Strategy.ToString().ToUpperInvariant() + " (" +
+        string.Join(", ", Columns.Select(SqlIdentifier.Quote)) + ")";
 }

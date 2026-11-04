@@ -51,5 +51,6 @@ internal static class ActivityTimingChecks
         finally{if(roleCreated){await using var drop=new NpgsqlCommand($"DROP ROLE {SqlIdentifier.Quote(role)}",admin);await drop.ExecuteNonQueryAsync();}}
         await ActivityBlockingChecks.RunAsync(connection,check);
         await ActivitySnapshotChecks.RunAsync(connection,check);
+        await ActivityMetricsChecks.RunAsync(connection,check);
     }
 }

@@ -352,7 +352,9 @@ internal static class Program
                 await using (var monitorFixture = new Npgsql.NpgsqlConnection(fixtureConnection + ";Application Name=PGMS.M6.fixture"))
                 {
                     await monitorFixture.OpenAsync();
-                    var monitor = new ActivityWindow(fixtureConnection) { ShowInTaskbar = false };
+                    var monitor = new ActivityHost(fixtureConnection) { ShowInTaskbar = false };
+                    Check(monitor.IsAutoRefreshRunning && monitor.AutoRefreshInterval == TimeSpan.FromSeconds(10), "monitor opens auto-refreshing every 10 seconds like SSMS");
+                    ((CheckBox)monitor.FindName("AutoRefreshCheck")).IsChecked = false;
                     monitor.Show();
                     var sessions = (DataGrid)monitor.FindName("Sessions");
                     for (int attempt = 0; attempt < 100 && monitor.SnapshotVersion == 0; attempt++) await Task.Delay(25);
@@ -372,14 +374,16 @@ internal static class Program
                     sessions.SelectedItem = sessions.Items.OfType<ActivitySession>().First(s => s.Pid == monitorFixture.ProcessID);
                     Check(((Button)monitor.FindName("CancelButton")).IsEnabled && ((Button)monitor.FindName("TerminateButton")).IsEnabled, "monitor exposes distinct cancel and terminate actions on selection");
                     var autoRefresh = (CheckBox)monitor.FindName("AutoRefreshCheck"); autoRefresh.IsChecked = true;
-                    Check(monitor.IsAutoRefreshRunning && monitor.AutoRefreshInterval == TimeSpan.FromSeconds(5), "monitor auto-refresh starts at the selected interval");
+                    var intervalSelector = (ComboBox)monitor.FindName("AutoRefreshIntervalSelector");
+                    Check(intervalSelector.Items.OfType<ComboBoxItem>().Select(i => (string)i.Tag).SequenceEqual(["1", "3", "5", "10", "15", "30", "60", "300", "1800", "3600"]), "monitor offers the SSMS refresh intervals from 1 second to 1 hour");
+                    intervalSelector.SelectedIndex = 0;
+                    Check(monitor.IsAutoRefreshRunning && monitor.AutoRefreshInterval == TimeSpan.FromSeconds(1), "monitor auto-refresh starts at the selected interval");
                     int previousRows = monitor.SnapshotVersion;
                     for (int attempt = 0; attempt < 80 && previousRows == monitor.SnapshotVersion; attempt++) await Task.Delay(100);
                     Check(previousRows != monitor.SnapshotVersion, "monitor timer actually reloads sessions");
                     Check(sessions.SelectedItem is ActivitySession selectedSession && selectedSession.Pid == monitorFixture.ProcessID, "monitor refresh preserves selected backend identity");
-                    var intervalSelector = (ComboBox)monitor.FindName("AutoRefreshIntervalSelector");
-                    intervalSelector.SelectedIndex = 1;
-                    Check(monitor.AutoRefreshInterval == TimeSpan.FromSeconds(10), "monitor applies changed auto-refresh interval");
+                    intervalSelector.SelectedIndex = 9;
+                    Check(monitor.AutoRefreshInterval == TimeSpan.FromHours(1), "monitor applies changed auto-refresh interval");
                     autoRefresh.IsChecked = false;
                     Check(!monitor.IsAutoRefreshRunning, "monitor auto-refresh stops when unchecked");
                     monitor.UpdateLayout();
@@ -392,9 +396,8 @@ internal static class Program
                     var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
                     using (var capture = File.Create("artifacts/review/m22-activity.png")) encoder.Save(capture);
                     monitor.Width = monitor.MinWidth; monitor.Height = monitor.MinHeight; monitor.UpdateLayout();
-                    var filterFields = (FrameworkElement)monitor.FindName("FilterFields");
-                    var selectorBounds = intervalSelector.TransformToAncestor(filterFields).TransformBounds(new Rect(intervalSelector.RenderSize));
-                    Check(selectorBounds.Right <= filterFields.ActualWidth && selectorBounds.Bottom <= filterFields.ActualHeight, "monitor interval selector fits at minimum window size");
+                    var selectorBounds = intervalSelector.TransformToAncestor(surface).TransformBounds(new Rect(intervalSelector.RenderSize));
+                    Check(selectorBounds.Right <= surface.ActualWidth && selectorBounds.Bottom <= surface.ActualHeight, "monitor interval selector fits at minimum window size");
                     bounds = new Rect(0, 0, surface.ActualWidth, surface.ActualHeight);
                     drawing = new DrawingVisual();
                     using (var dc = drawing.RenderOpen()) { dc.DrawRectangle(monitor.Background, null, bounds); dc.DrawRectangle(new VisualBrush(surface), null, bounds); }
@@ -403,6 +406,8 @@ internal static class Program
                     encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
                     using (var capture = File.Create("artifacts/review/m22-activity-min.png")) encoder.Save(capture);
                     autoRefresh.IsChecked = true;
+                    // A monitor refuses to close mid-refresh; let a tick of the earlier 1-second interval finish first.
+                    await monitor.ReloadAsync();
                     monitor.Close();
                     Check(!monitor.IsAutoRefreshRunning, "monitor stops auto-refresh when closed");
                 }

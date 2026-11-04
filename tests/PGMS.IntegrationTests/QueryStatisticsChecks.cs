@@ -29,6 +29,7 @@ internal static class QueryStatisticsChecks
             }
             var notLoaded = missing with { LibraryLoaded = false };
             check(!notLoaded.IsReadable && notLoaded.Describe().Contains("shared_preload_libraries"), "Description for an unloaded library points to server configuration");
+            await LegacyVersionChecks(new NpgsqlConnectionStringBuilder(connection) { Database = missingDb }.ConnectionString, "pgms_legacy_" + suffix, check);
 
             await using (var exists = new NpgsqlCommand("SELECT count(*) FROM pg_catalog.pg_extension WHERE extname='pg_stat_statements'", admin))
                 if ((long)(await exists.ExecuteScalarAsync())! == 0) { await using var create = new NpgsqlCommand("CREATE EXTENSION pg_stat_statements", admin); await create.ExecuteNonQueryAsync(); extensionCreated = true; }
@@ -44,7 +45,8 @@ internal static class QueryStatisticsChecks
             var counted = snapshot.Rows.Single(r => r.Query.StartsWith("SELECT count(*) FROM", StringComparison.Ordinal) && !r.Query.Contains("pg_sleep"));
             check(counted.Calls == 3 && counted.Rows == 3 && counted.Database == "postgres" && counted.User == "pgms_test" && counted.TopLevel, "Repeated statement is aggregated with calls, rows, database and user");
             check(counted.TotalExecMs >= 0 && Math.Abs(counted.MeanExecMs - counted.TotalExecMs / 3) < 0.001 && counted.MinExecMs <= counted.MaxExecMs, "Mean equals total over calls and min does not exceed max");
-            check(counted.StatsSince is { Kind: DateTimeKind.Utc } && snapshot.ObservedAt.Kind == DateTimeKind.Utc && snapshot.ObservedAt >= counted.StatsSince, "Stats since and observation are server UTC instants");
+            bool timestamps = available.HasEntryTimestamps;
+            check((timestamps ? counted.StatsSince is { Kind: DateTimeKind.Utc } && snapshot.ObservedAt >= counted.StatsSince : counted.StatsSince is null && counted.StatsSinceLabel == "—") && snapshot.ObservedAt.Kind == DateTimeKind.Utc, $"Stats since (pg_stat_statements {available.InstalledVersion}) and observation are server UTC instants");
             check(counted.HitRatio is null or (>= 0 and <= 1) && !counted.QueryTextRestricted, "Hit ratio stays within [0,1] or is unknown; query text visible to superuser");
             check((counted with { SharedBlocksHit = 3, SharedBlocksRead = 1 }).HitRatio == 0.75 && (counted with { SharedBlocksHit = 0, SharedBlocksRead = 0 }).HitRatioLabel == "—", "Hit ratio is hits over hits plus reads and unknown without block access");
             var slept = snapshot.Rows.Single(r => r.Query.Contains("pg_sleep"));
@@ -102,7 +104,7 @@ internal static class QueryStatisticsChecks
             var resetAt = await service.ResetAsync();
             check(resetAt.Kind == DateTimeKind.Utc && resetAt >= snapshot.ObservedAt, "Superuser reset returns the server reset instant");
             check((await service.ReadSnapshotAsync(byQuery)).Rows.Count == 0, "Reset discards the previously tracked statements");
-            await WindowChecks(admin, service, limitedService, "pgms_window_" + suffix, check);
+            await WindowChecks(admin, service, limitedService, "pgms_window_" + suffix, timestamps, check);
         }
         finally
         {
@@ -113,8 +115,48 @@ internal static class QueryStatisticsChecks
         }
     }
 
+    // Older extension versions created on purpose in a scratch database, so every server runs the 1.10 path (PostgreSQL 15/16, or 17 after pg_upgrade).
+    private static async Task LegacyVersionChecks(string connection, string table, Action<bool, string> check)
+    {
+        string quoted = SqlIdentifier.Quote(table);
+        await using var db = new NpgsqlConnection(connection); await db.OpenAsync();
+        async Task Run(string sql, int times = 1) { for (int i = 0; i < times; i++) { await using var cmd = new NpgsqlCommand(sql, db); await cmd.ExecuteNonQueryAsync(); } }
+        var service = new QueryStatisticsService(connection);
+        try
+        {
+            await Run("CREATE EXTENSION pg_stat_statements VERSION '1.9'");
+            var old = await service.DetectAsync();
+            check(old.ExtensionInstalled && old.InstalledVersion == "1.9" && !old.IsSupportedVersion && !old.IsReadable && old.Describe().Contains("older than 1.10", StringComparison.Ordinal) && old.Describe().Contains("ALTER EXTENSION pg_stat_statements UPDATE", StringComparison.Ordinal),
+                "pg_stat_statements 1.9 is reported as too old, naming ALTER EXTENSION UPDATE: " + old.Describe());
+            bool refused = false; try { await service.CaptureBaselineAsync(); } catch (QueryStatisticsUnavailableException ex) when (!ex.Availability.IsSupportedVersion) { refused = true; }
+            check(refused, "A baseline over pg_stat_statements 1.9 raises an availability error instead of a column error");
+
+            await Run("ALTER EXTENSION pg_stat_statements UPDATE TO '1.10'");
+            var legacy = await service.DetectAsync();
+            check(legacy.IsReadable && !legacy.HasEntryTimestamps && legacy.Describe().Contains("stats_since", StringComparison.Ordinal), "pg_stat_statements 1.10 is readable and its description names the missing stats_since");
+            await Run($"CREATE TABLE {quoted}(id int)");
+            string repeated = $"SELECT count(*) FROM {quoted}";
+            await Run(repeated, 3);
+            var filter = new QueryStatisticsFilter(Query: table);
+            var cumulative = (await service.ReadSnapshotAsync(filter)).Rows.Single(r => r.Query == repeated);
+            check(cumulative.Calls == 3 && cumulative.StatsSince is null && cumulative.StatsSinceLabel == "—" && cumulative.IoTimeMs >= 0, "1.10 cumulative read has calls and I/O time from blk_*_time, and no stats since");
+            var baseline = await service.CaptureBaselineAsync();
+            check(baseline.Entries.Single(e => e.QueryId == cumulative.QueryId && e.DatabaseOid == cumulative.DatabaseOid) is { Calls: 3, StatsSince: null }, "1.10 baseline keeps counters without an entry timestamp");
+            await Run(repeated, 2); await Run($"SELECT min(id) FROM {quoted}");
+            var window = await service.ReadSnapshotAsync(filter, baseline);
+            check(window.Rows.Single(r => r.Query == repeated).Calls == 2 && window.Rows.Single(r => r.Query.StartsWith("SELECT min(id)", StringComparison.Ordinal)).Calls == 1,
+                "1.10 window matches entries by key and counts a statement new since the baseline in full");
+            var disk = System.Text.Json.JsonSerializer.Deserialize<QueryStatisticsBaseline>(System.Text.Json.JsonSerializer.Serialize(baseline))!.Validate();
+            check(disk.Entries.All(e => e.StatsSince is null) && (await service.ReadSnapshotAsync(filter, disk)).Rows.Single(r => r.Query == repeated).Calls == 2, "A 1.10 baseline survives a JSON round trip and still measures the window");
+            await service.ResetAsync(); await Run(repeated, 4);
+            var afterReset = await service.ReadSnapshotAsync(filter, baseline);
+            check(afterReset.ResetSinceWindowStart && afterReset.Rows.Single(r => r.Query == repeated).Calls == 4, "1.10 full reset after the baseline counts every entry from the reset instead of subtracting old counters");
+        }
+        finally { await Run($"DROP TABLE IF EXISTS {quoted}; DROP EXTENSION IF EXISTS pg_stat_statements"); }
+    }
+
     // Time windows: a baseline of counters, then the difference of a later read. Statements name their own table; constants normalise to $n.
-    private static async Task WindowChecks(NpgsqlConnection admin, QueryStatisticsService service, QueryStatisticsService limitedService, string table, Action<bool, string> check)
+    private static async Task WindowChecks(NpgsqlConnection admin, QueryStatisticsService service, QueryStatisticsService limitedService, string table, bool timestamps, Action<bool, string> check)
     {
         string quoted = SqlIdentifier.Quote(table);
         async Task Run(string sql, int times = 1) { for (int i = 0; i < times; i++) { await using var cmd = new NpgsqlCommand(sql, admin); await cmd.ExecuteNonQueryAsync(); } }
@@ -144,7 +186,7 @@ internal static class QueryStatisticsChecks
                 "Window counts only the two executions after the baseline, with mean over the window calls");
             check(double.IsNaN(delta.MinExecMs) && double.IsNaN(delta.MaxExecMs) && delta.MinExecLabel == "—" && delta.MaxExecLabel == "—", "Min and max are unavailable in a window and labelled —");
             check(!window.Rows.Any(r => r.Query.StartsWith("SELECT max(id)", StringComparison.Ordinal)), "Statement with no executions in the window is left out");
-            check(window.Rows.Single(r => r.Query.StartsWith("SELECT min(id)", StringComparison.Ordinal)) is { Calls: 1 } created && created.StatsSince >= baseline.TakenAt, "Entry created after the baseline counts in full");
+            check(window.Rows.Single(r => r.Query.StartsWith("SELECT min(id)", StringComparison.Ordinal)) is { Calls: 1 } created && (timestamps ? created.StatsSince >= baseline.TakenAt : created.StatsSince is null), "Entry created after the baseline counts in full");
             var spread = window.Rows.Single(r => r.Query.Contains("pg_sleep"));
             check(spread.Calls == 2 && spread.TotalExecMs >= 40 && spread.StddevExecMs >= 15 && spread.StddevExecMs <= spread.TotalExecMs,
                 "Window std dev is derived from the two new executions (about 0 and 40 ms): " + spread.StddevExecLabel);
@@ -161,12 +203,18 @@ internal static class QueryStatisticsChecks
             // Without the baseline counters of an entry that existed before, the window cannot measure it: counted, then left out.
             var partial = baseline with { Entries = baseline.Entries.Where(e => e.QueryId != repeatedBefore.QueryId).ToList() };
             var withoutCounters = await service.ReadSnapshotAsync(filter, partial);
-            check(withoutCounters.UnusableEntries >= 1 && withoutCounters.Rows.All(r => r.QueryId != repeatedBefore.QueryId), "Entry missing from the baseline but older than it is counted as unmeasurable and left out");
+            if (timestamps)
+                check(withoutCounters.UnusableEntries >= 1 && withoutCounters.Rows.All(r => r.QueryId != repeatedBefore.QueryId), "Entry missing from the baseline but older than it is counted as unmeasurable and left out");
+            else
+                check(withoutCounters.Rows.Single(r => r.QueryId == repeatedBefore.QueryId).Calls == 5, "Without stats_since, an entry missing from the baseline cannot be dated and counts in full");
 
             // A selective reset re-creates the entry: it then counts from its new creation instead of subtracting stale counters.
             await service.ResetAsync(delta); await Run(repeated);
-            var recreated = (await service.ReadSnapshotAsync(filter, baseline)).Rows.Single(r => r.QueryId == repeatedBefore.QueryId);
-            check(recreated.Calls == 1 && recreated.StatsSince > repeatedBefore.StatsSince, "Entry reset after the baseline counts only its executions since re-creation");
+            var afterSelective = await service.ReadSnapshotAsync(filter, baseline);
+            if (timestamps)
+                check(afterSelective.Rows.Single(r => r.QueryId == repeatedBefore.QueryId) is { Calls: 1 } recreated && recreated.StatsSince > repeatedBefore.StatsSince, "Entry reset after the baseline counts only its executions since re-creation");
+            else
+                check(afterSelective.Rows.All(r => r.QueryId != repeatedBefore.QueryId) && afterSelective.UnusableEntries >= 1, "Without stats_since, an entry reset after the baseline with fewer calls than before is unmeasurable and left out");
 
             var hidden = await limitedService.ReadSnapshotAsync(new QueryStatisticsFilter(Query: table), baseline);
             check(hidden.Rows.All(r => r.QueryId is not null), "Window rows always carry a query id, even for another role");

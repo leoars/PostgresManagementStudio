@@ -225,6 +225,7 @@ internal static class QueryStatisticsDialogChecks
             var row = grid.Items.OfType<QueryStatisticsEntry>().Single();
             check(row.Calls == 2 && row.IsWindowed && row.MaxExecLabel == "—" && row.MinExecLabel == "—" && window.ChartItems.Count == 1 && window.ChartItems[0].ValueLabel == row.TotalExecLabel, "Since baseline shows only the new executions, without min/max, and charts them");
             check(status.Text.Contains("Window ") && status.Text.Contains(takenAt.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)), "Status names the window start and end: " + status.Text);
+            check(status.Text.Contains("has no stats_since", StringComparison.Ordinal) == (window.Availability?.HasEntryTimestamps == false), $"Window status names the stats_since limit only for pg_stat_statements before 1.11 ({window.Availability?.InstalledVersion})");
             int beforeHeader = window.SnapshotVersion; var appliedBefore = window.AppliedOrder; await ClickHeader(window, grid, "Max ms");
             check(window.SnapshotVersion == beforeHeader && window.AppliedOrder == appliedBefore && status.Text.Contains("cannot be derived"), "Max ms header is refused in a window and keeps the order");
             grid.SelectedItem = row;

@@ -29,7 +29,7 @@
     <Separator/><MenuItem x:Name="CommentSelectionMenu" Header="Comment Selection" Command="{x:Static local:SqlEditorCommands.Comment}" InputGestureText="Ctrl+K, Ctrl+C"/>
     <MenuItem x:Name="UncommentSelectionMenu" Header="Uncomment Selection" Command="{x:Static local:SqlEditorCommands.Uncomment}" InputGestureText="Ctrl+K, Ctrl+U"/>
    </MenuItem>
-   <MenuItem Header="_View" SubmenuOpened="ViewMenuOpened"><MenuItem Header="Object _Explorer" Click="ShowExplorer" InputGestureText="F8"/><MenuItem Header="Activity Monitor…" Click="ShowActivity"/><MenuItem Header="Query Statistics…" Click="ShowQueryStatistics" ToolTip="Read-only pg_stat_statements view; the extension must already be loaded and created"/><Separator/><MenuItem x:Name="WordWrapMenu" Header="Word Wrap" IsCheckable="True" Click="ToggleWordWrap" ToolTip="Wrap SQL visually without inserting line breaks"/><MenuItem x:Name="WhiteSpaceMenu" Header="Show White Space" IsCheckable="True" Click="ToggleWhiteSpace" ToolTip="Show spaces and tabs in the active SQL document"/></MenuItem>
+   <MenuItem Header="_View" SubmenuOpened="ViewMenuOpened"><MenuItem Header="Object _Explorer" Click="ShowExplorer" InputGestureText="F8"/><MenuItem x:Name="ActivityMonitorMenu" Header="Activity _Monitor" Click="ShowActivity" InputGestureText="Ctrl+Alt+A" ToolTip="Opens a document tab; a tab already monitoring the same server and user is activated"/><MenuItem Header="Query Statistics…" Click="ShowQueryStatistics" ToolTip="Read-only pg_stat_statements view; the extension must already be loaded and created"/><Separator/><MenuItem x:Name="WordWrapMenu" Header="Word Wrap" IsCheckable="True" Click="ToggleWordWrap" ToolTip="Wrap SQL visually without inserting line breaks"/><MenuItem x:Name="WhiteSpaceMenu" Header="Show White Space" IsCheckable="True" Click="ToggleWhiteSpace" ToolTip="Show spaces and tabs in the active SQL document"/></MenuItem>
    <MenuItem Header="_Query">
     <MenuItem Header="_Connect…" Click="Connect"/>
     <MenuItem Header="_Execute" Click="Execute" InputGestureText="F5" x:Name="ExecuteMenu" IsEnabled="False"/>
@@ -88,6 +88,10 @@
     <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.ToolWindowCaptionActiveText}" Color="#1E1E1E"/>
     <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.ToolWindowCaptionInactiveBackground}" Color="#F5FAFE"/>
     <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.ToolWindowCaptionActiveBackground}" Color="#F5FAFE"/>
+    <!-- SSMS 22.11 blue keeps document tab titles dark when the tab or its well is inactive; the VS2026 blue theme draws them pale on #A8C7D9 (M1030). -->
+    <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabUnselectedText}" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabUnselectedHoveredText}" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabSelectedInactiveText}" Color="#1E1E1E"/>
    </ad:DockingManager.Resources>
    <ad:DockingManager.Theme><theme:VS2026BlueTheme/></ad:DockingManager.Theme>
    <ad:LayoutRoot>

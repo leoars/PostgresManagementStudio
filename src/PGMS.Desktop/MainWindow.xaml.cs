@@ -14,6 +14,7 @@ namespace PGMS.Desktop;
 public partial class MainWindow : Window
 {
     private readonly Dictionary<QueryView, LayoutDocument> documents = [];
+    private readonly Dictionary<ActivityMonitorView, LayoutDocument> monitors = [];
     private int sequence;
     private string? explorerConnection;
     private CatalogService? catalogService;
@@ -25,6 +26,7 @@ public partial class MainWindow : Window
     public Task CloseCompletion => closeTask;
     private readonly string layoutFile = Path.Combine(Environment.GetEnvironmentVariable("PGMS_STATE_DIRECTORY") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PGMS"), "layout.xml");
     private QueryView? ActiveQuery => DockManager.ActiveContent as QueryView;
+    private ActivityMonitorView? ActiveMonitor => DockManager.ActiveContent as ActivityMonitorView;
 
     public MainWindow()
     {
@@ -48,9 +50,11 @@ public partial class MainWindow : Window
         {
             e.Handled = true;
             if (ActiveQuery is { } query) await CloseQueryAsync(query);
+            else if (ActiveMonitor is { } monitor && monitors.TryGetValue(monitor, out var tab)) tab.Close();
         }, (_, e) =>
         {
-            e.CanExecute = ActiveQuery is { } query && !closeRequested && !closingWindow && !shuttingDown && !closingQueries.Contains(query) && !pendingTabCloses.ContainsKey(query);
+            e.CanExecute = (ActiveQuery is { } query ? !closingQueries.Contains(query) && !pendingTabCloses.ContainsKey(query) : ActiveMonitor is not null)
+                && !closeRequested && !closingWindow && !shuttingDown;
             e.Handled = true;
         }));
         InputBindings.Add(new KeyBinding(ApplicationCommands.Close, Key.F4, ModifierKeys.Control));
@@ -69,12 +73,15 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 if (ExplorerContent.IsKeyboardFocusWithin) await RefreshSelectedExplorerAsync();
                 else if (ActiveQuery is { } query) await query.ExecuteAsync();
+                else if (ActiveMonitor is { } monitor) await monitor.ReloadAsync();
             }
             if (e.Key == Key.Escape && ExplorerContent.IsKeyboardFocusWithin && (ExplorerTree.SelectedItem as CatalogNode)?.LoadTarget is { IsBusy: true } loading)
             {
                 loading.CancelLoad(); e.Handled = true;
             }
             if (e.Key == Key.F8) { ShowExplorer(this, e); e.Handled = true; }
+            // SSMS shortcut for Activity Monitor; with Alt held WPF reports the letter in SystemKey.
+            if ((e.Key == Key.System ? e.SystemKey : e.Key) == Key.A && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt)) { ShowActivity(this, e); e.Handled = true; }
         };
     }
 
@@ -109,13 +116,7 @@ public partial class MainWindow : Window
             _ = CloseQueryAsync(view);
         };
         document.Closed += async (_, _) => { documents.Remove(view); await view.DisposeAsync(); RefreshCommands(); };
-        var pane = DockManager.Layout.Descendents().OfType<LayoutDocumentPane>().FirstOrDefault();
-        if (pane is null)
-        {
-            pane = new LayoutDocumentPane();
-            DockManager.Layout.RootPanel.Children.Add(pane);
-        }
-        pane.Children.Add(document);
+        AddDocument(document);
         if (activate) document.IsActive = true;
         // The editor is not yet in the visual tree when the document is inserted.
         // Defer focus until layout has created it, so Ctrl+N accepts typing immediately.
@@ -127,6 +128,17 @@ public partial class MainWindow : Window
         });
         RefreshCommands();
         return view;
+    }
+
+    private void AddDocument(LayoutDocument document)
+    {
+        var pane = DockManager.Layout.Descendents().OfType<LayoutDocumentPane>().FirstOrDefault();
+        if (pane is null)
+        {
+            pane = new LayoutDocumentPane();
+            DockManager.Layout.RootPanel.Children.Add(pane);
+        }
+        pane.Children.Add(document);
     }
 
     private async void Open(object sender, ExecutedRoutedEventArgs e)
@@ -520,8 +532,23 @@ public partial class MainWindow : Window
     private void ShowActivity(object sender, RoutedEventArgs e)
     {
         if (SelectedConnection is not { } connection) { Status.Text = "Connect before opening Activity Monitor."; return; }
-        new ActivityWindow(connection) { Owner = this }.Show();
+        OpenActivityMonitor(connection);
     }
+    /// <summary>Activity Monitor as a document tab, like SSMS; a tab already monitoring the same server and user is activated instead.</summary>
+    internal ActivityMonitorView OpenActivityMonitor(string connection)
+    {
+        if (monitors.FirstOrDefault(m => m.Key.Targets(connection)) is { Key: { } existing, Value: { } tab }) { tab.IsActive = true; return existing; }
+        var view = new ActivityMonitorView(connection) { OpenQueryText = OpenQueryTextAsync, OpenQueryPlan = OpenEstimatedPlanAsync };
+        var document = new LayoutDocument { Title = view.Title, ContentId = Guid.NewGuid().ToString(), Content = view };
+        monitors.Add(view, document);
+        document.Closing += (_, e) => { if (!view.RequestClose()) e.Cancel = true; };
+        document.Closed += (_, _) => { monitors.Remove(view); view.Shutdown(); RefreshCommands(); };
+        AddDocument(document);
+        document.IsActive = true;
+        RefreshCommands();
+        return view;
+    }
+    internal IReadOnlyCollection<ActivityMonitorView> ActivityMonitors => monitors.Keys;
     private void ShowQueryStatistics(object sender, RoutedEventArgs e)
     {
         if (SelectedConnection is not { } connection) { Status.Text = "Connect before opening Query Statistics."; return; }
@@ -533,6 +560,21 @@ public partial class MainWindow : Window
         var query = NewQuery(sql);
         try { await query.ConnectAsync(connection); await query.ExplainGenericPlanAsync(); }
         catch (Exception ex) when (ex is Npgsql.NpgsqlException or IOException or OperationCanceledException) { ShowError(ex); }
+        return query;
+    }
+    // Activity Monitor → Active Expensive Queries: the running statement in a new tab connected to its database, not executed.
+    internal async Task<QueryView> OpenQueryTextAsync(string connection, string sql)
+    {
+        var query = NewQuery(sql);
+        try { await query.ConnectAsync(connection); }
+        catch (Exception ex) when (ex is Npgsql.NpgsqlException or IOException or OperationCanceledException) { ShowError(ex); }
+        return query;
+    }
+    // Estimated plan only (EXPLAIN without ANALYZE); text with $n placeholders switches to the generic plan.
+    internal async Task<QueryView> OpenEstimatedPlanAsync(string connection, string sql)
+    {
+        var query = await OpenQueryTextAsync(connection, sql);
+        if (query.IsConnected) await query.ExplainPlanAsync();
         return query;
     }
     private async void RoutinePermissionsFromExplorer(object sender, RoutedEventArgs e)
@@ -660,7 +702,7 @@ public partial class MainWindow : Window
         if (existing is not null) { existing.Content = null; }
         tools.Children.Add(new LayoutAnchorable { Title = "Object Explorer", ContentId = "explorer", Content = ExplorerContent, CanClose = false });
         var pane = new LayoutDocumentPane();
-        foreach (var document in documents.Values) pane.Children.Add(document);
+        foreach (var document in documents.Values.Concat(monitors.Values)) pane.Children.Add(document);
         panel.Children.Add(tools); panel.Children.Add(pane); root.RootPanel = panel; DockManager.Layout = root;
     }
 
@@ -733,6 +775,7 @@ public partial class MainWindow : Window
         {
             if (!await ClearRecoveryOnCloseAsync()) return;
             catalogCancellation.Cancel();
+            foreach (var monitor in monitors.Keys) monitor.Shutdown();
             try
             {
                 using var writer = new StringWriter();
