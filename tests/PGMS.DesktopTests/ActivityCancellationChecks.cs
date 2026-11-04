@@ -12,7 +12,7 @@ internal static class ActivityCancellationChecks
         string pooled=new NpgsqlConnectionStringBuilder(connection){ApplicationName=application,Pooling=true,MinPoolSize=1,MaxPoolSize=1}.ConnectionString;
         await using var observer=new NpgsqlConnection(connection);await observer.OpenAsync();
         await using var blocker=new NpgsqlConnection(connection);await blocker.OpenAsync();
-        var monitor=new ActivityWindow(pooled){ShowInTaskbar=false};ActivityDialogChecks.Find<TextBox>(monitor,"PidFilter").Text=observer.ProcessID.ToString();monitor.Show();var grid=ActivityDialogChecks.Find<DataGrid>(monitor,"Sessions");
+        var monitor=new ActivityHost(pooled){ShowInTaskbar=false};ActivityDialogChecks.Find<CheckBox>(monitor,"AutoRefreshCheck").IsChecked=false;ActivityDialogChecks.Find<TextBox>(monitor,"PidFilter").Text=observer.ProcessID.ToString();monitor.Show();var grid=ActivityDialogChecks.Find<DataGrid>(monitor,"Sessions");
         Task? pending=null;
         try
         {
@@ -22,7 +22,7 @@ internal static class ActivityCancellationChecks
             int previous=monitor.SnapshotVersion;
             int monitorPid;await using(var pid=new NpgsqlCommand("SELECT pid FROM pg_stat_get_activity(NULL) WHERE application_name=@app",observer)){pid.Parameters.AddWithValue("app",application);monitorPid=Convert.ToInt32(await pid.ExecuteScalarAsync());}
             await using var blockedQuery=new NpgsqlCommand("SELECT cardinality(pg_blocking_pids(@pid))>0",observer);blockedQuery.Parameters.AddWithValue("pid",monitorPid);await blockedQuery.ExecuteScalarAsync();
-            ActivityDialogChecks.Find<ComboBox>(monitor,"AutoRefreshIntervalSelector").SelectedIndex=3;ActivityDialogChecks.Find<CheckBox>(monitor,"AutoRefreshCheck").IsChecked=true;
+            var interval=ActivityDialogChecks.Find<ComboBox>(monitor,"AutoRefreshIntervalSelector");interval.SelectedItem=interval.Items.OfType<ComboBoxItem>().Single(i=>(string)i.Tag=="60");ActivityDialogChecks.Find<CheckBox>(monitor,"AutoRefreshCheck").IsChecked=true;
             await using(var transaction=await blocker.BeginTransactionAsync())
             {
                 await using(var lockView=new NpgsqlCommand("LOCK TABLE pg_catalog.pg_stat_activity IN ACCESS EXCLUSIVE MODE",blocker,transaction)){await lockView.ExecuteNonQueryAsync();}

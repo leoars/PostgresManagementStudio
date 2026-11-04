@@ -382,7 +382,9 @@ internal static class RepresentativeLoadChecks
             }
             foreach (var c in sessions.Take(10))
                 sleepers.Add(Task.Run(async () => { try { await using var cmd = new NpgsqlCommand("SELECT pg_sleep(60)", c); await cmd.ExecuteNonQueryAsync(); } catch (Exception ex) when (ex is NpgsqlException or InvalidOperationException) { } }));
-            var window = new ActivityWindow(connection) { ShowInTaskbar = false, Opacity = 0 };
+            var window = new ActivityHost(connection) { ShowInTaskbar = false, Opacity = 0 };
+            // Measured refreshes are explicit; the default 10-second timer would otherwise race them.
+            ((CheckBox)window.FindName("AutoRefreshCheck")).IsChecked = false;
             try
             {
                 var grid = (DataGrid)window.FindName("Sessions");
@@ -398,6 +400,8 @@ internal static class RepresentativeLoadChecks
                 check(window.IsAutoRefreshRunning, "Auto-refresh runs every 5 seconds");
                 await probe.StepAsync("auto-refresh-12s", () => Task.Delay(12000), window);
                 ((CheckBox)window.FindName("AutoRefreshCheck")).IsChecked = false;
+                // The monitor refuses to close mid-refresh; let a running tick finish.
+                await window.ReloadAsync();
                 return new { sessionsListed = rows, autoRefreshSeconds = 5 };
             }
             finally { window.Close(); }

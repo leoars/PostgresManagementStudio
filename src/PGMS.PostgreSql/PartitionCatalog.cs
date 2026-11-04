@@ -5,7 +5,7 @@ namespace PGMS.PostgreSql;
 
 public sealed record PartitionParent(uint DatabaseOid,uint NamespaceOid,uint Oid,string Schema,string Name,PartitionStrategy Strategy,int KeyCount,string Definition,string Signature);
 public sealed record PartitionChild(uint Oid,uint NamespaceOid,string Schema,string Name,string Kind,string Bound,bool DetachPending);
-public sealed record PartitionInspection(PartitionParent Parent,IReadOnlyList<PartitionChild> Children);
+public sealed record PartitionInspection(PartitionParent Parent,IReadOnlyList<PartitionChild> Children,IReadOnlyList<string> Columns);
 
 public sealed class PartitionCatalog(string connectionString)
 {
@@ -25,7 +25,11 @@ public sealed class PartitionCatalog(string connectionString)
         var children=new List<PartitionChild>();while(await reader.ReadAsync(token).ConfigureAwait(false))
             children.Add(new(reader.GetFieldValue<uint>(0),reader.GetFieldValue<uint>(1),reader.GetString(2),reader.GetString(3),reader.GetString(4),reader.GetString(5),reader.GetBoolean(6)));
         if(children.Count>1000)throw new InvalidOperationException("More than 1000 direct partitions; refusing an incomplete inspection.");
-        return new(parent,children.AsReadOnly());
+        await reader.DisposeAsync().ConfigureAwait(false);
+        await using var columns=new NpgsqlCommand("SELECT a.attname FROM pg_catalog.pg_attribute a WHERE a.attrelid=@oid AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum",c,tx){CommandTimeout=15};
+        columns.Parameters.AddWithValue("oid",NpgsqlTypes.NpgsqlDbType.Oid,parent.Oid);
+        var names=new List<string>();await using(var r=await columns.ExecuteReaderAsync(token).ConfigureAwait(false))while(await r.ReadAsync(token).ConfigureAwait(false))names.Add(r.GetString(0));
+        return new(parent,children.AsReadOnly(),names.AsReadOnly());
     }
     internal static async Task<PartitionParent> ReadParent(NpgsqlConnection c,NpgsqlTransaction tx,string schema,string name,CancellationToken token)
     {
@@ -60,16 +64,27 @@ public sealed class PartitionCatalog(string connectionString)
 
 public sealed record CreatePartitionEdit(PartitionParent Parent,string Schema,string Name,PartitionBounds Bounds):IAdministrativeEdit
 {
-    public string ToSql()=> $"CREATE TABLE {ObjectSql.Relation(Schema,Name)} PARTITION OF {ObjectSql.Relation(Parent.Schema,Parent.Name)} {Bounds.ToSql(Parent.Strategy,Parent.KeyCount)};";
+    /// <summary>When set, the new partition is itself partitioned (a sub-partition level) and starts without partitions.</summary>
+    public TablePartitioning? Partitioning { get; init; }
+    public string ToSql()=> $"CREATE TABLE {ObjectSql.Relation(Schema,Name)} PARTITION OF {ObjectSql.Relation(Parent.Schema,Parent.Name)} {Bounds.ToSql(Parent.Strategy,Parent.KeyCount)}{(Partitioning is null?"":" "+Partitioning.KeySql())};";
     public Task ValidateAsync(NpgsqlConnection c,NpgsqlTransaction tx,CancellationToken token=default)=>PartitionCatalog.Guard(c,tx,Parent,token);
     public async Task VerifyAppliedAsync(NpgsqlConnection c,NpgsqlTransaction tx,CancellationToken token=default)
     {
         await PartitionCatalog.Verify(c,tx,Parent,token).ConfigureAwait(false);
         await using var cmd=new NpgsqlCommand("""
-            SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
-              JOIN pg_catalog.pg_inherits i ON i.inhrelid=c.oid WHERE n.nspname=@schema AND c.relname=@name AND i.inhparent=@parent AND c.relispartition AND NOT i.inhdetachpending)
+            SELECT c.relkind::text,p.partstrat::text,
+              (SELECT array_agg(a.attname::text ORDER BY k.o) FROM unnest(p.partattrs::int2[]) WITH ORDINALITY k(n,o)
+                 JOIN pg_catalog.pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.n),p.partexprs IS NULL
+            FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+            JOIN pg_catalog.pg_inherits i ON i.inhrelid=c.oid LEFT JOIN pg_catalog.pg_partitioned_table p ON p.partrelid=c.oid
+            WHERE n.nspname=@schema AND c.relname=@name AND i.inhparent=@parent AND c.relispartition AND NOT i.inhdetachpending
             """,c,tx);
         cmd.Parameters.AddWithValue("schema",Schema);cmd.Parameters.AddWithValue("name",Name);cmd.Parameters.AddWithValue("parent",NpgsqlTypes.NpgsqlDbType.Oid,Parent.Oid);
-        if(await cmd.ExecuteScalarAsync(token).ConfigureAwait(false) is not true)throw new InvalidOperationException("Created partition link could not be verified.");
+        await using var r=await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
+        if(!await r.ReadAsync(token).ConfigureAwait(false))throw new InvalidOperationException("Created partition link could not be verified.");
+        bool matches=Partitioning is null?r.GetString(0)=="r"
+            :r.GetString(0)=="p" && r.GetString(1)==Partitioning.Strategy switch{PartitionStrategy.Range=>"r",PartitionStrategy.List=>"l",_=>"h"}
+              && !r.IsDBNull(2) && r.GetFieldValue<string[]>(2).SequenceEqual(Partitioning.Columns) && r.GetBoolean(3);
+        if(!matches)throw new InvalidOperationException("Created partition kind or sub-partition key could not be verified.");
     }
 }

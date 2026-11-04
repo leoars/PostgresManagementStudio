@@ -10,20 +10,28 @@ public sealed record QueryStatisticsAvailability(bool? LibraryLoaded, bool Exten
 {
     /// <summary>track_io_timing as reported by pg_settings; null when hidden from the role. When off, I/O times stay 0.</summary>
     public bool? TrackIoTiming { get; init; }
+    // The view columns follow the extension version created in the database, not the server: pg_upgrade keeps 1.10 on PostgreSQL 17 until ALTER EXTENSION … UPDATE.
+    private Version? ParsedVersion => Version.TryParse(InstalledVersion, out var version) ? version : null;
+    /// <summary>1.10 (PostgreSQL 15/16) is the oldest version read; it has temp block timing and toplevel. An unparsable version is read as current.</summary>
+    public bool IsSupportedVersion => ParsedVersion is not { } v || v >= new Version(1, 10);
+    /// <summary>1.11 (PostgreSQL 17) adds stats_since, which identifies an entry instance, and splits block timing into shared, local and temp.</summary>
+    public bool HasEntryTimestamps => ParsedVersion is not { } v || v >= new Version(1, 11);
     /// <summary>LibraryLoaded is null when pg_settings hides shared_preload_libraries from the connected role; the read itself then proves it.</summary>
-    public bool IsReadable => LibraryLoaded != false && ExtensionInstalled && ViewSchema is not null;
+    public bool IsReadable => LibraryLoaded != false && ExtensionInstalled && ViewSchema is not null && IsSupportedVersion;
     public string Describe()
     {
         if (LibraryLoaded == false) return "pg_stat_statements is not loaded on this server: it requires shared_preload_libraries = 'pg_stat_statements' in postgresql.conf and a server restart. PGMS does not change server configuration.";
+        if (ExtensionInstalled && !IsSupportedVersion) return $"pg_stat_statements {InstalledVersion} in database \"{Database}\" is older than 1.10, the oldest version PGMS reads. "
+            + (AvailableVersion is null ? "" : $"This server offers {AvailableVersion}; a privileged user can run ALTER EXTENSION pg_stat_statements UPDATE. ") + "PGMS does not change extensions.";
         if (!ExtensionInstalled) return AvailableVersion is null
             ? $"The extension files for pg_stat_statements are not available to this server, so it cannot be created in database \"{Database}\"."
             : (LibraryLoaded is null
                 ? $"The pg_stat_statements extension is not created in database \"{Database}\"; the connected role cannot read shared_preload_libraries to confirm the library is loaded. "
                 : $"The pg_stat_statements library is loaded, but the extension is not created in database \"{Database}\". ")
               + "A privileged user can run CREATE EXTENSION pg_stat_statements in that database; PGMS does not install extensions.";
-        return CanReadAllQueries
-            ? $"pg_stat_statements {InstalledVersion} is available in database \"{Database}\"."
-            : $"pg_stat_statements {InstalledVersion} is available in database \"{Database}\". Query text of other users is hidden as <insufficient privilege> because the connected role is not a member of pg_read_all_stats.";
+        return $"pg_stat_statements {InstalledVersion} is available in database \"{Database}\"."
+            + (CanReadAllQueries ? "" : " Query text of other users is hidden as <insufficient privilege> because the connected role is not a member of pg_read_all_stats.")
+            + (HasEntryTimestamps ? "" : " This version has no entry creation time (stats_since, 1.11): a time window cannot detect a statement removed and tracked again during the window, by eviction or by an individual reset, and may then count it short.");
     }
 }
 
@@ -105,8 +113,9 @@ public sealed record QueryStatisticsSnapshot(IReadOnlyList<QueryStatisticsEntry>
 }
 
 /// <summary>Cumulative counters of one visible pg_stat_statements entry, without its SQL. SumSquaresMs is the sum of squared execution times, so a
-/// standard deviation can be derived for the difference of two reads. StatsSince identifies the entry instance: a reset or eviction recreates it with a new value.</summary>
-public sealed record QueryStatisticsCounters(uint UserOid, uint DatabaseOid, long QueryId, bool TopLevel, DateTime StatsSince, long Calls, double TotalExecMs, double SumSquaresMs,
+/// standard deviation can be derived for the difference of two reads. StatsSince identifies the entry instance: a reset or eviction recreates it with a new value.
+/// It is null before pg_stat_statements 1.11.</summary>
+public sealed record QueryStatisticsCounters(uint UserOid, uint DatabaseOid, long QueryId, bool TopLevel, DateTime? StatsSince, long Calls, double TotalExecMs, double SumSquaresMs,
     long Rows, long SharedBlocksHit, long SharedBlocksRead, long TempBlocksRead, long TempBlocksWritten, long WalBytes, double IoTimeMs);
 
 /// <summary>Counters of every entry visible to the role at one server instant. Window reads subtract it from current counters.</summary>
@@ -123,7 +132,7 @@ public sealed record QueryStatisticsBaseline(DateTime TakenAt, DateTime? StatsRe
         foreach (var e in Entries)
         {
             if (e is null) throw new System.IO.InvalidDataException("Invalid baseline entry.");
-            if (e.StatsSince.Kind != DateTimeKind.Utc || e.StatsSince > TakenAt) throw new System.IO.InvalidDataException("Baseline entry created after the baseline instant.");
+            if (e.StatsSince is { } since && (since.Kind != DateTimeKind.Utc || since > TakenAt)) throw new System.IO.InvalidDataException("Baseline entry created after the baseline instant.");
             if (e.Calls < 0 || e.Rows < 0 || e.SharedBlocksHit < 0 || e.SharedBlocksRead < 0 || e.TempBlocksRead < 0 || e.TempBlocksWritten < 0 || e.WalBytes < 0) throw new System.IO.InvalidDataException("Baseline counters cannot be negative.");
             if (!double.IsFinite(e.TotalExecMs) || !double.IsFinite(e.SumSquaresMs) || !double.IsFinite(e.IoTimeMs) || e.TotalExecMs < 0 || e.SumSquaresMs < 0 || e.IoTimeMs < 0) throw new System.IO.InvalidDataException("Baseline times must be finite and non-negative.");
             if (!keys.Add((e.UserOid, e.DatabaseOid, e.QueryId, e.TopLevel))) throw new System.IO.InvalidDataException("Duplicate baseline entry.");
@@ -136,8 +145,11 @@ public sealed record QueryStatisticsBaseline(DateTime TakenAt, DateTime? StatsRe
 public sealed class QueryStatisticsService(string connectionString)
 {
     public const int DefaultMaximumRows = 1000;
-    // pg_stat_statements 1.11 (PostgreSQL 17) splits block timing into shared, local and temp columns.
-    private static string IoTimeSql(string p) => $"({p}.shared_blk_read_time + {p}.shared_blk_write_time + {p}.local_blk_read_time + {p}.local_blk_write_time + {p}.temp_blk_read_time + {p}.temp_blk_write_time)";
+    // pg_stat_statements 1.11 (PostgreSQL 17) splits block timing into shared, local and temp columns; in 1.10 blk_*_time covers shared and local blocks.
+    private static string IoTimeSql(string p, QueryStatisticsAvailability a) => a.HasEntryTimestamps
+        ? $"({p}.shared_blk_read_time + {p}.shared_blk_write_time + {p}.local_blk_read_time + {p}.local_blk_write_time + {p}.temp_blk_read_time + {p}.temp_blk_write_time)"
+        : $"({p}.blk_read_time + {p}.blk_write_time + {p}.temp_blk_read_time + {p}.temp_blk_write_time)";
+    private static string StatsSinceSql(string p, QueryStatisticsAvailability a) => a.HasEntryTimestamps ? $"{p}.stats_since" : "NULL::timestamptz";
     // Sum of squared execution times from the Welford variance pg_stat_statements keeps: population variance times calls plus total squared over calls.
     private static string SumSquaresSql(string p) => $"({p}.stddev_exec_time * {p}.stddev_exec_time * {p}.calls + CASE WHEN {p}.calls > 0 THEN {p}.total_exec_time * {p}.total_exec_time / {p}.calls ELSE 0 END)";
 
@@ -195,6 +207,9 @@ public sealed class QueryStatisticsService(string connectionString)
         string schema = SqlIdentifier.Quote(availability.ViewSchema!), view = schema + ".pg_stat_statements";
         (DateTime? StatsReset, long? Deallocations) info = default;
         if (baseline is not null) info = await InfoAsync(c, schema, availability, token).ConfigureAwait(false);
+        bool resetSinceBaseline = baseline is not null && info.StatsReset is { } reset && reset > baseline.TakenAt;
+        // Without stats_since a full reset cannot be told from the old entries by instance, but every entry now postdates the baseline: count them all.
+        var subtracted = resetSinceBaseline && !availability.HasEntryTimestamps ? baseline! with { Entries = [] } : baseline;
         string order = filter.Order switch
         {
             QueryStatisticsOrder.MeanExecTime => "s.mean_exec_time DESC",
@@ -212,9 +227,9 @@ public sealed class QueryStatisticsService(string connectionString)
         // Both modes produce the same columns in "s"; "j" also keeps entries a window cannot measure, so they can be counted.
         string source = baseline is null
             ? $"""
-              j AS (SELECT p.queryid, p.userid, p.dbid, p.toplevel, p.query, p.stats_since, p.calls, p.total_exec_time, p.mean_exec_time, p.min_exec_time, p.max_exec_time,
+              j AS (SELECT p.queryid, p.userid, p.dbid, p.toplevel, p.query, {StatsSinceSql("p", availability)} AS stats_since, p.calls, p.total_exec_time, p.mean_exec_time, p.min_exec_time, p.max_exec_time,
                            p.stddev_exec_time, p.rows, p.shared_blks_hit, p.shared_blks_read, p.temp_blks_read, p.temp_blks_written, p.wal_bytes::bigint AS wal_bytes,
-                           {IoTimeSql("p")} AS io_time, true AS usable
+                           {IoTimeSql("p", availability)} AS io_time, true AS usable
                     FROM {view} p),
               s AS (SELECT * FROM j)
               """
@@ -223,7 +238,8 @@ public sealed class QueryStatisticsService(string connectionString)
                                              pg_catalog.unnest(@bc), pg_catalog.unnest(@btot), pg_catalog.unnest(@bsq), pg_catalog.unnest(@br), pg_catalog.unnest(@bh),
                                              pg_catalog.unnest(@bre), pg_catalog.unnest(@btr), pg_catalog.unnest(@btw), pg_catalog.unnest(@bw), pg_catalog.unnest(@bio))
                     AS b(userid, dbid, queryid, toplevel, stats_since, calls, total, sumsq, rows, hit, rd, tr, tw, wal, io)),
-              j AS (SELECT p.queryid, p.userid, p.dbid, p.toplevel, p.query, p.stats_since,
+              q AS (SELECT p.*, {StatsSinceSql("p", availability)} AS since, {IoTimeSql("p", availability)} AS io FROM {view} p WHERE p.queryid IS NOT NULL),
+              j AS (SELECT p.queryid, p.userid, p.dbid, p.toplevel, p.query, p.since AS stats_since,
                            p.calls - coalesce(b.calls, 0) AS calls,
                            p.total_exec_time - coalesce(b.total, 0) AS total_exec_time,
                            {SumSquaresSql("p")} - coalesce(b.sumsq, 0) AS sumsq,
@@ -233,11 +249,11 @@ public sealed class QueryStatisticsService(string connectionString)
                            p.temp_blks_read - coalesce(b.tr, 0) AS temp_blks_read,
                            p.temp_blks_written - coalesce(b.tw, 0) AS temp_blks_written,
                            p.wal_bytes::bigint - coalesce(b.wal, 0) AS wal_bytes,
-                           {IoTimeSql("p")} - coalesce(b.io, 0) AS io_time,
-                           b.queryid IS NOT NULL OR p.stats_since >= @windowStart AS usable
-                    FROM {view} p
-                    LEFT JOIN b ON b.userid = p.userid AND b.dbid = p.dbid AND b.queryid = p.queryid AND b.toplevel = p.toplevel AND b.stats_since = p.stats_since
-                    WHERE p.queryid IS NOT NULL),
+                           p.io - coalesce(b.io, 0) AS io_time,
+                           -- Unmatched: created after the baseline (by stats_since, or by absence when it is unknown). Fewer calls than the baseline: a recreated entry.
+                           CASE WHEN b.queryid IS NULL THEN p.since IS NULL OR p.since >= @windowStart ELSE p.calls >= b.calls END AS usable
+                    FROM q p
+                    LEFT JOIN b ON b.userid = p.userid AND b.dbid = p.dbid AND b.queryid = p.queryid AND b.toplevel = p.toplevel AND b.stats_since IS NOT DISTINCT FROM p.since),
               s AS (SELECT j.queryid, j.userid, j.dbid, j.toplevel, j.query, j.stats_since, j.calls, j.total_exec_time,
                            j.total_exec_time / j.calls AS mean_exec_time, 'NaN'::float8 AS min_exec_time, 'NaN'::float8 AS max_exec_time,
                            pg_catalog.sqrt(GREATEST(j.sumsq / j.calls - (j.total_exec_time / j.calls) * (j.total_exec_time / j.calls), 0)) AS stddev_exec_time,
@@ -271,7 +287,7 @@ public sealed class QueryStatisticsService(string connectionString)
         cmd.Parameters.AddWithValue("user", filter.User);
         cmd.Parameters.AddWithValue("query", filter.Query);
         cmd.Parameters.Add("minimumCalls", NpgsqlDbType.Bigint).Value = filter.MinimumCalls;
-        if (baseline is not null) AddBaseline(cmd, baseline);
+        if (subtracted is not null) AddBaseline(cmd, subtracted);
         var rows = new List<QueryStatisticsEntry>();
         DateTime observed = default; long unusable = 0;
         NpgsqlDataReader reader;
@@ -295,7 +311,7 @@ public sealed class QueryStatisticsService(string connectionString)
         {
             WindowStart = baseline?.TakenAt, UnusableEntries = unusable,
             EvictedSinceWindowStart = baseline?.Deallocations is { } before && info.Deallocations is { } now ? Math.Max(0, now - before) : null,
-            ResetSinceWindowStart = baseline is not null && info.StatsReset is { } reset && reset > baseline.TakenAt
+            ResetSinceWindowStart = resetSinceBaseline
         };
     }
 
@@ -338,8 +354,8 @@ public sealed class QueryStatisticsService(string connectionString)
         var info = await InfoAsync(c, schema, availability, token).ConfigureAwait(false);
         DateTime takenAt = await ServerTimeAsync(c, token).ConfigureAwait(false);
         await using var cmd = new NpgsqlCommand($"""
-            SELECT p.userid, p.dbid, p.queryid, p.toplevel, p.stats_since, p.calls, p.total_exec_time, {SumSquaresSql("p")}, p.rows,
-                   p.shared_blks_hit, p.shared_blks_read, p.temp_blks_read, p.temp_blks_written, p.wal_bytes::bigint, {IoTimeSql("p")}
+            SELECT p.userid, p.dbid, p.queryid, p.toplevel, {StatsSinceSql("p", availability)}, p.calls, p.total_exec_time, {SumSquaresSql("p")}, p.rows,
+                   p.shared_blks_hit, p.shared_blks_read, p.temp_blks_read, p.temp_blks_written, p.wal_bytes::bigint, {IoTimeSql("p", availability)}
             FROM {schema}.pg_stat_statements(false) p
             WHERE p.queryid IS NOT NULL
             ORDER BY p.queryid, p.dbid, p.userid, p.toplevel
@@ -349,12 +365,12 @@ public sealed class QueryStatisticsService(string connectionString)
         var entries = new List<QueryStatisticsCounters>();
         await using (var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false))
             while (await reader.ReadAsync(token).ConfigureAwait(false))
-                entries.Add(new(reader.GetFieldValue<uint>(0), reader.GetFieldValue<uint>(1), reader.GetInt64(2), reader.GetBoolean(3), reader.GetDateTime(4), reader.GetInt64(5),
+                entries.Add(new(reader.GetFieldValue<uint>(0), reader.GetFieldValue<uint>(1), reader.GetInt64(2), reader.GetBoolean(3), reader.IsDBNull(4) ? null : reader.GetDateTime(4), reader.GetInt64(5),
                     reader.GetDouble(6), Math.Max(0, reader.GetDouble(7)), reader.GetInt64(8), reader.GetInt64(9), reader.GetInt64(10), reader.GetInt64(11), reader.GetInt64(12),
                     reader.GetInt64(13), reader.GetDouble(14)));
         if (entries.Count > QueryStatisticsBaseline.MaximumEntries) throw new QueryStatisticsBaselineException($"More than {QueryStatisticsBaseline.MaximumEntries} statements are tracked; a baseline cannot hold them all.");
         // Entries created after the instant count fully in a later window, so they must not be subtracted.
-        entries.RemoveAll(e => e.StatsSince > takenAt);
+        entries.RemoveAll(e => e.StatsSince is { } since && since > takenAt);
         return new QueryStatisticsBaseline(takenAt, info.StatsReset, info.Deallocations, entries.AsReadOnly()).Validate();
     }
 

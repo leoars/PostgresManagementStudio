@@ -347,7 +347,11 @@ public partial class QueryStatisticsWindow : Window
             if (snapshot.WindowStart is { } start)
             {
                 window = $" Window {start:yyyy-MM-dd HH:mm:ss} to {snapshot.ObservedAt:HH:mm:ss} UTC ({Span(snapshot.ObservedAt - start)}).";
-                if (snapshot.UnusableEntries > 0) window += $" {snapshot.UnusableEntries} statement(s) existed before the window start without counters in the earlier read and were left out.";
+                if (snapshot.UnusableEntries > 0) window += snapshot.Availability.HasEntryTimestamps
+                    ? $" {snapshot.UnusableEntries} statement(s) existed before the window start without counters in the earlier read and were left out."
+                    : $" {snapshot.UnusableEntries} statement(s) have fewer calls than in the earlier read (tracked again since) and were left out.";
+                // Only windows depend on stats_since, so the 1.10 limit is stated here instead of in the availability banner.
+                if (!snapshot.Availability.HasEntryTimestamps) window += $" pg_stat_statements {snapshot.Availability.InstalledVersion} has no stats_since: a statement removed and tracked again within the window can count low.";
                 if (snapshot.EvictedSinceWindowStart > 0) window += $" pg_stat_statements evicted {snapshot.EvictedSinceWindowStart} entr(ies) since then, so some counts can be low.";
                 if (snapshot.ResetSinceWindowStart) window += " Statistics were reset after the window start; entries are counted from their re-creation.";
             }
@@ -373,7 +377,7 @@ public partial class QueryStatisticsWindow : Window
     {
         Availability = availability;
         AvailabilityText.Text = availability.Describe();
-        AvailabilityBanner.Visibility = availability.IsReadable && availability.CanReadAllQueries ? Visibility.Collapsed : Visibility.Visible;
+        AvailabilityBanner.Visibility = availability.IsReadable && availability.CanReadAllQueries ?Visibility.Collapsed : Visibility.Visible;
     }
     // Keeps server order; rows are keyed by (queryid, database, user, toplevel) so a sort or selection survives refresh.
     // Statements hidden from the role have no queryid and therefore no stable identity: they are replaced on every refresh.

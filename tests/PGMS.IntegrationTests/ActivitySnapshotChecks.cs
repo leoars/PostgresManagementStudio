@@ -20,6 +20,22 @@ internal static class ActivitySnapshotChecks
         check(!fewer.IsTruncated && fewer.Rows.Count==3,"Fewer sessions than limit reports complete snapshot");
         var empty=await service.ReadSnapshotAsync(new ActivityFilter(Application:app+"missing"),1);
         check(!empty.IsTruncated && empty.Rows.Count==0,"Empty filtered snapshot is complete");
+        var pids=new[]{a.ProcessID,b.ProcessID,c.ProcessID}.Order().ToArray();
+        var first=await service.ReadSnapshotAsync(filter,ActivityPage.First,1);
+        check(first.Rows.Single().Pid==pids[0] && first.TotalMatching==3 && first.Preceding==0 && first.IsTruncated && !first.HasPrevious,"First activity page reports total and following sessions");
+        var middle=await service.ReadSnapshotAsync(filter,new ActivityPage(AfterPid:pids[0]),1);
+        check(middle.Rows.Single().Pid==pids[1] && middle.Preceding==1 && middle.IsTruncated && middle.HasPrevious,"Page after a PID continues in PID order with its position");
+        var last=await service.ReadSnapshotAsync(filter,new ActivityPage(AfterPid:pids[1]),1);
+        check(last.Rows.Single().Pid==pids[2] && last.Preceding==2 && !last.IsTruncated && last.TotalMatching==3,"Last activity page is complete and not truncated");
+        var back=await service.ReadSnapshotAsync(filter,new ActivityPage(BeforePid:pids[2]),2);
+        check(back.Rows.Select(x=>x.Pid).SequenceEqual(pids[..2]) && back.Preceding==0 && back.IsTruncated,"Page before a PID returns the nearest sessions in ascending order");
+        var beyond=await service.ReadSnapshotAsync(filter,new ActivityPage(AfterPid:pids[2]),2);
+        check(beyond.Rows.Count==0 && !beyond.IsTruncated,"Page after the last session is empty");
+        foreach(var bad in new[]{new ActivityPage(AfterPid:1,BeforePid:2),new ActivityPage(AfterPid:-1),new ActivityPage(BeforePid:0)})
+        {
+            bool rejected=false;try{await service.ReadSnapshotAsync(filter,bad,2);}catch(ArgumentException){rejected=true;}
+            check(rejected,"Invalid activity page rejected before connection");
+        }
         foreach(int invalid in new[]{0,-1,1001})
         {
             bool rejected=false;try{await service.ReadSnapshotAsync(filter,invalid);}catch(ArgumentOutOfRangeException){rejected=true;}

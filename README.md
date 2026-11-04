@@ -6,7 +6,7 @@ English | [Português (Brasil)](README.pt-BR.md)
 
 **The SQL Server Management Studio experience, for PostgreSQL.** A native Windows client with Object Explorer, F5 to run, execution plans, session monitoring and backup/restore, built for people who already think in SSMS.
 
-**[Download v0.1.0-alpha.3 for Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.3)** · Graphical installer (EN/pt-BR) or portable ZIP, .NET runtime included · Works with PostgreSQL 17 and 18
+**[Download v0.1.0-alpha.4 for Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.4)** · Graphical installer (EN/pt-BR) or portable ZIP, .NET runtime included · Works with PostgreSQL 16–18
 
 ![PGMS editor, Object Explorer and query results](docs/assets/pgms-results-m959.jpg)
 
@@ -46,14 +46,14 @@ Get-FileHash .\PGMS-* -Algorithm SHA256
 Compare the hashes with `SHA256SUMS.txt` in the release. Starting with v0.1.0-alpha.2 the assets are built by the [release workflow](.github/workflows/release.yml) on GitHub Actions and carry a build provenance attestation, so you can also confirm that the ZIP or installer came from that workflow and this repository (requires the [GitHub CLI](https://cli.github.com/)):
 
 ```powershell
-gh attestation verify .\PGMS-0.1.0-alpha.3-Setup-x64.exe --repo leoars/PostgresManagementStudio
+gh attestation verify .\PGMS-0.1.0-alpha.4-Setup-x64.exe --repo leoars/PostgresManagementStudio
 ```
 
 v0.1.0-alpha.1 was built on the maintainer's machine and has checksums only. Code signing through the SignPath Foundation open source program is planned.
 
 ### Build from source
 
-For development: Windows x64, PowerShell 7 and the .NET SDK selected by [global.json](global.json) (`10.0.400`, latest installed patch in that feature band). PostgreSQL 17/18 and matching-major tools are needed for database tests and backup/restore.
+For development: Windows x64, PowerShell 7 and the .NET SDK selected by [global.json](global.json) (`10.0.400`, latest installed patch in that feature band). PostgreSQL 16–18 and matching-major tools are needed for database tests and backup/restore.
 
 ```powershell
 git clone https://github.com/leoars/PostgresManagementStudio.git

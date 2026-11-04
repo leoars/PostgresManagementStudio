@@ -2,5 +2,5 @@ namespace PGMS.Desktop;
 
 public static class BuildInfo
 {
-    public const string Milestone = "M1022";
+    public const string Milestone = "M1030";
 }
