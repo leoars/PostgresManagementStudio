@@ -9,9 +9,11 @@ public partial class RoleMembershipDialog : Window
     private readonly string connection;
     private bool ready, busy;
     public string? ScriptSql { get; private set; }
-    public RoleMembershipDialog(string connection)
+    public RoleMembershipDialog(string connection, string? memberRole = null)
     {
         this.connection = connection; InitializeComponent();
+        // Opened on a role (Object Explorer ▸ Role Memberships…): show its memberships right away.
+        if (memberRole is not null) { MemberRole.Text = memberRole; Loaded += async (_, _) => await InspectAsync(); }
         var c = new NpgsqlConnectionStringBuilder(connection);
         Target.Text = $"Role Memberships\nServer: {c.Host}:{c.Port}   Connected role: {c.Username}";
         OptionChoice.ItemsSource = new object[] { "Membership only", MembershipOption.Admin, MembershipOption.Inherit, MembershipOption.Set };

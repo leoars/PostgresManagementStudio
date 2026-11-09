@@ -10,6 +10,6 @@ Mudanças na documentação pública devem atualizar `docs/en` e `docs/pt-BR` e 
 
 Novos comportamentos, administração e mudanças de interface precisam de validação proporcional. Não declare paridade com SSMS ou certificação de plataformas somente por testes sintéticos. As verificações de desktop e banco exigem Windows e ferramentas PostgreSQL; informe o que não conseguiu executar.
 
-O código e a documentação próprios do PGMS usam a [licença MIT](LICENSE); componentes de terceiros mantêm suas licenças. Envie somente material que possa contribuir nesses termos. Nunca inclua binários proprietários, ícones copiados de fornecedores ou segredos. Siga a [política de segurança](SECURITY.pt-BR.md) para vulnerabilidades.
+O código e a documentação próprios do PGMS usam a [licença Apache-2.0](LICENSE) (as versões até 0.1.0-alpha.4 continuam sob MIT); componentes de terceiros mantêm suas licenças. Envie somente material que possa contribuir nesses termos. Nunca inclua binários proprietários, ícones copiados de fornecedores ou segredos. Siga a [política de segurança](SECURITY.pt-BR.md) para vulnerabilidades.
 
 Mensagens de commits criados pelo Codex devem começar com `[Codex]`, conforme preferência do autor do repositório. Esse prefixo não é exigido de contribuidores humanos.

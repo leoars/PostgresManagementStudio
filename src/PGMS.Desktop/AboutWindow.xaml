@@ -1,7 +1,7 @@
 <Window x:Class="PGMS.Desktop.AboutWindow"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="About PGMS" Icon="Resources/PGMS.ico" Width="640" Height="540" MinWidth="560" MinHeight="480"
+ Title="About PGMS" Icon="Resources/PGMS.ico" Width="640" Height="650" MinWidth="560" MinHeight="480"
  Background="{StaticResource PanelBrush}" WindowStartupLocation="CenterOwner" ResizeMode="CanResizeWithGrip">
  <DockPanel>
   <Border DockPanel.Dock="Bottom" BorderBrush="#B5C5D2" BorderThickness="0,1,0,0" Padding="20,12">
@@ -10,11 +10,20 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
    <StackPanel Margin="28,18,28,22">
     <Image Source="Resources/PGMS-logo.png" Width="480" Height="180" Stretch="Uniform" HorizontalAlignment="Left" AutomationProperties.Name="PGMS — Postgres Management Studio"/>
-    <TextBlock x:Name="Milestone" FontWeight="SemiBold" Margin="0,8,0,12"/>
-    <TextBlock Text="Queries, object navigation and PostgreSQL administration." TextWrapping="Wrap" Margin="0,0,0,12"/>
-    <TextBlock Text="C# / WPF / .NET 10"/>
-    <TextBlock Text="AvalonDock · AvalonEdit · Npgsql" Margin="0,3,0,16"/>
-    <TextBlock Text="Development build. Supported workflows and limitations are still under review; full SSMS parity is not claimed." TextWrapping="Wrap" Margin="0,0,0,16"/>
+    <TextBlock x:Name="ProductVersion" FontWeight="SemiBold" Margin="0,8,0,12"/>
+    <TextBlock x:Name="Attribution" Text="Created and maintained by Leonardo Santos" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
+    <TextBlock Margin="0,5,0,0" TextWrapping="Wrap"><Hyperlink x:Name="GitHubLink" NavigateUri="https://github.com/leoars" RequestNavigate="OpenLink">https://github.com/leoars</Hyperlink></TextBlock>
+    <TextBlock Margin="0,2,0,0" TextWrapping="Wrap"><Hyperlink x:Name="LinkedInLink" NavigateUri="https://www.linkedin.com/in/leonardoars/" RequestNavigate="OpenLink">https://www.linkedin.com/in/leonardoars/</Hyperlink></TextBlock>
+    <TextBlock Margin="0,2,0,0" TextWrapping="Wrap"><Hyperlink x:Name="IssuesLink" NavigateUri="https://github.com/leoars/PostgresManagementStudio/issues" RequestNavigate="OpenLink">Report an issue</Hyperlink></TextBlock>
+    <TextBlock x:Name="CopyrightNotice" Text="Copyright (c) 2026 Leonardo Santos. Free for personal and business use under the Apache-2.0 license." TextWrapping="Wrap" Margin="0,10,0,0"/>
+    <TextBlock Margin="0,5,0,0" TextWrapping="Wrap">
+     <Hyperlink x:Name="LicenseLink" Tag="LICENSE" Click="OpenDocument">View license</Hyperlink>
+     <Run Text="·"/>
+     <Hyperlink x:Name="NoticesLink" Tag="THIRD-PARTY-NOTICES.md" Click="OpenDocument">Third-party notices</Hyperlink>
+    </TextBlock>
+    <TextBlock x:Name="LinkStatus" TextWrapping="Wrap" Foreground="#A1260D" Margin="0,4,0,0"/>
+    <TextBlock Text="Queries, object navigation and PostgreSQL administration." TextWrapping="Wrap" Margin="0,16,0,8"/>
+    <TextBlock Text="Supported workflows and limitations are still under review; full SSMS parity is not claimed." TextWrapping="Wrap" Margin="0,0,0,16"/>
     <TextBlock Text="PGMS is an independent project and is not affiliated with the PostgreSQL project." TextWrapping="Wrap" Foreground="#4B5964" Margin="0,0,0,8"/>
     <TextBlock Text="PostgreSQL and the Slonik elephant logo are trademarks or registered trademarks of the PostgreSQL Community Association of Canada." TextWrapping="Wrap" Foreground="#4B5964"/>
    </StackPanel>

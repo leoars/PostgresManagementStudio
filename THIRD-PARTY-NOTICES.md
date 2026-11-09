@@ -37,6 +37,8 @@ O PGMS usa os seguintes pacotes, com versões resolvidas registradas nos `packag
 | Npgsql | 10.0.3 | PostgreSQL License — https://github.com/npgsql/npgsql |
 | Microsoft.Extensions.Logging.Abstractions | 10.0.0 | MIT — https://github.com/dotnet/runtime |
 | Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.0 | MIT — https://github.com/dotnet/runtime |
+| Anthropic (SDK C#, assistente de IA) | 13.5.0 | Apache-2.0 (MIT nas versões anteriores à 13.0.0; o pacote traz os dois textos) — https://github.com/anthropics/anthropic-sdk-csharp |
+| Microsoft.Extensions.AI.Abstractions | 10.5.1 | MIT — https://github.com/dotnet/extensions |
 
 Textos de licença estão em `docs/licenses`. Os ícones simples do shell foram desenhados no próprio XAML. Não foram copiados assemblies ou ícones da instalação do SSMS. Nome de referência e nomes de bibliotecas identificam seus respectivos produtos e autores.
 

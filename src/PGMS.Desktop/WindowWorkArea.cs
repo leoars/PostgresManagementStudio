@@ -57,7 +57,8 @@ internal sealed class WindowWorkArea
         {
             window.MinWidth = Math.Min(minimumWidth, Math.Max(1, (work.Right - work.Left) / scale - 16));
             window.MinHeight = Math.Min(minimumHeight, Math.Max(1, (work.Bottom - work.Top) / scale - 16));
-            if (window.WindowState != WindowState.Normal) return;
+            // A window snapped to half or a quarter of the screen stays Normal; moving it would undo the snap.
+            if (window.WindowState != WindowState.Normal || IsArranged(handle)) return;
             var fit = FitBounds(new Rect(bounds.Left, bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top),
                 new Rect(work.Left, work.Top, work.Right - work.Left, work.Bottom - work.Top), scale);
             if (Math.Abs(fit.X - bounds.Left) >= 1 || Math.Abs(fit.Y - bounds.Top) >= 1 ||
@@ -76,11 +77,18 @@ internal sealed class WindowWorkArea
             Math.Clamp(bounds.Y, work.Top + margin, work.Bottom - margin - height), width, height);
     }
 
+    private static bool IsArranged(nint handle)
+    {
+        try { return IsWindowArranged(handle); }
+        catch (EntryPointNotFoundException) { return false; }
+    }
+
     [StructLayout(LayoutKind.Sequential)] private struct NativeRect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)] private struct MonitorInfo { public int Size; public NativeRect Monitor, Work; public uint Flags; }
     [DllImport("user32.dll")] private static extern nint MonitorFromWindow(nint hwnd, uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(nint hwnd, out NativeRect rect);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(nint hwnd);
+    [DllImport("user32.dll")] private static extern bool IsWindowArranged(nint hwnd);
     [DllImport("user32.dll")] private static extern bool SetWindowPos(nint hwnd, nint after, int x, int y, int width, int height, uint flags);
 }

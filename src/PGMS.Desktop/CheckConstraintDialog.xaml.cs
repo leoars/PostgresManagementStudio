@@ -18,10 +18,12 @@ public partial class CheckConstraintDialog : Window
     public string? ScriptSql { get; private set; }
     public bool WasApplied { get; private set; }
 
+    /// <summary>Set by Object Explorer: read the current state as soon as the window opens, as SSMS does.</summary>
+    public bool InspectOnOpen { get; init; }
     public CheckConstraintDialog(string connection, string? schema = null, string? table = null)
     {
         this.connection = connection; InitializeComponent();
-        Loaded += (_, _) => Operation.Focus();
+        Loaded += async (_, _) => { Operation.Focus(); if (InspectOnOpen) await InspectAsync(); }; // Opened on a table: list its constraints right away.
         var c = new NpgsqlConnectionStringBuilder(connection);
         Target.Text = $"CHECK Constraint Operations\nServer: {c.Host}:{c.Port}   Database: {c.Database}   User: {c.Username}";
         ExistingConstraints.ItemsSource = constraints;

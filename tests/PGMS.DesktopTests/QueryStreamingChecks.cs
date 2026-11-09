@@ -120,11 +120,13 @@ internal static class QueryStreamingChecks
             editor.Text = "SELECT i, repeat('x',128) FROM generate_series(1,12000)i; SELECT pg_sleep(30);";
             pending = query.ExecuteAsync();
             deadline = DateTime.UtcNow.AddSeconds(5);
-            while (DateTime.UtcNow < deadline && !((TextBlock)query.FindName("ExportScope")).Text.Contains("Display limit reached")) await Task.Delay(10);
-            check(query.IsBusy && ((TextBlock)query.FindName("ExportScope")).Text.Contains("Display limit reached"), "M102 row cap is announced while remaining query still runs");
+            int Shown() => sets.Items.Count == 0 ? 0 : ((DataGrid)((TabItem)sets.Items[0]).Content).Items.Count;
+            // Past the last count that tells the grid (10,000). The server keeps the final few KB of output in its buffer during pg_sleep, so not all 12,000 arrive yet.
+            while (DateTime.UtcNow < deadline && Shown() < 11900) await Task.Delay(10);
+            check(query.IsBusy && Shown() >= 11900 && !((TextBlock)query.FindName("ExportScope")).Text.Contains("Display limit reached"), $"M1053 rows past the last count reach the screen while a later statement runs ({Shown():N0})");
             cancelButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await pending.WaitAsync(TimeSpan.FromSeconds(5));
-            check(!query.IsBusy && ((TextBlock)query.FindName("ExportScope")).Text.Contains("Partial results"), "M102 capped reader remains cancelable during drain");
+            check(!query.IsBusy && ((TextBlock)query.FindName("ExportScope")).Text.Contains("Partial results"), "M1053 the later statement remains cancelable");
         }
         finally { query.Cancel(); await query.DisposeAsync(); window.Close(); }
         await QueryLoadChecks.RunAsync(connection, check);

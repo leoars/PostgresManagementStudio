@@ -53,8 +53,29 @@ public partial class MainWindow
             { Status.Text = "Save failed; query remains open: " + ex.Message; return false; }
         }
         if (query.IsBusy) { MessageBox.Show(this, "Cancel the running operation before closing this query.", "PGMS"); return false; }
-        if (!query.IsDirty) return true;
-        var answer = MessageBox.Show(this, "Save changes to this query?", "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-        return answer == MessageBoxResult.No || (answer == MessageBoxResult.Yes && await SaveAsync(query) && !query.IsDirty);
+        if (query.IsDirty)
+        {
+            var answer = MessageBox.Show(this, "Save changes to this query?", "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+            if (!(answer == MessageBoxResult.No || (answer == MessageBoxResult.Yes && await SaveAsync(query) && !query.IsDirty))) return false;
+        }
+        return await ConfirmOpenTransactionAsync(query);
+    }
+
+    /// <summary>Answers the open-transaction question in tests: receives true for a failed transaction.</summary>
+    internal Func<bool, MessageBoxResult>? OpenTransactionPrompt { get; set; }
+
+    /// <summary>Query Options ▸ Execution ▸ General ▸ Check for open transactions before closing. Yes commits; No closes, and closing the session rolls back.
+    /// A failed transaction can only be rolled back, so it is asked differently.</summary>
+    private async Task<bool> ConfirmOpenTransactionAsync(QueryView query)
+    {
+        if (!query.QueryOptions.CheckOpenTransactions || await query.FindOpenTransactionAsync() is not { } risk) return true;
+        var answer = OpenTransactionPrompt?.Invoke(risk.Aborted) ?? (risk.Aborted
+            ? MessageBox.Show(this, "The transaction in this query has failed and will be rolled back. Close the query?", "PGMS", MessageBoxButton.OKCancel, MessageBoxImage.Warning)
+            : MessageBox.Show(this, "There are uncommitted transactions. Do you wish to commit these transactions?", "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question));
+        if (answer == MessageBoxResult.Cancel) return false;
+        if (answer != MessageBoxResult.Yes) return true;
+        try { await query.CommitOpenTransactionAsync(); return true; }
+        catch (Exception ex) when (ex is Npgsql.NpgsqlException or IOException or InvalidOperationException or TimeoutException)
+        { Status.Text = "Commit failed; query remains open: " + ex.Message; return false; }
     }
 }

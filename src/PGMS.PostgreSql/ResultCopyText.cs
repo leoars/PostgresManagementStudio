@@ -17,7 +17,10 @@ public static class ResultCopyText
         _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? ""
     };
 
-    public static string Format(IReadOnlyList<string> headers, IEnumerable<IReadOnlyList<object?>> rows, bool includeHeaders, int maximumCharacters = MaximumCharacters)
+    /// <summary>Query Options ▸ Results ▸ Grid ▸ Retain CR/LF on copy or save, when off: each line break becomes one space.</summary>
+    public static string FlattenLineBreaks(string text) => text.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\r', ' ').Replace('\n', ' ');
+
+    public static string Format(IReadOnlyList<string> headers, IEnumerable<IReadOnlyList<object?>> rows, bool includeHeaders, int maximumCharacters = MaximumCharacters, bool retainLineBreaks = true)
     {
         ArgumentNullException.ThrowIfNull(headers);
         ArgumentNullException.ThrowIfNull(rows);
@@ -39,7 +42,7 @@ public static class ResultCopyText
                 else
                 {
                     Append('"');
-                    foreach (char c in DisplayValue(cells[i]))
+                    foreach (char c in retainLineBreaks ? DisplayValue(cells[i]) : FlattenLineBreaks(DisplayValue(cells[i])))
                     { if (c == '"') Append('"'); Append(c); }
                     Append('"');
                 }

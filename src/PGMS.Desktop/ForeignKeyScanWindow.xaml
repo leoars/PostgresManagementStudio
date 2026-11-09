@@ -1,0 +1,32 @@
+<Window x:Class="PGMS.Desktop.ForeignKeyScanWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop" Title="Missing Foreign Keys" Width="1040" Height="640" MinWidth="760" MinHeight="460" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#F5F5F5" Closing="OnClosing">
+ <Grid Margin="10">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="120"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel>
+   <TextBlock TextWrapping="Wrap" Text="Looks for columns whose name and type point to a key of another table but have no foreign key. Scan also reads the rows of each candidate, read-only, up to 30 seconds per candidate."/>
+   <StackPanel Orientation="Horizontal" Margin="0,8">
+    <Button x:Name="ScanButton" Content="_Scan" Click="Scan" Padding="16,3"/>
+    <Button x:Name="CancelScanButton" Content="_Cancel Scan" Click="CancelScan" IsEnabled="False" Padding="12,3" Margin="6,0,0,0"/>
+    <Button x:Name="SelectMatchesButton" Content="Select All _Matches" Click="SelectMatches" IsEnabled="False" Padding="12,3" Margin="18,0,0,0"/>
+    <TextBlock x:Name="ScanStatus" VerticalAlignment="Center" Margin="12,0,0,0" TextTrimming="CharacterEllipsis" Text="Not scanned."/>
+   </StackPanel>
+  </StackPanel>
+  <DataGrid local:DataGridRowNames.Enabled="True" x:Name="Candidates" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" RowHeight="23" SelectionMode="Single" AutomationProperties.Name="Foreign key candidates">
+   <DataGrid.Columns>
+    <DataGridCheckBoxColumn Header="" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Width="28"/>
+    <DataGridTextColumn Header="Column" Binding="{Binding Source}" IsReadOnly="True" Width="2*"/>
+    <DataGridTextColumn Header="References" Binding="{Binding Target}" IsReadOnly="True" Width="2*"/>
+    <DataGridTextColumn Header="Why" Binding="{Binding Candidate.Evidence}" IsReadOnly="True" Width="2*"/>
+    <DataGridTextColumn Header="Rows with a value" Binding="{Binding Rows}" IsReadOnly="True" Width="110"/>
+    <DataGridTextColumn Header="Without a match" Binding="{Binding Orphans}" IsReadOnly="True" Width="110"/>
+    <DataGridTextColumn Header="Result" Binding="{Binding Result}" IsReadOnly="True" Width="2*"/>
+   </DataGrid.Columns>
+  </DataGrid>
+  <TextBlock Grid.Row="2" Text="Script of the selected keys" FontWeight="SemiBold" Margin="0,8,0,3"/>
+  <TextBox x:Name="Script" Grid.Row="3" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Script of the selected foreign keys"/>
+  <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+   <Button x:Name="OpenScriptButton" Content="_Open Script in Query" Click="OpenScript" IsEnabled="False" Padding="12,4"/>
+   <Button x:Name="ApplyButton" Content="_Apply…" Click="Apply" IsEnabled="False" Padding="20,4" Margin="8,0,0,0"/>
+   <Button Content="Close" IsCancel="True" Padding="16,4" Margin="8,0,0,0"/>
+  </StackPanel>
+ </Grid>
+</Window>

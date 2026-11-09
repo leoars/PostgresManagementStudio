@@ -1,0 +1,26 @@
+<Window x:Class="PGMS.Desktop.ServerTlsDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Configure Server TLS" Width="720" Height="740" MinWidth="640" MinHeight="660" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="120"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <TextBox Grid.Row="1" x:Name="Inspection" IsReadOnly="True" VerticalScrollBarVisibility="Auto" Padding="6" FontFamily="Consolas" AutomationProperties.Name="Current server TLS settings"/>
+  <StackPanel x:Name="Fields" Grid.Row="2" Margin="0,10,0,0">
+   <GroupBox Header="Certificate" Padding="6,4">
+    <StackPanel>
+     <RadioButton x:Name="GenerateOption" Content="Generate a self-signed certificate" IsChecked="True" Checked="Changed"/>
+     <Grid x:Name="GeneratePanel" Margin="20,6,0,8"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions>
+      <StackPanel><Label Content="Server names and IP addresses (comma-separated):" Target="{Binding ElementName=Names}"/><TextBox x:Name="Names" TextChanged="Changed" Padding="4"/></StackPanel>
+      <StackPanel Grid.Column="2"><Label Content="Valid for (years):" Target="{Binding ElementName=Years}"/><TextBox x:Name="Years" Text="5" TextChanged="Changed" Padding="4"/></StackPanel>
+     </Grid>
+     <RadioButton x:Name="ImportOption" Content="Import an existing certificate and unencrypted private key (PEM files)" Checked="Changed"/>
+     <Grid x:Name="ImportPanel" Margin="20,6,0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Label Content="Certificate:" Target="{Binding ElementName=CertificatePath}"/><TextBox x:Name="CertificatePath" Grid.Column="1" TextChanged="Changed" Padding="4" Margin="0,2"/><Button x:Name="BrowseCertificate" Grid.Column="2" Content="…" Click="Browse" Padding="10,2" Margin="6,2,0,2" AutomationProperties.Name="Browse certificate"/>
+      <Label Grid.Row="1" Content="Private key:" Target="{Binding ElementName=KeyPath}"/><TextBox x:Name="KeyPath" Grid.Row="1" Grid.Column="1" TextChanged="Changed" Padding="4" Margin="0,2"/><Button x:Name="BrowseKey" Grid.Row="1" Grid.Column="2" Content="…" Click="Browse" Padding="10,2" Margin="6,2,0,2" AutomationProperties.Name="Browse private key"/>
+     </Grid>
+    </StackPanel>
+   </GroupBox>
+   <CheckBox x:Name="UpdateProfiles" IsChecked="True" Margin="0,10,0,0"/>
+  </StackPanel>
+  <TextBlock Grid.Row="3" TextWrapping="Wrap" Margin="0,10" Text="PGMS writes two new files in the server's data directory (existing files are never overwritten), sets ssl_cert_file, ssl_key_file and ssl = on with ALTER SYSTEM, reloads the configuration and confirms a new TLS session that presents this certificate. If that fails, the previous settings are restored. The private key is sent only as a query parameter with statement logging disabled for that transaction. Requires a superuser connection to a server running on Windows."/>
+  <TextBlock Grid.Row="4" x:Name="Feedback" TextWrapping="Wrap" Margin="0,4"/>
+  <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right"><Button x:Name="ApplyButton" Content="Apply" Click="Apply" Padding="16,5"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="16,5" Margin="8,0"/></StackPanel>
+ </Grid>
+</Window>

@@ -14,10 +14,12 @@ public partial class RelationEditDialog : Window
     private readonly ObservableCollection<InspectedIndex> indexes = [];
     public string? ScriptSql { get; private set; }
     public bool WasApplied { get; private set; }
+    /// <summary>Set by Object Explorer: read the current state as soon as the window opens, as SSMS does.</summary>
+    public bool InspectOnOpen { get; init; }
     public RelationEditDialog(string connection, string? schema = null, string? table = null)
     {
         this.connection = connection; InitializeComponent();
-        Loaded += (_, _) => Operation.Focus();
+        Loaded += async (_, _) => { Operation.Focus(); if (InspectOnOpen) await InspectAsync(); }; // Opened on a table: list its indexes right away.
         var c = new NpgsqlConnectionStringBuilder(connection);
         Target.Text = $"Index Operations\nServer: {c.Host}:{c.Port}   Database: {c.Database}   User: {c.Username}";
         SortOrder.ItemsSource = Enum.GetValues<IndexSortOrder>(); SortOrder.SelectedItem = IndexSortOrder.Default;

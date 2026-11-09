@@ -1,0 +1,60 @@
+<UserControl x:Class="PGMS.Desktop.DatabaseDiagramView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  Background="White" Loaded="OnLoaded" Focusable="True" FocusVisualStyle="{x:Null}">
+ <DockPanel>
+  <Border DockPanel.Dock="Top" Background="#EEF0F5" BorderBrush="#CCCEDB" BorderThickness="0,0,0,1" Padding="4,2">
+   <StackPanel Orientation="Horizontal">
+    <Button x:Name="NewTableButton" Click="NewTableClick" Padding="4,1" Margin="0,0,4,0" Background="Transparent" BorderThickness="0" ToolTip="New Table" AutomationProperties.Name="New Table">
+     <TextBlock Text="New Table"/>
+    </Button>
+    <Button x:Name="AddTableButton" Click="AddTableClick" Padding="4,1" Background="Transparent" BorderThickness="0" ToolTip="Add Table" AutomationProperties.Name="Add Table">
+     <StackPanel Orientation="Horizontal">
+      <Viewbox Width="16" Height="16"><Canvas Width="16" Height="16">
+       <Path Stroke="#1E1E1E" StrokeThickness="1.1" Data="M1.5,4.5 H11.5 V14.5 H1.5 Z M1.5,7.5 H11.5 M1.5,11 H11.5 M5,7.5 V14.5"/>
+       <Ellipse Canvas.Left="8" Width="8" Height="8" Fill="#107C10"/>
+       <Path Stroke="White" StrokeThickness="1.3" Data="M12,1.5 V6.5 M9.5,4 H14.5"/>
+      </Canvas></Viewbox>
+      <TextBlock Text="Add Table" Margin="4,0,0,0" VerticalAlignment="Center"/>
+     </StackPanel>
+    </Button>
+    <Button x:Name="RelatedButton" Click="AddRelatedClick" Padding="4,1" Margin="4,0,0,0" Background="Transparent" BorderThickness="0" ToolTip="Add Related Tables" AutomationProperties.Name="Add Related Tables">
+     <TextBlock Text="Add Related Tables"/>
+    </Button>
+    <Button x:Name="TableViewButton" Click="TableViewClick" Padding="4,1" Margin="4,0,0,0" Background="Transparent" BorderThickness="0" ToolTip="Table View" AutomationProperties.Name="Table View">
+     <TextBlock Text="Table View ▾"/>
+    </Button>
+    <Rectangle Width="1" Fill="#CCCEDB" Margin="6,2"/>
+    <Button x:Name="ScriptButton" Click="ScriptClick" Padding="4,1" Background="Transparent" BorderThickness="0" ToolTip="Generate Change Script" AutomationProperties.Name="Generate Change Script">
+     <ContentControl Content="{StaticResource DesignerIconScript}"/>
+    </Button>
+    <Rectangle Width="1" Fill="#CCCEDB" Margin="6,2"/>
+    <!-- Undo of Arrange Tables and of moving tables or lines (Ctrl+Z, pedido do usuário 08/11/2026). -->
+    <Button x:Name="UndoButton" Click="UndoClick" IsEnabled="False" Padding="4,1" Background="Transparent" BorderThickness="0" ToolTip="Undo (Ctrl+Z)" AutomationProperties.Name="Undo">
+     <Viewbox Width="16" Height="16"><Canvas Width="16" Height="16">
+      <Path x:Name="UndoArrow" Stroke="#1E6FC6" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M5,6.5 H10 A3.75,3.75 0 0 1 10,14 H6"/>
+      <Path x:Name="UndoHead" Fill="#1E6FC6" Data="M1.5,6.5 L6,2.5 V10.5 Z"/>
+     </Canvas></Viewbox>
+     <Button.Style>
+      <Style TargetType="Button"><Style.Triggers><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.35"/></Trigger></Style.Triggers></Style>
+     </Button.Style>
+    </Button>
+    <Rectangle Width="1" Fill="#CCCEDB" Margin="6,2"/>
+    <ComboBox x:Name="ZoomBox" Width="74" SelectionChanged="ZoomChanged" AutomationProperties.Name="Zoom" ToolTip="Zoom"/>
+   </StackPanel>
+  </Border>
+  <DockPanel x:Name="FeedbackBar" DockPanel.Dock="Bottom" Margin="8,4" Visibility="Collapsed">
+   <Button x:Name="CancelButton" DockPanel.Dock="Right" Content="_Cancel" Padding="12,1" Margin="8,0,0,0" Click="CancelOperation" Visibility="Collapsed"/>
+   <TextBlock x:Name="Feedback" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+  </DockPanel>
+  <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="White" Focusable="False">
+   <Canvas x:Name="Surface" Background="White" Width="1600" Height="1200" ClipToBounds="True" AutomationProperties.Name="Diagram" HorizontalAlignment="Left" VerticalAlignment="Top"
+     MouseLeftButtonDown="SurfaceMouseDown" MouseMove="SurfaceMouseMove" MouseLeftButtonUp="SurfaceMouseUp" LostMouseCapture="SurfaceLostCapture" PreviewMouseRightButtonDown="SurfaceRightDown" ContextMenuOpening="SurfaceMenuOpening">
+    <Canvas.LayoutTransform><ScaleTransform x:Name="ZoomTransform" ScaleX="1" ScaleY="1"/></Canvas.LayoutTransform>
+    <Canvas.ContextMenu><ContextMenu x:Name="SurfaceMenu"/></Canvas.ContextMenu>
+    <Canvas x:Name="PageBreaksLayer" Panel.ZIndex="-1" IsHitTestVisible="False"/>
+    <Canvas x:Name="LinesLayer" Panel.ZIndex="0"/>
+    <Canvas x:Name="TablesLayer" Panel.ZIndex="1"/>
+    <Canvas x:Name="DragLayer" Panel.ZIndex="2" IsHitTestVisible="False"/>
+   </Canvas>
+  </ScrollViewer>
+ </DockPanel>
+</UserControl>

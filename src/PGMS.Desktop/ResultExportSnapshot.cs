@@ -7,7 +7,7 @@ namespace PGMS.Desktop;
 
 internal static class ResultExportSnapshot
 {
-    internal static async Task<DataTable> CreateAsync(DataGrid grid,bool selectedRowsOnly=false,CancellationToken token=default)
+    internal static async Task<DataTable> CreateAsync(DataGrid grid,bool selectedRowsOnly=false,CancellationToken token=default,bool retainLineBreaks=true)
     {
         token.ThrowIfCancellationRequested();
         if(grid.ItemsSource is not DataView view || view.Table is null)throw new InvalidOperationException("Select a result set to export.");
@@ -20,11 +20,12 @@ internal static class ResultExportSnapshot
         try
         {
             var rows=grid.Items.OfType<DataRowView>().Where(row=>!selectedRowsOnly || selected.Contains(row)).ToArray();
-            if(rows.Length>10000 || (long)rows.Length*columns.Length>250000)throw new InvalidOperationException("Export exceeds displayed result limits.");
+            var slice=System.Diagnostics.Stopwatch.StartNew();
             for(int index=0;index<rows.Length;index++)
             {
-                token.ThrowIfCancellationRequested();snapshot.Rows.Add(columns.Select(i=>rows[index].Row[i]).ToArray());
-                if((index+1)%128==0)await Dispatcher.Yield(DispatcherPriority.Background);
+                token.ThrowIfCancellationRequested();snapshot.Rows.Add(columns.Select(i=>rows[index].Row[i] is string text && !retainLineBreaks?PGMS.PostgreSql.ResultCopyText.FlattenLineBreaks(text):rows[index].Row[i]).ToArray());
+                // Early on so even a short export can be canceled; then by time, as waiting for the screen every few rows made long ones slow.
+                if(index==127 || slice.ElapsedMilliseconds>=30){await Dispatcher.Yield(DispatcherPriority.Background);slice.Restart();}
             }
             token.ThrowIfCancellationRequested();return snapshot;
         }

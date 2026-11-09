@@ -95,8 +95,10 @@ internal static class UnicodePasswordChecks
                 check(baseline == await Scalar($"SELECT rolpassword FROM pg_catalog.pg_authid WHERE rolname='{role}'"), "Refusal leaves existing verifier unchanged");
             }
             check(await Login(cases[^1].Password) && await ExternalLogin(cases[^1].Password), "Original password remains usable after all refusals");
-            bool nonTls = false; try { await Set(cases[0].Password, connection); } catch (InvalidOperationException) { nonTls = true; }
-            check(nonTls, "Unicode password change still requires TLS");
+            // Loopback without TLS is allowed since M1031; a remote profile still needs TLS or an explicit opt-in.
+            string remotePlain = new NpgsqlConnectionStringBuilder(connection) { Host = "pgms-password-check.invalid" }.ConnectionString;
+            bool nonTls = false; try { await Set(cases[0].Password, remotePlain); } catch (InvalidOperationException) { nonTls = true; }
+            check(nonTls && baseline == await Scalar($"SELECT rolpassword FROM pg_catalog.pg_authid WHERE rolname='{role}'"), "Unicode password change still requires TLS on a remote profile without opt-in");
             using var canceled = new CancellationTokenSource(); canceled.Cancel();
             bool stopped = false; try { await Set(cases[0].Password, "invalid connection syntax", canceled.Token); } catch (OperationCanceledException) { stopped = true; }
             check(stopped, "Pre-cancellation precedes connection parsing and password extraction");

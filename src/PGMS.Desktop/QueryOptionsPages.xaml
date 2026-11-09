@@ -1,0 +1,72 @@
+<UserControl x:Class="PGMS.Desktop.QueryOptionsPages" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <DockPanel>
+  <StackPanel DockPanel.Dock="Bottom">
+   <TextBlock x:Name="ErrorText" Foreground="#B00020" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
+   <Button x:Name="ResetButton" Content="_Reset to Default" Click="ResetPage" HorizontalAlignment="Right" Padding="12,3" Margin="0,8,0,0"/>
+  </StackPanel>
+  <Grid>
+   <StackPanel x:Name="ExecutionGeneralPanel">
+    <TextBlock Text="Execution ▸ General" FontWeight="SemiBold" Margin="0,0,0,8"/>
+    <Grid>
+     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
+     <Label Content="Execution time-_out (seconds):" Target="{Binding ElementName=TimeoutBox}" Padding="0" VerticalAlignment="Center"/>
+     <TextBox x:Name="TimeoutBox" Grid.Column="1" MaxLength="5" TextAlignment="Right" Padding="2,1" AutomationProperties.Name="Execution time-out in seconds"/>
+    </Grid>
+    <TextBlock Text="0 waits without limit. Same value as Read timeout on the query toolbar." TextWrapping="Wrap" Foreground="#5A5A5A" Margin="0,4,0,10"/>
+    <CheckBox x:Name="CheckTransactionsBox" Content="_Check for open transactions before closing"/>
+    <TextBlock Text="Closing a query with a transaction still open asks whether to commit it." TextWrapping="Wrap" Foreground="#5A5A5A" Margin="20,4,0,0"/>
+   </StackPanel>
+   <StackPanel x:Name="ExecutionAdvancedPanel" Visibility="Collapsed">
+    <TextBlock Text="Execution ▸ Advanced" FontWeight="SemiBold" Margin="0,0,0,8"/>
+    <CheckBox x:Name="NoCountBox" Content="Hide row counts (SET _NOCOUNT)"/>
+    <CheckBox x:Name="CompletionBox" Content="Show completion _time" Margin="0,6,0,10"/>
+    <Grid>
+     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <Label Content="Transaction _isolation level:" Target="{Binding ElementName=IsolationBox}" Padding="0" VerticalAlignment="Center"/>
+     <ComboBox x:Name="IsolationBox" Grid.Column="1" AutomationProperties.Name="Transaction isolation level">
+      <ComboBoxItem Content="Server default"/><ComboBoxItem Content="READ COMMITTED"/><ComboBoxItem Content="REPEATABLE READ"/><ComboBoxItem Content="SERIALIZABLE"/>
+     </ComboBox>
+     <Label Grid.Row="1" Content="_Lock timeout (milliseconds):" Target="{Binding ElementName=LockBox}" Padding="0" VerticalAlignment="Center" Margin="0,8,0,0"/>
+     <TextBox x:Name="LockBox" Grid.Row="1" Grid.Column="1" MaxLength="9" TextAlignment="Right" Padding="2,1" Margin="0,8,0,0" AutomationProperties.Name="Lock timeout in milliseconds"/>
+    </Grid>
+    <TextBlock Text="-1 keeps the server's lock timeout; 0 waits without limit. The isolation level and lock timeout take effect at the next execution, or after the open transaction ends." TextWrapping="Wrap" Foreground="#5A5A5A" Margin="0,8,0,0"/>
+   </StackPanel>
+   <StackPanel x:Name="ResultsGridPanel" Visibility="Collapsed">
+    <TextBlock Text="Results ▸ Grid" FontWeight="SemiBold" Margin="0,0,0,8"/>
+    <CheckBox x:Name="RetainBox" Content="Retain CR/_LF on copy or save"/>
+    <TextBlock Text="When off, each line break in a value becomes a space in the clipboard and in exported files." TextWrapping="Wrap" Foreground="#5A5A5A" Margin="20,4,0,8"/>
+    <CheckBox x:Name="GridDiscardBox" Content="_Discard results after execution"/>
+    <CheckBox x:Name="JsonLinkBox" Content="Display _JSON in text columns as Hyperlink" Margin="0,6,0,0"/>
+    <TextBlock Text="Clicking a JSON object or array opens it formatted in a new tab. Applies to the results of the next execution." TextWrapping="Wrap" Foreground="#5A5A5A" Margin="20,4,0,0"/>
+    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+     <Label Content="_Rows per result page:" Target="{Binding ElementName=PageRowsBox}" Padding="0" VerticalAlignment="Center"/>
+     <TextBox x:Name="PageRowsBox" Width="90" Margin="8,0,0,0" AutomationProperties.Name="Rows per result page"/>
+    </StackPanel>
+    <TextBlock Text="A result with more rows is shown in pages. The rows after the first page are kept in a temporary file until the next execution." TextWrapping="Wrap" Foreground="#5A5A5A" Margin="0,4,0,0"/>
+   </StackPanel>
+   <StackPanel x:Name="ResultsTextPanel" Visibility="Collapsed">
+    <TextBlock Text="Results ▸ Text" FontWeight="SemiBold" Margin="0,0,0,8"/>
+    <Grid>
+     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <Label Content="_Output format:" Target="{Binding ElementName=FormatBox}" Padding="0" VerticalAlignment="Center"/>
+     <ComboBox x:Name="FormatBox" Grid.Column="1" SelectionChanged="FormatChanged" AutomationProperties.Name="Output format">
+      <ComboBoxItem Content="Column aligned"/><ComboBoxItem Content="Comma delimited"/><ComboBoxItem Content="Tab delimited"/><ComboBoxItem Content="Space delimited"/><ComboBoxItem Content="Custom delimiter"/>
+     </ComboBox>
+     <Label Grid.Row="1" Content="C_ustom delimiter:" Target="{Binding ElementName=DelimiterBox}" Padding="0" VerticalAlignment="Center" Margin="0,6,0,0"/>
+     <TextBox x:Name="DelimiterBox" Grid.Row="1" Grid.Column="1" MaxLength="1" Padding="2,1" Margin="0,6,0,0" AutomationProperties.Name="Custom delimiter"/>
+    </Grid>
+    <CheckBox x:Name="TextHeadersBox" Content="Include column _headers in the result set" Margin="0,10,0,0"/>
+    <CheckBox x:Name="TextQueryBox" Content="Include the _query in the result set" Margin="0,6,0,0"/>
+    <CheckBox x:Name="RightAlignBox" Content="Right align nu_meric values" Margin="0,6,0,0"/>
+    <CheckBox x:Name="TextDiscardBox" Content="Discard results after e_xecution" Margin="0,6,0,10"/>
+    <Grid>
+     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
+     <Label Content="Maximum number of characters displayed in each col_umn:" Target="{Binding ElementName=MaxCharactersBox}" Padding="0" VerticalAlignment="Center"/>
+     <TextBox x:Name="MaxCharactersBox" Grid.Column="1" MaxLength="4" TextAlignment="Right" Padding="2,1" AutomationProperties.Name="Maximum number of characters displayed in each column"/>
+    </Grid>
+   </StackPanel>
+  </Grid>
+ </DockPanel>
+</UserControl>

@@ -4,7 +4,7 @@
 
 ## Trabalho próprio
 
-Código e documentação próprios do PGMS usam a [licença MIT](../../LICENSE), escolhida pelo mantenedor. Preserve o aviso de copyright e permissão nas cópias ou partes substanciais. O texto canônico está em inglês; este guia explica a organização do projeto, sem substituir o texto. Software, recursos e marcas de terceiros não se tornam propriedade MIT do PGMS por essa escolha.
+Código e documentação próprios do PGMS usam a [Apache License 2.0](../../LICENSE), escolhida pelo mantenedor: uso livre pessoal e em empresas. Quem redistribuir o PGMS ou uma obra baseada nele precisa manter os avisos de copyright e a atribuição do [NOTICE](../../NOTICE), e indicar os arquivos que alterou. As versões até 0.1.0-alpha.4 continuam sob MIT. O texto canônico está em inglês; este guia explica a organização do projeto, sem substituir o texto. Software, recursos e marcas de terceiros não se tornam propriedade MIT do PGMS por essa escolha.
 
 ## Dependências e recursos
 
@@ -20,7 +20,7 @@ As versões seguem os `packages.lock.json` atuais. Textos originais estão em [d
 | Runtime .NET/WPF self-contained | depende do pacote | Licenças/avisos copiados dos runtime packs ao empacotar; M1008 inclui 10.0.14. |
 | Elefante PostgreSQL/Slonik | arte original | Licença em [PostgreSQL-logo.txt](../licenses/PostgreSQL-logo.txt); [press kit](https://www.postgresql.org/about/press/presskit12/) e [política de marcas](https://www.postgresql.org/about/policies/trademarks/). |
 
-A arte do aplicativo inclui o elefante PostgreSQL. Permissão autoral e condições de marca são distintas. A licença MIT do PGMS não concede permissão para alterar/combinar marcas ou sugerir endosso. Preserve a origem da arte; qualquer redesign público da marca deve seguir a política PostgreSQL. PGMS é independente, sem endosso ou afiliação com Microsoft ou projeto PostgreSQL.
+A arte do aplicativo inclui o elefante PostgreSQL. Permissão autoral e condições de marca são distintas. A licença do PGMS não concede permissão para alterar/combinar marcas ou sugerir endosso. Preserve a origem da arte; qualquer redesign público da marca deve seguir a política PostgreSQL. PGMS é independente, sem endosso ou afiliação com Microsoft ou projeto PostgreSQL.
 
 ## Mecanismo do instalador
 

@@ -176,8 +176,9 @@ internal static class ObjectPropertyChecks
                 timer.Stop();
                 try
                 {
-                    await properties.InspectAsync();
-                    check(properties.Snapshot?.Target == database, "Explorer command opens exact selected object identity");
+                    // Opened from Object Explorer, the window reads by itself (InspectOnOpen); wait for that read instead of starting another.
+                    for (int i = 0; i < 200 && (properties.Snapshot is null || properties.IsBusy); i++) await Task.Delay(50);
+                    check(properties.Snapshot?.Target == database, "Explorer command opens exact selected object identity, already read");
                     completion.SetResult();
                 }
                 catch (Exception ex) { completion.SetException(ex); }

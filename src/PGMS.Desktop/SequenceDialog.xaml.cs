@@ -16,6 +16,8 @@ public partial class SequenceDialog : Window
     public string? ScriptSql { get; private set; }
     public bool WasApplied { get; private set; }
     public SequenceSnapshot? Snapshot { get; private set; }
+    /// <summary>Set by Object Explorer: read the current state as soon as the window opens, as SSMS does.</summary>
+    public bool InspectOnOpen { get; init; }
     public SequenceDialog(string connection, string? schema = null, string? name = null, uint? expectedOid = null)
     {
         this.connection = connection; InitializeComponent();
@@ -26,7 +28,7 @@ public partial class SequenceDialog : Window
         ParameterType.ItemsSource = Enum.GetValues<SequenceDataType>(); ParameterType.SelectedItem = SequenceDataType.BigInt;
         Operation.ItemsSource = Enum.GetValues<SequenceOperation>(); Operation.SelectedItem = SequenceOperation.Inspect;
         expectedExplorerOid = expectedOid; ready = true; UpdatePreview();
-        Loaded += (_, _) => Operation.Focus();
+        Loaded += async (_, _) => { Operation.Focus(); if (InspectOnOpen) await InspectAsync(); }; // Opened on a sequence: read it right away.
     }
     private void Changed(object sender, RoutedEventArgs e)
     {

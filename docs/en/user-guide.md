@@ -16,6 +16,22 @@ Object Explorer loads folders on demand, filters and inspects objects. Supported
 
 Identity and sequence operations distinguish configured START from RESTART. A restart can repeat existing values. The **Partitions** dialog creates, attaches and detaches partitions. A new child can itself be partitioned (**Sub-partition by**, keyed by columns of the parent), and a partitioned table can be attached or detached with its sub-tree. **Detach concurrently** runs `DETACH PARTITION … CONCURRENTLY` outside a transaction, without blocking queries; it is refused for a DEFAULT partition or while another detach is pending, and a pending detach is finished with `FINALIZE`. Privilege changes, delegation, CASCADE and COMMIT reconciliation have specific review and concurrency rules. See the [documentation index](../README.md) for supported behavior.
 
+## Database diagrams
+
+In Object Explorer, right-click **Database Diagrams** under a database and choose **New Database Diagram**. The first time, PGMS asks to create its support objects (schema `pgms`). Add tables with **Add Table** or **Add Related Tables**, drag a column onto another to create a foreign key, and use **Arrange Tables** to lay them out. Saving shows the SQL script of any change to the database for review.
+
+## Query Designer
+
+**Query ▸ Design Query in Editor** (`Ctrl+Shift+Q`) opens the statement under the cursor, or the selection, in the Diagram, Criteria and SQL panes. **OK** replaces that statement in the editor; nothing is executed. On an empty line it starts empty and inserts at the cursor. `UNION` and `WITH` open only in the SQL pane.
+
+## IntelliSense
+
+`Ctrl+Space` or `Ctrl+J` opens the list; typing a dot opens it by itself. `Tab` accepts and `Esc` closes. **Query ▸ IntelliSense Enabled** (`Ctrl+B`, `Ctrl+I`) turns it off for the tab, and **Edit ▸ IntelliSense ▸ Refresh Local Cache** (`Ctrl+Shift+R`) reads the catalog again after schema changes. After `FROM` and similar keywords it searches table names in every user schema; after `JOIN` it offers whole joins from foreign keys.
+
+## Large results
+
+A grid result larger than **Query Options ▸ Results ▸ Grid ▸ Rows per result page** (100,000 by default) is shown in pages, with a bar below the grid. Rows after the first page are kept in a temporary file until the next execution or until the tab closes. Sorting, copy and export apply to the current page; **Results to File** writes every row.
+
 ## Activity Monitor
 
 **View → Activity Monitor** (`Ctrl+Alt+A`) opens a document tab for the connected server and role (`host:port (role) - Activity Monitor`); opening it again activates the same tab. It has six collapsible panels, following the SSMS layout:

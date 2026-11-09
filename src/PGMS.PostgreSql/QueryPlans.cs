@@ -42,6 +42,7 @@ public sealed partial class QuerySession
         if(options.Notices is not null || generic)connection.Notice+=Notice;
         try
         {
+            await DisarmPlanCaptureAsync().ConfigureAwait(false);
             string result;
             if(generic)
             {

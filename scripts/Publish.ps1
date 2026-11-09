@@ -28,7 +28,7 @@ try {
     $publishArgs += @('-p:DebugType=None', '-p:DebugSymbols=false', '-p:IncludeSourceRevisionInInformationalVersion=false', "-p:PathMap=$projectRoot=/_/PGMS")
     dotnet publish src/PGMS.Desktop/PGMS.Desktop.csproj -c Release --no-restore -o $stagingPath @publishArgs
     if ($LASTEXITCODE -ne 0) { throw "Publish failed; staging retained at $stagingPath" }
-    Copy-Item -LiteralPath 'LICENSE', 'THIRD-PARTY-NOTICES.md' -Destination $stagingPath
+    Copy-Item -LiteralPath 'LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md' -Destination $stagingPath
     Copy-Item -LiteralPath 'docs/pt-BR/distribution.md' -Destination (Join-Path $stagingPath 'LEIA-ME.md')
     Copy-Item -LiteralPath 'docs/en/distribution.md' -Destination (Join-Path $stagingPath 'READ-ME.md')
     New-Item -ItemType Directory -Path (Join-Path $stagingPath 'licenses') | Out-Null

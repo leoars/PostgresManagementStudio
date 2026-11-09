@@ -9,6 +9,26 @@ public partial class QueryView
 {
     private QuerySessionSnapshot? sessionSnapshot;
     private bool inspectingSession;
+    internal Task<QuerySessionLossRisk> InspectSessionLossRiskAsync()=>session?.InspectLossRiskAsync()??Task.FromResult(new QuerySessionLossRisk(false,false));
+    /// <summary>Moves this tab to another connection. The new one opens first, so a failure leaves the current session untouched.</summary>
+    internal async Task ChangeDatabaseAsync(string connectionString)
+    {
+        if(IsBusy || session is null)return;
+        IsBusy=true;cancellation=new();
+        UpdateExport();StateChanged?.Invoke(this,EventArgs.Empty);
+        var candidate=new QuerySession(connectionString);
+        QuerySession previous=session;
+        try
+        {
+            await candidate.OpenAsync(cancellation.Token);
+            HideSessionSettings();ClearAnalysisReview();sessionSnapshot=null;SessionProperties.ItemsSource=null;
+            session=candidate;ConnectionString=connectionString;ForgetSessionState();
+            QueryStatus.Text=$"Connected | {Database}";
+        }
+        catch{await candidate.DisposeAsync();throw;}
+        finally{IsBusy=false;cancellation.Dispose();cancellation=null;UpdateExport();StateChanged?.Invoke(this,EventArgs.Empty);}
+        await previous.DisposeAsync();
+    }
     private async void InspectSession(object sender,RoutedEventArgs e)=>await InspectSessionAsync();
     private void ShowSessionSnapshot(QuerySessionSnapshot snapshot)
     {

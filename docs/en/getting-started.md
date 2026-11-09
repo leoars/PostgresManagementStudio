@@ -2,7 +2,7 @@
 
 English | [Português (Brasil)](../pt-BR/getting-started.md)
 
-[Download v0.1.0-alpha.4](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.4): [graphical installer](graphical-installer.md), portable ZIP or PowerShell 7 installer. The graphical installer offers current-user and all-users modes and does not require PowerShell. See [release notes](release-notes.md).
+[Download v0.1.0-alpha.5](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.5): [graphical installer](graphical-installer.md), portable ZIP or PowerShell 7 installer. The graphical installer offers current-user and all-users modes and does not require PowerShell. See [release notes](release-notes.md).
 
 ### Windows SmartScreen warning
 
@@ -15,7 +15,7 @@ Get-FileHash .\PGMS-* -Algorithm SHA256
 Compare the hashes with `SHA256SUMS.txt` in the release. Starting with v0.1.0-alpha.2 the assets are built by the [release workflow](../../.github/workflows/release.yml) on GitHub Actions and carry a build provenance attestation, so you can also confirm that the ZIP or installer came from that workflow and this repository (requires the [GitHub CLI](https://cli.github.com/); see [development](development.md)):
 
 ```powershell
-gh attestation verify .\PGMS-0.1.0-alpha.4-Setup-x64.exe --repo leoars/PostgresManagementStudio
+gh attestation verify .\PGMS-0.1.0-alpha.5-Setup-x64.exe --repo leoars/PostgresManagementStudio
 ```
 
 v0.1.0-alpha.1 was built on the maintainer's machine and has checksums only. Code signing through the SignPath Foundation open source program is planned.

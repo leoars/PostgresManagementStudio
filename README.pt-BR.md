@@ -2,15 +2,40 @@
 
 [English](README.md) | Português (Brasil)
 
-[![Build](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml/badge.svg)](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml) [![Pré-release](https://img.shields.io/github/v/release/leoars/PostgresManagementStudio?include_prereleases&label=pr%C3%A9-release)](https://github.com/leoars/PostgresManagementStudio/releases) [![Licença: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Build](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml/badge.svg)](https://github.com/leoars/PostgresManagementStudio/actions/workflows/build.yml) [![Pré-release](https://img.shields.io/github/v/release/leoars/PostgresManagementStudio?include_prereleases&label=pr%C3%A9-release)](https://github.com/leoars/PostgresManagementStudio/releases) [![Licença: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-**A experiência do SQL Server Management Studio, para PostgreSQL.** Cliente nativo Windows com Object Explorer, F5 para executar, planos de execução, monitor de sessões e backup/restore, feito para quem já pensa em SSMS.
+**A experiência do SQL Server Management Studio, para PostgreSQL.** Cliente nativo Windows com **diagramas de banco**, **Query Designer visual** e **IntelliSense por contexto**, além de Object Explorer, F5 para executar, planos de execução, monitor de sessões e backup/restore, feito para quem já pensa em SSMS.
 
-**[Baixar v0.1.0-alpha.4 para Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.4)** · Instalador gráfico (EN/pt-BR) ou ZIP portátil, runtime .NET incluído · Funciona com PostgreSQL 16 a 18
+**[Baixar v0.1.0-alpha.5 para Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.5)** · Instalador gráfico (EN/pt-BR) ou ZIP portátil, runtime .NET incluído · Funciona com PostgreSQL 16 a 18
 
 ![Editor, Object Explorer e resultados do PGMS](docs/assets/pgms-results-m959.jpg)
 
 > Pré-release inicial. Consultas, navegação e monitoramento são o núcleo desta alpha; administração e backup usam SQL revisável e as ferramentas oficiais do PostgreSQL. Não se declara paridade integral com SSMS. Veja os [limites conhecidos](docs/pt-BR/validation.md) e as [notas da versão](docs/pt-BR/release-notes.md).
+
+## Destaques
+
+### Diagramas de banco de dados
+
+![Um diagrama de banco no PGMS com oito tabelas e suas chaves estrangeiras](docs/assets/pgms-diagram.png)
+
+Veja o seu schema como no SSMS. Adicione tabelas e as tabelas relacionadas, arraste uma coluna sobre outra para criar uma chave estrangeira, altere colunas e chaves primárias dentro do diagrama e deixe o **Arrange Tables** organizar tudo. Toda alteração no banco aparece antes como script SQL para revisão. Os diagramas ficam salvos no servidor, num pequeno schema `pgms` que o PGMS pede permissão para criar.
+
+### Query Designer visual
+
+![O Query Designer com os painéis Diagram, Criteria e SQL](docs/assets/pgms-query-designer.png)
+
+Monte consultas clicando, em vez de digitar. **Query ▸ Design Query in Editor** (`Ctrl+Shift+Q`) abre a instrução sob o cursor nos painéis Diagram, Criteria e SQL, sempre sincronizados: marque colunas, defina filtros e ordenação, e as junções vêm das suas chaves estrangeiras. Mude o tipo para Update, Delete, Insert ou Make Table. Ele só escreve SQL no editor e nunca executa nada. `UNION` e `WITH` abrem apenas no painel SQL.
+
+### IntelliSense que sabe onde você está
+
+![IntelliSense depois de JOIN sugerindo uma junção completa a partir de uma chave estrangeira](docs/assets/pgms-intellisense.png)
+
+Aperte `Ctrl+Space` e receba o que cabe naquela posição. Depois de `FROM`: tabelas, views e funções de tabela, encontradas pelo nome em todos os seus schemas. Depois de `JOIN`: a junção inteira a partir das chaves estrangeiras, como `orders o ON o.customer_id = c.id`. Depois de um alias: as colunas dele. A busca ignora acentos, então `usuar` encontra `Usuários`. Parameter Info, Quick Info e colunas de CTE ainda não existem.
+
+### Também no PGMS
+
+- **Gerar SQL com IA.** Descreva a consulta e revise o SQL antes de ele ir para o editor, com Anthropic, OpenAI ou um Ollama local, usando a sua própria chave. O pedido e a estrutura do banco vão para o provedor que você configurar; dados das tabelas nunca são lidos nem enviados.
+- **Configure Server TLS.** Assistente que instala um certificado e liga o TLS, restaurando a configuração anterior se algo falhar. Exige conexão de superusuário a um servidor em Windows.
 
 ## Por que o PGMS
 
@@ -22,9 +47,10 @@
 
 ## Funcionalidades
 
-- Editor SQL: destaque, busca/substituição, múltiplas abas, abrir/salvar e recuperação criptografada de rascunhos.
-- Sessões PostgreSQL independentes, executar/cancelar, Results/Messages, grade com limites, cópia e exportação CSV/JSON.
-- Object Explorer, inspeção, planos estimados/analisados e configuração da sessão.
+- Editor SQL: destaque, IntelliSense por contexto, busca/substituição, múltiplas abas, abrir/salvar e recuperação criptografada de rascunhos.
+- Diagramas de banco, Table Designer, View Designer e Query Designer.
+- Sessões PostgreSQL independentes, executar/cancelar, Results/Messages, grade em páginas de 100.000 linhas (configurável), resultados em texto ou arquivo, cópia e exportação CSV/JSON.
+- Object Explorer, inspeção, planos de execução gráficos (estimados e reais) e configuração da sessão.
 - Administração com SQL revisável nos casos suportados de bancos, schemas, tabelas, colunas, identity, índices, constraints, sequences, roles e privilégios.
 - Monitor de sessões/bloqueadores, com cancelamento de consulta e encerramento de sessão distintos.
 - Backup/restore lógico por ferramentas externas PostgreSQL: custom, tar, SQL e diretório, além de operações globais revisadas.
@@ -46,7 +72,7 @@ Get-FileHash .\PGMS-* -Algorithm SHA256
 Compare os hashes com o `SHA256SUMS.txt` da release. A partir da v0.1.0-alpha.2 os assets são compilados pelo [workflow de release](.github/workflows/release.yml) no GitHub Actions e trazem atestado de proveniência de build, então você também pode confirmar que o ZIP ou o instalador saiu desse workflow e deste repositório (exige o [GitHub CLI](https://cli.github.com/)):
 
 ```powershell
-gh attestation verify .\PGMS-0.1.0-alpha.4-Setup-x64.exe --repo leoars/PostgresManagementStudio
+gh attestation verify .\PGMS-0.1.0-alpha.5-Setup-x64.exe --repo leoars/PostgresManagementStudio
 ```
 
 A v0.1.0-alpha.1 foi compilada na máquina do mantenedor e tem apenas checksums. A assinatura de código pelo programa open source da SignPath Foundation está planejada.
@@ -83,4 +109,4 @@ Veja [CONTRIBUTING.pt-BR.md](CONTRIBUTING.pt-BR.md) e o [código de conduta](COD
 
 ## Licença
 
-Código e documentação próprios do PGMS usam a [MIT](LICENSE). Componentes de terceiros e o elefante PostgreSQL mantêm suas licenças e condições de marca; veja os [avisos de terceiros](THIRD-PARTY-NOTICES.md). O PGMS é independente, sem endosso da Microsoft ou do projeto PostgreSQL. SSMS é referência, sem dependência distribuída.
+O PGMS é criado e mantido por [Leonardo Santos](https://github.com/leoars). Código e documentação próprios usam a [Apache-2.0](LICENSE): uso livre pessoal e em empresas, mantendo o copyright e os créditos do [NOTICE](NOTICE). As versões até 0.1.0-alpha.4 continuam sob MIT. Componentes de terceiros e o elefante PostgreSQL mantêm suas licenças e condições de marca; veja os [avisos de terceiros](THIRD-PARTY-NOTICES.md). O PGMS é independente, sem endosso da Microsoft ou do projeto PostgreSQL. SSMS é referência, sem dependência distribuída.
