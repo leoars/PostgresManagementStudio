@@ -35,4 +35,8 @@ foreach ($path in ($paths | Sort-Object -Unique)) {
         $linkCount++
     }
 }
+foreach ($guide in @('docs/en/distribution.md', 'docs/pt-BR/distribution.md')) {
+    $text = [IO.File]::ReadAllText((Join-Path $root $guide))
+    if (!$text.Contains('Apache-2.0') -or $text -cmatch '\bMIT\b') { throw "Packaged guide must state the current license: $guide" }
+}
 [pscustomobject]@{ Valid=$true; LanguagePairs=$pairs.Count; PublicDocuments=@($paths | Sort-Object -Unique).Count; LocalLinksChecked=$linkCount; CommandsMatch=$true; HistoricalRecordsTranslated=$false }
