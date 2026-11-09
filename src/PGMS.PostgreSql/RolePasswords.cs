@@ -2,12 +2,31 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography;
 using System.Globalization;
+using System.Net;
 using Npgsql;
 
 namespace PGMS.PostgreSql;
 
+public enum RolePasswordTransport { Tls, Loopback, Unencrypted }
+
 public static class RolePasswordService
 {
+    public static RolePasswordTransport TransportOf(string connectionString)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        if (builder.SslMode is SslMode.Require or SslMode.VerifyCA or SslMode.VerifyFull) return RolePasswordTransport.Tls;
+        return IsLoopback(builder.Host) ? RolePasswordTransport.Loopback : RolePasswordTransport.Unencrypted;
+    }
+
+    // Every host in a multi-host list must be loopback; a name other than localhost is never resolved here.
+    public static bool IsLoopback(string? hosts) => !string.IsNullOrWhiteSpace(hosts) && hosts.Split(',').All(entry =>
+    {
+        string host = entry.Trim();
+        if (host.StartsWith('[')) host = host[1..Math.Max(1, host.IndexOf(']'))];
+        else if (host.Count(c => c == ':') == 1) host = host[..host.IndexOf(':')];
+        return host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || (IPAddress.TryParse(host, out var address) && IPAddress.IsLoopback(address));
+    });
+
     public static void ValidatePassword(SecureString password)
     {
         byte[] bytes = PreparePassword(password);
@@ -31,15 +50,15 @@ public static class RolePasswordService
         }
     }
 
-    public static async Task SetAsync(string connectionString, string role, SecureString password, CancellationToken token = default)
+    public static async Task SetAsync(string connectionString, string role, SecureString password, CancellationToken token = default, bool allowUnencrypted = false)
     {
         token.ThrowIfCancellationRequested();
         SqlIdentifier.Quote(role);
         if (role.StartsWith("pg_", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("PostgreSQL predefined roles cannot be changed here.");
         if (password.Length == 0) throw new ArgumentException("Enter a non-empty password.");
         var builder = new NpgsqlConnectionStringBuilder(connectionString);
-        if (builder.SslMode is not (SslMode.Require or SslMode.VerifyCA or SslMode.VerifyFull))
-            throw new InvalidOperationException("Role passwords can be changed only over TLS. Set this connection profile to Require, VerifyCA or VerifyFull and reconnect.");
+        if (TransportOf(connectionString) == RolePasswordTransport.Unencrypted && !allowUnencrypted)
+            throw new InvalidOperationException("Role passwords can be changed only over TLS, on a loopback connection, or after explicitly allowing an unencrypted connection. Set this connection profile to Require, VerifyCA or VerifyFull and reconnect.");
 
         byte[]? passwordBytes = null, salt = null, saltedPassword = null, clientKey = null, storedKey = null, serverKey = null;
         string? sql = null;

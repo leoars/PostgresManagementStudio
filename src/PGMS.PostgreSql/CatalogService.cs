@@ -2,11 +2,16 @@ using Npgsql;
 
 namespace PGMS.PostgreSql;
 
-public enum CatalogKind { Server, Databases, Database, Schemas, Schema, Tables, Views, MaterializedViews, Sequences, Functions, Procedures, Relation, Routine, Columns, Column, Indexes, Index, Roles, Role, Enums, Domains, DataType }
+public enum CatalogKind { Server, Databases, Database, Schemas, Schema, Tables, Views, MaterializedViews, Sequences, Functions, Procedures, Relation, Routine, Columns, Column, Indexes, Index, Roles, Role, Enums, Domains, DataType, DatabaseDiagrams, DatabaseDiagram }
 public sealed record CatalogEntry(CatalogKind Kind, string Name, string? Database = null, string? Schema = null, uint Oid = 0)
 {
     public string? RelationType { get; init; }
     public string? DataTypeKind { get; init; }
+    public string? RoleName { get; init; }
+    public string? Owner { get; init; }
+    public bool CanManageRole => Kind == CatalogKind.Role && RoleName is not null;
+    public bool CanConfigureTls => Kind == CatalogKind.Server;
+    public bool IsServer => Kind == CatalogKind.Server;
     public bool CanManageEnum => Kind == CatalogKind.DataType && DataTypeKind == "e" && Oid != 0;
     public bool CanManageDomain => Kind == CatalogKind.DataType && DataTypeKind == "d" && Oid != 0;
     public bool CanInspectObjectProperties => Kind is CatalogKind.Database or CatalogKind.Schema or CatalogKind.Routine || (Kind == CatalogKind.Relation && RelationType is "v" or "m");
@@ -15,7 +20,8 @@ public sealed record CatalogEntry(CatalogKind Kind, string Name, string? Databas
     public bool CanInspectTable => Kind == CatalogKind.Relation && RelationType is "r" or "p";
     public bool CanEditTable => Kind == CatalogKind.Relation && RelationType == "r";
     public bool CanManagePartitions => Kind == CatalogKind.Relation && RelationType == "p";
-    public bool CanExpand => Kind is not (CatalogKind.Routine or CatalogKind.Column or CatalogKind.Index or CatalogKind.Role or CatalogKind.DataType);
+    public bool CanExpand => Kind is not (CatalogKind.Routine or CatalogKind.Column or CatalogKind.Index or CatalogKind.Role or CatalogKind.DataType or CatalogKind.DatabaseDiagram);
+    public bool IsDiagram => Kind == CatalogKind.DatabaseDiagram && Oid != 0;
 }
 
 public sealed class CatalogService(string connectionString)
@@ -33,7 +39,9 @@ public sealed class CatalogService(string connectionString)
         switch (parent.Kind)
         {
             case CatalogKind.Server: return [Folder(CatalogKind.Databases, "Databases"), Folder(CatalogKind.Roles, "Login/Group Roles")];
-            case CatalogKind.Database: return [Folder(CatalogKind.Schemas, "Schemas")];
+            // SSMS 22.11 lists Database Diagrams first under a database (M1043).
+            case CatalogKind.Database: return [Folder(CatalogKind.DatabaseDiagrams, "Database Diagrams"), Folder(CatalogKind.Schemas, "Schemas")];
+            case CatalogKind.DatabaseDiagrams: return await DiagramsAsync(parent, token).ConfigureAwait(false);
             case CatalogKind.Schema: return [Folder(CatalogKind.Tables, "Tables"), Folder(CatalogKind.Views, "Views"), Folder(CatalogKind.MaterializedViews, "Materialized Views"), Folder(CatalogKind.Sequences, "Sequences"), Folder(CatalogKind.Functions, "Functions"), Folder(CatalogKind.Procedures, "Procedures"), Folder(CatalogKind.Enums, "Enums"), Folder(CatalogKind.Domains, "Domains")];
             case CatalogKind.Relation: return [Folder(CatalogKind.Columns, "Columns"), Folder(CatalogKind.Indexes, "Indexes")];
         }
@@ -42,12 +50,12 @@ public sealed class CatalogService(string connectionString)
         {
             CatalogKind.Databases => "SELECT oid, datname FROM pg_catalog.pg_database WHERE NOT datistemplate AND datallowconn ORDER BY datname",
             CatalogKind.Schemas => "SELECT oid, nspname FROM pg_catalog.pg_namespace WHERE nspname <> 'information_schema' AND nspname !~ '^pg_' ORDER BY nspname",
-            CatalogKind.Roles => "SELECT oid, rolname || CASE WHEN rolcanlogin THEN ' (login)' ELSE '' END FROM pg_catalog.pg_roles ORDER BY rolname",
+            CatalogKind.Roles => "SELECT oid, rolname || CASE WHEN rolcanlogin THEN ' (login)' ELSE '' END, rolname FROM pg_catalog.pg_roles ORDER BY rolname",
             CatalogKind.Enums or CatalogKind.Domains => "SELECT t.oid, t.typname, t.typtype::text FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname=@schema AND t.typtype::text=@kind ORDER BY t.typname, t.oid",
-            CatalogKind.Functions or CatalogKind.Procedures => "SELECT p.oid, p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=@schema AND p.prokind::text=@kind ORDER BY p.proname, p.oid",
+            CatalogKind.Functions or CatalogKind.Procedures => "SELECT p.oid, p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')', pg_catalog.pg_get_userbyid(p.proowner) FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=@schema AND p.prokind::text=@kind ORDER BY p.proname, p.oid",
             CatalogKind.Columns => "SELECT attnum::oid, attname || ' (' || pg_catalog.format_type(atttypid, atttypmod) || CASE WHEN attnotnull THEN ', not null)' ELSE ', null)' END FROM pg_catalog.pg_attribute WHERE attrelid=@oid AND attnum>0 AND NOT attisdropped ORDER BY attnum",
             CatalogKind.Indexes => "SELECT c.oid, c.relname FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid=i.indexrelid WHERE i.indrelid=@oid ORDER BY c.relname",
-            _ => "SELECT c.oid, c.relname, c.relkind::text FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=@schema AND c.relkind::text=ANY(@kinds) ORDER BY c.relname"
+            _ => "SELECT c.oid, c.relname, c.relkind::text, pg_catalog.pg_get_userbyid(c.relowner) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=@schema AND c.relkind::text=ANY(@kinds) ORDER BY c.relname"
         };
         await using var connection = new NpgsqlConnection(ConnectionFor(parent.Database));
         await connection.OpenAsync(token).ConfigureAwait(false);
@@ -76,8 +84,14 @@ public sealed class CatalogService(string connectionString)
                 _ => CatalogKind.Relation
             };
             entries.Add(new(kind, name, kind == CatalogKind.Database ? name : parent.Database,
-                kind == CatalogKind.Schema ? name : parent.Schema, oid) { RelationType = kind == CatalogKind.Relation && reader.FieldCount > 2 ? reader.GetString(2) : null, DataTypeKind = kind == CatalogKind.DataType ? reader.GetString(2) : null });
+                kind == CatalogKind.Schema ? name : parent.Schema, oid) { RelationType = kind == CatalogKind.Relation && reader.FieldCount > 2 ? reader.GetString(2) : null, DataTypeKind = kind == CatalogKind.DataType ? reader.GetString(2) : null, RoleName = kind == CatalogKind.Role ? reader.GetString(2) : null, Owner = kind == CatalogKind.Relation ? reader.GetString(3) : kind == CatalogKind.Routine ? reader.GetString(2) : null });
         }
         return entries;
+    }
+
+    private async Task<IReadOnlyList<CatalogEntry>> DiagramsAsync(CatalogEntry folder, CancellationToken token)
+    {
+        var diagrams = await new DiagramService(ConnectionFor(folder.Database)).ListAsync(token).ConfigureAwait(false);
+        return diagrams.Select(d => new CatalogEntry(CatalogKind.DatabaseDiagram, d.Name, folder.Database, null, (uint)d.Id) { Owner = d.Owner }).ToArray();
     }
 }

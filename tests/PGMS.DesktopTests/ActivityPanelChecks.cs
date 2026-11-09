@@ -167,9 +167,9 @@ internal static class ActivityPanelChecks
             // The real actions behind Active Expensive Queries: a statement that would sleep an hour proves the plan does not execute it.
             const string sleeper="SELECT pg_sleep(3600)";var started=System.Diagnostics.Stopwatch.StartNew();
             var planned=await window.OpenEstimatedPlanAsync(connection,sleeper);
-            check(planned.IsConnected && planned.Editor.Text==sleeper && ((TreeView)planned.FindName("PlanTree")).Items.Count==1 && ((TextBlock)planned.FindName("PlanStatus")).Text.Contains("Estimated plan") && started.Elapsed<TimeSpan.FromSeconds(30) && dock.ActiveContent==planned,"Show Execution Plan opens a connected tab with the estimated plan without running the statement");
+            check(planned.IsConnected && planned.Editor.Text==sleeper && ((ExecutionPlanView)planned.FindName("PlanDiagram")).Statements.Count==1 && ((TextBlock)planned.FindName("PlanStatus")).Text.Contains("Estimated plan") && started.Elapsed<TimeSpan.FromSeconds(30) && dock.ActiveContent==planned,"Show Execution Plan opens a connected tab with the estimated plan without running the statement");
             var edited=await window.OpenQueryTextAsync(connection,"SELECT 42");
-            check(edited.IsConnected && edited.Editor.Text=="SELECT 42" && !edited.IsDirty && ((TreeView)edited.FindName("PlanTree")).Items.Count==0 && dock.ActiveContent==edited,"Edit Query Text opens a connected tab with the statement and does not run it");
+            check(edited.IsConnected && edited.Editor.Text=="SELECT 42" && !edited.IsDirty && ((ExecutionPlanView)edited.FindName("PlanDiagram")).Statements.Count==0 && dock.ActiveContent==edited,"Edit Query Text opens a connected tab with the statement and does not run it");
             window.Close();await window.CloseCompletion.WaitAsync(TimeSpan.FromSeconds(30));await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
             check(!reopened.IsAutoRefreshRunning,"Closing the main window shuts down an open monitor tab");
         }

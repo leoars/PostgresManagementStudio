@@ -32,8 +32,43 @@ public partial class QueryView
         }
         finally{IsBusy=exporting=false;cancellation.Dispose();cancellation=null;UpdateExport();StateChanged?.Invoke(this,EventArgs.Empty);}
     }
-    private void SelectedPlanNode(object sender,RoutedPropertyChangedEventArgs<object> e)
-        => PlanProperties.ItemsSource=(e.NewValue as QueryPlanNode)?.Properties;
+    private void SavePlanFromDiagram(object? sender,EventArgs e)=>ExportPlan(this,new RoutedEventArgs());
+    /// <summary>Show Execution Plan In New Tab: the host opens the plan on screen in a document of its own.</summary>
+    internal event Action<IReadOnlyList<ExecutionPlanStatement>>? PlanTabRequested;
+    private void ShowPlanInNewTab(object? sender,EventArgs e){if(PlanDiagram.Statements.Count>0)PlanTabRequested?.Invoke(PlanDiagram.Statements);}
+    // Export follows the statement of the selected operator; with no plan on screen there is nothing to export.
+    private void SelectedPlanOperator(object? sender,EventArgs e)
+    {
+        PlanProperties.ItemsSource=PlanDiagram.SelectedOperator?.Properties;
+        currentPlan=PlanDiagram.SelectedStatement?.Source;
+        RefreshPlanRevision();UpdateExport();
+    }
+    private bool includeActualPlan;
+    /// <summary>Include Actual Execution Plan (Ctrl+M): each execution of this tab also collects the plans it really used.</summary>
+    public bool IncludeActualPlan
+    {
+        get=>includeActualPlan;
+        set{if(includeActualPlan==value)return;includeActualPlan=value;StateChanged?.Invoke(this,EventArgs.Empty);}
+    }
+    /// <summary>Shows what an execution collected. As in SSMS the Results tab stays in front; the plan waits in its own tab.</summary>
+    private async Task ShowActualPlansAsync(ActualPlanCapture capture,long revision)
+    {
+        PlanDiagram.Clear();
+        if(capture.Unavailable is { } reason)
+        {
+            PlanStatus.Text="Actual plan not available: "+reason+"\nThe SQL ran normally. Include Actual Execution Plan needs a superuser connection and the auto_explain module; Analyze Plan works for any user, one statement at a time.";
+            Messages.AppendText("\nActual plan not available: "+reason);
+            return;
+        }
+        if(capture.Plans.Count==0){PlanStatus.Text="This execution produced no plan: statements such as SET or CREATE have none.";return;}
+        try
+        {
+            var statements=await Task.Run(()=>ExecutionPlanBuilder.Build(capture.Plans));
+            planRevision=revision;PlanDiagram.Show(statements);
+            PlanStatus.Text=$"Actual plan · captured during this execution, which ran once. {statements.Count} statement(s)."+(capture.Omitted>0?$" {capture.Omitted} plan(s) omitted: limit {ActualPlanCapture.MaximumPlans} plans, 1 Mi characters each.":"");
+        }
+        catch(Exception ex)when(ex is JsonException or InvalidDataException){PlanStatus.Text="Actual plan could not be read: "+ex.Message;}
+    }
     private void RefreshPlanRevision()
         => PlanStale.Visibility=currentPlan is not null && planRevision!=EditRevision?Visibility.Visible:Visibility.Collapsed;
     private async void ExplainPlan(object sender,RoutedEventArgs e)=>await ExplainPlanAsync();
@@ -55,7 +90,7 @@ public partial class QueryView
             if(analyze)
             {
                 if(reviewedSql is null)MarkUnboundParameter(unbound,Editor.SelectionLength>0?Editor.SelectionStart:0,revision);
-                currentPlan=null;PlanTree.ItemsSource=null;PlanProperties.ItemsSource=null;RefreshPlanRevision();UpdateExport();
+                PlanDiagram.Clear();
                 PlanStatus.Text=$"Not executed: the SQL contains parameter placeholder {unbound.Description}, which has no value. An analyzed plan runs the statement, so replace each $n with a literal value first. Estimated Plan shows the generic plan without values.\nNothing was sent to the server and the session stays open.";
                 OutputTabs.SelectedItem=PlanTab;QueryStatus.Text=$"Not executed | {Database} | Unbound parameter ${unbound.Number}";
                 return;
@@ -64,7 +99,7 @@ public partial class QueryView
         }
         var notices=new QueryNotices();var options=new QueryExecutionOptions(timeout,notices);
         IsBusy=executingQuery=true;cancellation=new();QueryTimeout.IsEnabled=false;
-        currentPlan=null;PlanTree.ItemsSource=null;PlanProperties.ItemsSource=null;RefreshPlanRevision();PlanStatus.Text=analyze?"Executing SQL for analyzed plan…":generic?"Reading generic plan…":"Reading estimated plan…";
+        PlanDiagram.Clear();PlanStatus.Text=analyze?"Executing SQL for analyzed plan…":generic?"Reading generic plan…":"Reading estimated plan…";
         OutputTabs.SelectedItem=PlanTab;QueryStatus.Text=PlanStatus.Text;
         UpdateExport();StateChanged?.Invoke(this,EventArgs.Empty);
         try
@@ -73,9 +108,9 @@ public partial class QueryView
             var loaded=await Task.Run(async()=>
             {
                 var plan=await (analyze?capturedSession.AnalyzeAsync(sql,options,token):generic?capturedSession.ExplainGenericAsync(sql,options,token):capturedSession.ExplainAsync(sql,options,token)).ConfigureAwait(false);
-                return (Plan:plan,Root:QueryPlanTree.Parse(plan,token),Timings:QueryPlanTimings.Read(plan));
+                return (Statements:ExecutionPlanBuilder.Build([plan],sql,token),Timings:QueryPlanTimings.Read(plan));
             },token);
-            currentPlan=loaded.Plan;planRevision=revision;RefreshPlanRevision();PlanTree.ItemsSource=new[]{loaded.Root};
+            planRevision=revision;PlanDiagram.Show(loaded.Statements);
             PlanStatus.Text=analyze?"Analyzed plan · SQL executed. Effects follow the current transaction; no automatic rollback.":generic?"Generic plan · $n parameters are not bound, so the planner cannot use their values; costs are planner units. Query rows were not executed.":"Estimated plan · costs are planner units, not milliseconds. Query rows were not executed.";
             PlanStatus.Text+="\n"+scope+" snapshot.";
             if(switchedToGeneric)PlanStatus.Text+=" The SQL contains $n placeholders, so Estimated Plan used GENERIC_PLAN instead of sending them unbound.";

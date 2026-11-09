@@ -9,8 +9,10 @@ public sealed class CatalogNode : INotifyPropertyChanged
     private readonly CatalogService service;
     private bool loaded;
     private readonly List<CatalogNode> allChildren = [];
-    public string Filter { get; private set; } = "";
-    public bool CanFilter => Entry.Kind is CatalogKind.Databases or CatalogKind.Schemas or CatalogKind.Tables or CatalogKind.Views or CatalogKind.MaterializedViews or CatalogKind.Sequences or CatalogKind.Functions or CatalogKind.Procedures or CatalogKind.Roles or CatalogKind.Columns or CatalogKind.Indexes or CatalogKind.Enums or CatalogKind.Domains;
+    public CatalogFilter Filter { get; private set; } = CatalogFilter.None;
+    // Folders whose Filter button SSMS 22.11 enables (M1040); it follows the folder type, not its contents.
+    public bool CanFilter => CanFilterByOwner || Entry.Kind is CatalogKind.Roles or CatalogKind.Indexes;
+    public bool CanFilterByOwner => Entry.Kind is CatalogKind.Tables or CatalogKind.Views or CatalogKind.MaterializedViews or CatalogKind.Functions or CatalogKind.Procedures;
     private bool busy;
     private CancellationTokenSource? loadCancellation;
     public bool IsBusy => busy;
@@ -29,13 +31,21 @@ public sealed class CatalogNode : INotifyPropertyChanged
     private bool expanded, selected;
     public bool IsExpanded { get => expanded; set { expanded = value; PropertyChanged?.Invoke(this, new(nameof(IsExpanded))); } }
     public bool IsSelected { get => selected; set { selected = value; PropertyChanged?.Invoke(this, new(nameof(IsSelected))); } }
-    public string Name => Entry.Name + (Filter.Length > 0 ? " (filtered)" : "") + (busy ? " (loading)" : WasCanceled ? " (load canceled)" : Error is not null ? " (load failed)" : "");
-    public string FilterSummary => (busy ? "Loading… " : WasCanceled ? "Load canceled; displayed items may be outdated. Refresh to retry. " : Error is not null ? "Load failed; displayed items may be outdated. Refresh to retry. " : "") + (loaded ? $"{allChildren.Count(n => Matches(n))} of {allChildren.Count} items. Filter applies to direct children only." : "Expand or refresh to load items.");
-    private bool Matches(CatalogNode node) => node.Entry.Name.Contains(Filter, StringComparison.OrdinalIgnoreCase);
-    public void SetFilter(string text)
+    private bool renaming;
+    private string renameText = "";
+    /// <summary>The label is being edited in place (Rename, F2 or a click on the selected label, as in SSMS).</summary>
+    public bool IsRenaming { get => renaming; set { renaming = value; PropertyChanged?.Invoke(this, new(nameof(IsRenaming))); } }
+    public string RenameText { get => renameText; set { renameText = value; PropertyChanged?.Invoke(this, new(nameof(RenameText))); } }
+    public string Name => Entry.Name + (Filter.IsActive ? " (filtered)" : "") + (busy ? " (loading)" : WasCanceled ? " (load canceled)" : Error is not null ? " (load failed)" : "");
+    public string FilterSummary => (busy ? "Loading… " : WasCanceled ? "Load canceled; displayed items may be outdated. Refresh to retry. " : Error is not null ? "Load failed; displayed items may be outdated. Refresh to retry. " : "") + (loaded ? $"{allChildren.Count(n => Matches(n))} of {allChildren.Count} items." : "Expand or refresh to load items.");
+    private bool Matches(CatalogNode node) => Filter.Matches(node.FilterName, node.Entry.Owner);
+    // Routines show their arguments and login roles a suffix; the filter compares the object name.
+    private string FilterName => Entry.RoleName ?? (Entry.Kind == CatalogKind.Routine ? Entry.Name[..Entry.Name.IndexOf('(')] : Entry.Name);
+    public void SetFilter(string name) => SetFilter(new CatalogFilter(name));
+    public void SetFilter(CatalogFilter filter)
     {
         if (!CanFilter) return;
-        Filter = text;
+        Filter = filter;
         if (loaded) ShowChildren();
         PropertyChanged?.Invoke(this, new(nameof(Name)));
         PropertyChanged?.Invoke(this, new(nameof(Filter)));

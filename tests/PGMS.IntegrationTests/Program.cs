@@ -88,6 +88,18 @@ if (args.Contains("--privilege-commit")) { await PrivilegeCommitChecks.RunAsync(
 if (args.Length == 0) await PrivilegeCommitChecks.RunAsync(connection,Check);
 if (args.Contains("--unicode-password")) { await UnicodePasswordChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} Unicode password checks passed."); return; }
 if (args.Length == 0) await UnicodePasswordChecks.RunAsync(connection,Check);
+if (args.Contains("--server-tls")) { await ServerTlsChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} server TLS checks passed."); return; }
+if (args.Length == 0) await ServerTlsChecks.RunAsync(connection,Check);
+if (args.Contains("--schema-context")) { await SchemaContextChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} schema context checks passed."); return; }
+if (args.Length == 0) await SchemaContextChecks.RunAsync(connection,Check);
+if (args.Contains("--table-design")) { await TableDesignChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} table design checks passed."); return; }
+if (args.Length == 0) await TableDesignChecks.RunAsync(connection,Check);
+if (args.Contains("--diagrams")) { await DiagramChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} database diagram checks passed."); return; }
+if (args.Length == 0) await DiagramChecks.RunAsync(connection,Check);
+if (args.Contains("--results-text")) { await ResultsTextChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} results text checks passed."); return; }
+if (args.Length == 0) await ResultsTextChecks.RunAsync(connection,Check);
+if (args.Contains("--reports")) { await ServerReportChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} server report checks passed."); return; }
+if (args.Length == 0) await ServerReportChecks.RunAsync(connection,Check);
 if (args.Contains("--privilege-identity")) { await PrivilegeIdentityChecks.RunAsync(connection,Check); await PrivilegeRecipientChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} privilege identity checks passed."); return; }
 if (args.Length == 0) { await PrivilegeIdentityChecks.RunAsync(connection,Check); await PrivilegeRecipientChecks.RunAsync(connection,Check); }
 if (args.Contains("--membership-option-sql")) { MembershipOptionChecks.RunSql(Check); Console.WriteLine($"{passed} membership SQL checks passed."); return; }
@@ -383,9 +395,21 @@ try
             }
         }
         passwordString = "";
+        string remotePlain = new NpgsqlConnectionStringBuilder(connection) { Host = "pgms-password-check.invalid" }.ConnectionString;
         bool insecureTransportRefused = false;
-        try { await RolePasswordService.SetAsync(connection, passwordRole, securePassword); } catch (InvalidOperationException ex) when (ex.Message.Contains("only over TLS", StringComparison.Ordinal)) { insecureTransportRefused = true; }
-        Check(insecureTransportRefused, "role password service refuses a non-TLS profile");
+        try { await RolePasswordService.SetAsync(remotePlain, passwordRole, securePassword); } catch (InvalidOperationException ex) when (ex.Message.Contains("only over TLS", StringComparison.Ordinal)) { insecureTransportRefused = true; }
+        Check(insecureTransportRefused, "role password service refuses a non-TLS, non-loopback profile without explicit permission");
+        Check(RolePasswordService.TransportOf(connection) == RolePasswordTransport.Loopback && RolePasswordService.TransportOf(remotePlain) == RolePasswordTransport.Unencrypted && RolePasswordService.TransportOf(tlsConnection) == RolePasswordTransport.Tls, "role password transport distinguishes TLS, loopback and unencrypted profiles");
+        Check(RolePasswordService.IsLoopback("localhost") && RolePasswordService.IsLoopback("127.0.0.2:5432,[::1]:5433") && RolePasswordService.IsLoopback("::1") && !RolePasswordService.IsLoopback("127.0.0.1,db.example") && !RolePasswordService.IsLoopback("localhost.example") && !RolePasswordService.IsLoopback("10.0.0.1") && !RolePasswordService.IsLoopback(null), "loopback detection requires every host to be loopback");
+        string? verifierBefore;
+        await using (var before = new NpgsqlCommand("SELECT rolpassword FROM pg_catalog.pg_authid WHERE rolname=@name", passwordCheck)) { before.Parameters.AddWithValue("name", passwordRole); verifierBefore = (string?)await before.ExecuteScalarAsync(); }
+        await RolePasswordService.SetAsync(connection, passwordRole, securePassword);
+        await using (var after = new NpgsqlCommand("SELECT rolpassword FROM pg_catalog.pg_authid WHERE rolname=@name", passwordCheck))
+        {
+            after.Parameters.AddWithValue("name", passwordRole);
+            string? verifierAfter = (string?)await after.ExecuteScalarAsync();
+            Check(verifierAfter is not null && verifierAfter.StartsWith("SCRAM-SHA-256$", StringComparison.Ordinal) && verifierAfter != verifierBefore, "role password changes on a loopback profile without TLS and stores a new SCRAM verifier");
+        }
     }
     Array.Clear(passwordChars);
     await session.ExecuteAsync($"CREATE ROLE {SqlIdentifier.Quote(roleName)} LOGIN;");

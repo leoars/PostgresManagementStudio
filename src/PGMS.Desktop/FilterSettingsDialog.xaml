@@ -1,0 +1,22 @@
+<Window x:Class="PGMS.Desktop.FilterSettingsDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop" Title="Filter Settings" Width="540" Height="440" MinWidth="420" MinHeight="320" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#F5F5F5">
+ <Grid Margin="10">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition/></Grid.ColumnDefinitions>
+  <TextBlock Text="Server:" Margin="0,0,0,6"/><TextBlock x:Name="ServerText" Grid.Column="1" TextTrimming="CharacterEllipsis" Margin="0,0,0,6"/>
+  <TextBlock x:Name="DatabaseLabel" Grid.Row="1" Text="Database:" Margin="0,0,0,6"/><TextBlock x:Name="DatabaseText" Grid.Row="1" Grid.Column="1" TextTrimming="CharacterEllipsis" Margin="0,0,0,6"/>
+  <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="Filter Criteria:" Margin="0,0,0,6"/>
+  <DataGrid x:Name="Criteria" Grid.Row="3" Grid.ColumnSpan="2" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserReorderColumns="False" CanUserSortColumns="False" CanUserResizeRows="False" HeadersVisibility="Column" GridLinesVisibility="All" HorizontalGridLinesBrush="#E0E0E0" VerticalGridLinesBrush="#E0E0E0" SelectionMode="Single" SelectionUnit="FullRow" Background="White" RowHeight="23" GotFocus="CriterionFocused" SelectionChanged="CriterionSelected" AutomationProperties.Name="Filter criteria">
+   <DataGrid.Columns>
+    <DataGridTextColumn Header="Property" Binding="{Binding Property}" IsReadOnly="True" Width="*"/>
+    <DataGridTemplateColumn Header="Operator" Width="*"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{x:Static local:FilterCriterion.Operators}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Operator, UpdateSourceTrigger=PropertyChanged}" BorderThickness="0" AutomationProperties.Name="{Binding OperatorName}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+    <DataGridTemplateColumn Header="Value" Width="*"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" BorderThickness="0" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding ValueName}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+   </DataGrid.Columns>
+  </DataGrid>
+  <Border Grid.Row="4" Grid.ColumnSpan="2" Margin="0,8,0,0" Height="56" Background="#FFFFE1" BorderBrush="#A0A0A0" BorderThickness="1"><TextBlock x:Name="Description" TextWrapping="Wrap" Margin="5,3"/></Border>
+  <StackPanel Grid.Row="5" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,10,0">
+   <Button x:Name="ClearButton" Content="_Clear Filter" Click="ClearFilter" Padding="16,4"/>
+   <Button x:Name="OkButton" Content="OK" IsDefault="True" Click="Accept" Padding="24,4" Margin="8,0,0,0"/>
+   <Button Content="Cancel" IsCancel="True" Padding="16,4" Margin="8,0,0,0"/>
+  </StackPanel>
+ </Grid>
+</Window>

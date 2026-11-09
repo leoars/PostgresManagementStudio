@@ -28,7 +28,7 @@ internal static class TablePropertyChecks
                     TableEditChecks.Capture(dialog, "m33-properties");
                     ((TabControl)dialog.FindName("Details")).SelectedIndex = 1;
                     var grid = (DataGrid)dialog.FindName("ColumnsGrid");
-                    grid.SelectedItem = dialog.Snapshot!.Columns.Single(c => c.Name == "note");
+                    grid.SelectedItem = dialog.ColumnRows.Single(c => c.Name == "note");
                     check(grid.Items.Count == 2 && ((TextBox)dialog.FindName("ColumnDetail")).Text.Contains("Column documentation", StringComparison.Ordinal), "column grid selection exposes default and comment in WPF");
                     TableEditChecks.Capture(dialog, "m34-columns");
                     dialog.Width = dialog.MinWidth; dialog.Height = dialog.MinHeight;

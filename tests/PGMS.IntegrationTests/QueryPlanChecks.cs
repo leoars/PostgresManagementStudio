@@ -9,6 +9,7 @@ internal static class QueryPlanChecks
         QueryPlanTreeChecks.Run(check);
         await QueryPlanFileChecks.RunAsync(check);
         await QueryPlanLimitChecks.RunAsync(connection,check);
+        await QueryActualPlanChecks.RunAsync(connection,check);
         await using var session=new QuerySession(connection);await session.OpenAsync();
         await session.ExecuteAsync("CREATE TEMP TABLE plan_fixture(id int); INSERT INTO plan_fixture SELECT generate_series(1,20)");
         var plan=await session.ExplainAsync("SELECT * FROM plan_fixture WHERE id>10;");

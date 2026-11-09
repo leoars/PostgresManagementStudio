@@ -20,12 +20,14 @@ public partial class ObjectPropertiesDialog : Window
     {
         this.connection = connection; this.target = target;
         InitializeComponent();
-        Loaded += (_, _) => InspectButton.Focus();
+        Loaded += async (_, _) => { InspectButton.Focus(); if (InspectOnOpen && Snapshot is null) await InspectAsync(); };
         var settings = new NpgsqlConnectionStringBuilder(connection);
         Title = $"Object Properties — {target.Name}";
         Target.Text = $"{target.Kind}: {target.Name}\nServer: {settings.Host}:{settings.Port}   Connected database: {settings.Database}\nSchema: {target.Schema ?? "(not applicable)"}   Explorer OID: {target.Oid}";
         Feedback.Text = "Inspect to read catalog metadata. This window does not change objects or read their rows.";
     }
+    /// <summary>Set by Object Explorer ▸ Properties: read the object as soon as the window opens, as SSMS shows properties already loaded.</summary>
+    public bool InspectOnOpen { get; init; }
 
     private async void Inspect(object sender, RoutedEventArgs e) => await InspectAsync();
     public async Task InspectAsync()

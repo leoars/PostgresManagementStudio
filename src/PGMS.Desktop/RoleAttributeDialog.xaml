@@ -1,13 +1,22 @@
-<Window x:Class="PGMS.Desktop.RoleAttributeDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Role Properties" Width="690" Height="600" MinWidth="630" MinHeight="560" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+<Window x:Class="PGMS.Desktop.RoleAttributeDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Role Properties" Width="690" Height="720" MinWidth="630" MinHeight="680" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
  <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="110"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,12"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
   <StackPanel x:Name="Fields" Grid.Row="1">
    <Label Content="Role name (exact name):" Target="{Binding ElementName=RoleName}"/>
    <DockPanel><Button x:Name="InspectButton" Content="Inspect" Click="Inspect" DockPanel.Dock="Right" Margin="8,0,0,0" Padding="12,3"/><TextBox x:Name="RoleName" TextChanged="Changed" Padding="4"/></DockPanel>
+   <GroupBox Header="Password (sent only as a SCRAM-SHA-256 verifier)" Margin="0,10,0,0" Padding="6,4">
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <Label Content="Password:" Target="{Binding ElementName=Password}"/><PasswordBox x:Name="Password" Grid.Row="1" PasswordChanged="PasswordChanged" Padding="4" AutomationProperties.Name="Password"/>
+     <Label Grid.Column="2" Content="Confirm password:" Target="{Binding ElementName=ConfirmPassword}"/><PasswordBox x:Name="ConfirmPassword" Grid.Row="1" Grid.Column="2" PasswordChanged="PasswordChanged" Padding="4" AutomationProperties.Name="Confirm password"/>
+     <Button x:Name="PasswordButton" Grid.Row="1" Grid.Column="3" Content="Set Password" Click="SetPassword" Margin="8,0,0,0" Padding="12,3"/>
+     <CheckBox x:Name="AllowUnencrypted" Grid.Row="2" Grid.ColumnSpan="4" Content="Allow sending without TLS (the password verifier crosses the network unencrypted)" Checked="PasswordChanged" Unchecked="PasswordChanged" Margin="0,8,0,0"/>
+     <TextBlock x:Name="PasswordFeedback" Grid.Row="3" Grid.ColumnSpan="4" TextWrapping="Wrap" Margin="0,6,0,0"/>
+    </Grid>
+   </GroupBox>
    <Grid Margin="0,8"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><Label Content="Attribute:"/><ComboBox x:Name="Attribute" SelectionChanged="Changed"/></StackPanel><StackPanel Grid.Column="2"><Label Content="Value (true/false; limit >= -1):"/><TextBox x:Name="AttributeValue" TextChanged="Changed" Padding="4"/></StackPanel></Grid>
   </StackPanel>
   <TextBox Grid.Row="2" x:Name="Inspection" IsReadOnly="True" VerticalScrollBarVisibility="Auto" Padding="6" AutomationProperties.Name="Current role attributes"/>
-  <TextBlock Grid.Row="3" Text="Only the selected attribute will change. Inspect again after applying to verify current state." TextWrapping="Wrap" Margin="0,10"/>
+  <TextBlock Grid.Row="3" Text="Script and Apply change only the selected attribute; Set Password changes only the password. Inspect again after applying to verify current state." TextWrapping="Wrap" Margin="0,10"/>
   <TextBox Grid.Row="4" x:Name="Preview" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="8" AutomationProperties.Name="SQL preview"/>
   <TextBlock Grid.Row="5" x:Name="Feedback" TextWrapping="Wrap" Margin="0,8"/>
   <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right"><Button x:Name="ScriptButton" Content="Script" Click="Script" Padding="16,5"/><Button x:Name="ApplyButton" Content="Apply" Click="Apply" Padding="16,5" Margin="8,0"/><Button x:Name="CloseButton" Content="Close" IsCancel="True" Padding="16,5"/></StackPanel>

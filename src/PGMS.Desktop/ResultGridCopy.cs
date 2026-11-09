@@ -6,7 +6,7 @@ namespace PGMS.Desktop;
 
 internal static class ResultGridCopy
 {
-    internal static string Prepare(DataGrid grid, bool includeHeaders)
+    internal static string Prepare(DataGrid grid, bool includeHeaders, bool retainLineBreaks = true)
     {
         if (grid.ItemsSource is not DataView) throw new InvalidOperationException("Select a result grid first.");
         var selected = grid.SelectedCells.Where(c => c.IsValid && c.Item is DataRowView).ToArray();
@@ -23,6 +23,6 @@ internal static class ResultGridCopy
             foreach (DataRowView row in rows)
                 yield return columns.Select(column => cells.Contains(((object)row,column)) ? row.Row[grid.Columns.IndexOf(column)] : (object?)"").ToArray();
         }
-        return ResultCopyText.Format(columns.Select(c => Convert.ToString(c.Header) ?? "").ToArray(), Values(), includeHeaders);
+        return ResultCopyText.Format(columns.Select(c => Convert.ToString(c.Header) ?? "").ToArray(), Values(), includeHeaders, retainLineBreaks: retainLineBreaks);
     }
 }

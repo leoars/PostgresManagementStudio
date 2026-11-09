@@ -27,20 +27,27 @@ internal static class ExplorerContextChecks
             CatalogEntry[] entries = [tables.Single(t => t.Name == table), tables.Single(t => t.Name == table + "_part"), views.Single(t => t.Name == table + "_view"), new(CatalogKind.Server, "Synthetic server")];
             tree.Items.Clear(); foreach (var entry in entries) tree.Items.Add(new CatalogNode(entry, catalog));
             window.UpdateLayout(); tree.UpdateLayout();
-            var properties = menu.Items.OfType<MenuItem>().Single(m => m.Name == "ExplorerTableProperties");
-            var operations = menu.Items.OfType<MenuItem>().Single(m => m.Name == "ExplorerTableOperations");
+            // Menus are built per node kind when opened (M1036): table actions exist only where they apply.
+            MenuItem? properties = null, operations = null;
             for (int index = 0; index < entries.Length; index++)
             {
                 ((TreeViewItem)tree.ItemContainerGenerator.ContainerFromIndex(index)).IsSelected = true;
                 menu.PlacementTarget = tree; menu.IsOpen = true;
-                await Dispatcher.Yield(DispatcherPriority.Background);
-                check(properties.IsEnabled == (index < 2) && operations.IsEnabled == (index == 0), "Explorer context enables table actions only for supported selection " + index);
-                if (index == 0) CaptureMenu(menu);
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                var items = menu.Items.OfType<MenuItem>().ToList();
+                var shownProperties = items.SingleOrDefault(m => m.Name == "ExplorerTableProperties");
+                var shownOperations = items.SingleOrDefault(m => m.Name == "ExplorerTableOperations");
+                check((shownProperties is { IsEnabled: true }) == (index < 2) && (shownOperations is { IsEnabled: true }) == (index == 0), "Explorer context lists table actions only for supported selection " + index + " (" + string.Join(",", items.Select(m => m.Name + (m.IsEnabled ? "" : "[off]"))) + ")");
+                if (index == 0) { CaptureMenu(menu); properties = shownProperties; operations = shownOperations; }
                 menu.IsOpen = false;
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
             }
             ((TreeViewItem)tree.ItemContainerGenerator.ContainerFromIndex(0)).IsSelected = true;
+            if (properties is null || operations is null) throw new InvalidOperationException("Table menu items were not built.");
             await OpenAsync<TablePropertiesDialog>(properties, async dialog =>
             {
+                for (int i = 0; i < 200 && dialog.Snapshot is null; i++) await Task.Delay(50);
+                check(dialog.Snapshot?.Oid == entries[0].Oid, "Table Properties from Object Explorer reads the table when it opens, without Inspect");
                 await dialog.InspectAsync();
                 check(dialog.Snapshot?.Oid == entries[0].Oid && ((TextBlock)dialog.FindName("Target")).Text.Contains("Database: postgres", StringComparison.Ordinal), "Explorer Properties opens selected table in its database");
                 TableEditChecks.Capture(dialog, "m42-context-properties");

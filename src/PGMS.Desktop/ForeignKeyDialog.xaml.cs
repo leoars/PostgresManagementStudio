@@ -19,10 +19,13 @@ public partial class ForeignKeyDialog : Window
     public bool WasApplied { get; private set; }
     private static readonly ReferentialAction[] Actions = Enum.GetValues<ReferentialAction>();
 
+    /// <summary>Set by Object Explorer: read the current state as soon as the window opens, as SSMS does.</summary>
+    public bool InspectOnOpen { get; init; }
     public ForeignKeyDialog(string connection, string? schema = null, string? table = null)
     {
         this.connection = connection; InitializeComponent();
-        Loaded += (_, _) => Operation.Focus(); var c = new NpgsqlConnectionStringBuilder(connection);
+        // Opened on a table: list its foreign keys right away.
+        Loaded += async (_, _) => { Operation.Focus(); if (InspectOnOpen) await InspectAsync(); }; var c = new NpgsqlConnectionStringBuilder(connection);
         Target.Text = $"Foreign Key Operations\nServer: {c.Host}:{c.Port}   Database: {c.Database}   User: {c.Username}";
         ExistingConstraints.ItemsSource = constraints;
         Operation.ItemsSource = new[] { new { Value = ForeignKeyOperation.Add, Label = "Add FOREIGN KEY" }, new { Value = ForeignKeyOperation.Drop, Label = "Drop FOREIGN KEY" }, new { Value = ForeignKeyOperation.Validate, Label = "Validate FOREIGN KEY" } };

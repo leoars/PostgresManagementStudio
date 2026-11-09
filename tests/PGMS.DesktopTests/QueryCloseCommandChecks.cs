@@ -117,7 +117,7 @@ internal static class QueryCloseCommandChecks
             var data = new DataTable();
             data.Columns.Add("value", typeof(int)); data.Columns.Add("long_text", typeof(string));
             data.Rows.Add(1, new string('x', 300));
-            typeof(QueryView).GetMethod("AddResultGrid", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(query, [data]);
+            typeof(QueryView).GetMethod("AddResultGrid", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(query, [data, null]);
             var results = (TabControl)query.FindName("ResultSets"); results.SelectedIndex = 0;
             fixture.Show();
             foreach (double height in new[] { 390d, 360d })

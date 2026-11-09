@@ -1,0 +1,15 @@
+<Window x:Class="PGMS.Desktop.AiQueryDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Generate SQL with AI" Width="760" Height="640" MinWidth="600" MinHeight="520" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+ <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <StackPanel x:Name="Fields" Grid.Row="1">
+   <Label Content="Describe the query you need:" Target="{Binding ElementName=Request}"/>
+   <TextBox x:Name="Request" TextChanged="Changed" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72" MaxHeight="140" VerticalScrollBarVisibility="Auto" Padding="4" AutomationProperties.Name="Request"/>
+   <CheckBox x:Name="IncludeSelection" Margin="0,8,0,0"/>
+  </StackPanel>
+  <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0"><Button x:Name="GenerateButton" Content="Generate" Click="Generate" Padding="16,5" IsDefault="True"/><Button x:Name="CancelButton" Content="Cancel" Click="CancelGeneration" Padding="16,5" Margin="8,0,0,0" Visibility="Collapsed"/><Button x:Name="ContextButton" Content="View Sent Context…" Click="ViewContext" Padding="12,5" Margin="8,0,0,0" IsEnabled="False"/></StackPanel>
+  <TextBlock Grid.Row="3" x:Name="ContextInfo" TextWrapping="Wrap" Foreground="#4B5964" Margin="0,8"/>
+  <TextBox Grid.Row="4" x:Name="Result" IsReadOnly="True" FontFamily="Consolas" TextWrapping="NoWrap" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="8" AutomationProperties.Name="Generated SQL"/>
+  <TextBlock Grid.Row="5" x:Name="Feedback" TextWrapping="Wrap" Margin="0,8"/>
+  <DockPanel Grid.Row="6" LastChildFill="False"><TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Foreground="#4B5964" TextWrapping="Wrap" MaxWidth="360" Text="Generated SQL is never executed here. Review it in the editor before running."/><Button x:Name="CloseButton" DockPanel.Dock="Right" Content="Close" IsCancel="True" Padding="16,5" Margin="8,0,0,0"/><Button x:Name="CopyButton" DockPanel.Dock="Right" Content="Copy" Click="Copy" Padding="16,5" Margin="8,0,0,0" IsEnabled="False"/><Button x:Name="InsertButton" DockPanel.Dock="Right" Content="Insert into Editor" Click="Insert" Padding="16,5" IsEnabled="False"/></DockPanel>
+ </Grid>
+</Window>

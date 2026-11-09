@@ -26,7 +26,7 @@ internal static class QueryLoadChecks
             var sets = (TabControl)query.FindName("ResultSets");
             var table = ((DataView)((DataGrid)((TabItem)sets.Items[0]).Content).ItemsSource).Table!;
             check(table.Columns.Count == 32 && table.Rows.Count > 0, "Wide NULL load displays retained rows and schema");
-            check(table.Rows.Count == PGMS.PostgreSql.QueryDisplayBudget.MaxCells / 32, "Wide load obeys global cell budget with whole rows");
+            check(table.Rows.Count == 10000, "A wide result is no longer cut by the old cell limit");
             check(table.Rows.Cast<DataRow>().All(r => r.ItemArray.All(v => v is DBNull)), "Wide load preserves database NULL values");
             var report = new { milestone = BuildInfo.Milestone, scenario = "10000 rows x32 NULL columns", rows = table.Rows.Count,
                 memory = new { memory.Baseline, memory.Maximum, memory.Samples, intervalMs = 20 },
@@ -38,12 +38,12 @@ internal static class QueryLoadChecks
             string json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(Path.Combine(directory, "measurement.json"), json);
             Console.WriteLine(json); Console.WriteLine("Query load report: " + directory);
-            check(((TextBox)query.FindName("Messages")).Text.Contains("Display limit reached (Cells)") && ((TextBlock)query.FindName("ExportScope")).Text.Contains("display limit reached"),
-                "Cell limit is explicit in completion message and export scope");
+            check(!((TextBox)query.FindName("Messages")).Text.Contains("Display limit reached") && !((TextBlock)query.FindName("ExportScope")).Text.Contains("display limit reached"),
+                "A complete result reports no limit");
             sets.SelectedIndex = 0;
             string csv = Path.Combine(directory, "retained.csv");
             await query.ExportSelectedCsvAsync(csv);
-            check(File.ReadLines(csv).Count() == table.Rows.Count + 1, "Limited CSV contains exactly retained whole rows and header");
+            check(File.ReadLines(csv).Count() == table.Rows.Count + 1, "CSV contains every displayed row and header");
             editor.Text = "SELECT " + string.Join(",", Enumerable.Range(1, 257).Select(i => $"NULL::text AS c{i}"));
             await query.ExecuteAsync();
             check(sets.Items.Count == 0 && !((Button)query.FindName("ExportCsvButton")).IsEnabled && ((TextBox)query.FindName("Messages")).Text.Contains("Display limit reached (Columns)"),
@@ -58,16 +58,15 @@ internal static class QueryLoadChecks
             watch.Restart();
             try { await query.ExecuteAsync(); } finally { await textMemory.DisposeAsync(); }
             var textTable = ((DataView)((DataGrid)((TabItem)sets.Items[0]).Content).ItemsSource).Table!;
-            check(textTable.Rows.Count == PGMS.PostgreSql.QueryDisplayBudget.MaxTextCharacters / 1024,
-                "Text load retains exactly the UTF-16 text budget in whole rows");
+            check(textTable.Rows.Count == 9000, "A long-text result is no longer cut by the old total text limit");
             check(textTable.Rows.Cast<DataRow>().All(row => (string)row[0] == new string('á', 1024)),
                 "Text load preserves complete Unicode values without cell truncation");
-            check(((TextBox)query.FindName("Messages")).Text.Contains("Display limit reached (Text)"),
-                "Text load explains the text limit after draining remaining server rows");
+            check(!((TextBox)query.FindName("Messages")).Text.Contains("Display limit reached"),
+                "A long-text result reports no limit");
             string textCsv = Path.Combine(directory, "text-retained.csv");
             await query.ExportSelectedCsvAsync(textCsv);
             check(File.ReadLines(textCsv).Count() == textTable.Rows.Count + 1,
-                "Text load CSV contains only retained rows and header");
+                "Long-text CSV contains every row and header");
             var textReport = new { milestone = BuildInfo.Milestone, scenario = "9000 rows x1024 Unicode characters",
                 rows = textTable.Rows.Count, executionAndExportMs = watch.ElapsedMilliseconds,
                 memory = new { textMemory.Baseline, textMemory.Maximum, textMemory.Samples, intervalMs = 20 },

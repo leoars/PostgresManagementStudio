@@ -31,6 +31,35 @@ public partial class QueryView : UserControl, IAsyncDisposable
     public bool IsConnected => session?.IsConnected == true;
     public bool HasSession => session is not null;
     public string Database => session?.Database ?? "Not connected";
+    /// <summary>Connection of this tab's session, for helpers that read metadata on their own connection.</summary>
+    internal string? ConnectionString { get; private set; }
+    internal string? SelectedSql => Editor.SelectionLength > 0 ? Editor.SelectedText : null;
+    internal string EditorText => Editor.Text;
+    internal int EditorCaret => Editor.CaretOffset;
+    /// <summary>Query Designer OK: the statement replaces the given range, or else the selection, or goes at the caret, and the caret ends after it (SSMS 22.11). One undo step; never executed.</summary>
+    internal void InsertDesignedSql(string sql, (int Start, int Length)? range = null)
+    {
+        sql = sql.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", Environment.NewLine, StringComparison.Ordinal);
+        int start = range?.Start ?? (Editor.SelectionLength > 0 ? Editor.SelectionStart : Editor.CaretOffset);
+        Editor.Document.Replace(start, range?.Length ?? Editor.SelectionLength, sql);
+        Editor.Select(start + sql.Length, 0);
+        Editor.CaretOffset = start + sql.Length;
+        Editor.Focus();
+    }
+    /// <summary>Puts AI-generated SQL in the editor for review: replaces the selection, or goes on new lines at the caret. Never executes it.</summary>
+    internal void InsertGeneratedSql(string sql)
+    {
+        sql = sql.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", Environment.NewLine, StringComparison.Ordinal);
+        if (Editor.SelectionLength > 0) { int start = Editor.SelectionStart; Editor.SelectedText = sql; Editor.Select(start, sql.Length); }
+        else
+        {
+            int offset = Editor.CaretOffset;
+            string before = offset > 0 && Editor.Document.GetCharAt(offset - 1) != '\n' ? Environment.NewLine : "";
+            Editor.Document.Insert(offset, before + sql + Environment.NewLine);
+            Editor.Select(offset + before.Length, sql.Length);
+        }
+        Editor.ScrollToLine(Editor.TextArea.Caret.Line); Editor.Focus();
+    }
     public event EventHandler? StateChanged;
     private QuerySession? session;
     private CancellationTokenSource? cancellation;
@@ -48,6 +77,8 @@ public partial class QueryView : UserControl, IAsyncDisposable
         return HighlightingLoader.Load(reader, HighlightingManager.Instance);
     });
 
+    internal static IHighlightingDefinition SqlDefinition => sqlHighlighting.Value;
+
     public QueryView() : this(Guid.NewGuid()) { }
 
     internal QueryView(Guid recoveryId) : this(recoveryId, text => Clipboard.SetText(text, TextDataFormat.UnicodeText)) { }
@@ -64,10 +95,17 @@ public partial class QueryView : UserControl, IAsyncDisposable
         using (UiPhaseScope.Start(observer, "view-xaml")) InitializeComponent();
         ConfigureSqlLinks();
         ConfigureSqlEditing();
+        ConfigureCompletion();
         QueryTimeout.TextChanged+=(_,_)=>{if(int.TryParse(QueryTimeout.Text,NumberStyles.None,CultureInfo.InvariantCulture,out int value) && value is >=0 and <=86400)CommandTimeoutSeconds=value;};
         CommandBindings.Add(new CommandBinding(GoToLineCommand,(_,e)=>{GoToLine();e.Handled=true;},(_,e)=>{e.CanExecute=true;e.Handled=true;}));
         InputBindings.Add(new KeyBinding(GoToLineCommand,Key.G,ModifierKeys.Control));
         Editor.OptionChanged += (_, _) => ConfigureSqlLinks();
+        var editorMenu = new ContextMenu();
+        foreach (var (label, command) in new[] { ("Cu_t", ApplicationCommands.Cut), ("_Copy", ApplicationCommands.Copy), ("_Paste", ApplicationCommands.Paste) }) editorMenu.Items.Add(new MenuItem { Header = label, Command = command, CommandTarget = Editor.TextArea });
+        editorMenu.Items.Add(new Separator());
+        editorMenu.Items.Add(new MenuItem { Header = "_Design Query in Editor…", Command = MainWindow.DesignQueryInEditor, CommandTarget = Editor.TextArea, InputGestureText = "Ctrl+Shift+Q" });
+        editorMenu.Items.Add(new MenuItem { Header = "Query _Options…", Command = MainWindow.ShowQueryOptions, CommandTarget = Editor.TextArea });
+        Editor.ContextMenu = editorMenu;
         using (UiPhaseScope.Start(observer, "highlight-definition")) Editor.SyntaxHighlighting = sqlHighlighting.Value;
         using (UiPhaseScope.Start(observer, "search-install")) search = SearchPanel.Install(Editor.TextArea);
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Replace, (_, e) => { Replace(); e.Handled = true; }));
@@ -98,7 +136,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
         try
         {
             await candidate.OpenAsync(cancellation.Token);
-            session = candidate;
+            session = candidate; ConnectionString = connectionString;
             QueryStatus.Text = $"Connected | {Database}";
             Messages.Text = $"Connected to {Database}. Each query tab has its own session.";
         }
@@ -113,6 +151,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
         int submittedStart=Editor.SelectionLength>0?Editor.SelectionStart:0;
         long submittedRevision=EditRevision;
         if (string.IsNullOrWhiteSpace(sql)) return;
+        NoteSubmittedSql(sql);
         if (!int.TryParse(QueryTimeout.Text,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out int timeout) || timeout is < 0 or > 86400)
         {
             QueryStatus.Text="Enter a read timeout from 0 to 86400 seconds (0 = no timeout).";
@@ -124,57 +163,55 @@ public partial class QueryView : UserControl, IAsyncDisposable
             MarkUnboundParameter(unbound, submittedStart, submittedRevision);
             Messages.Text = $"Not sent: the SQL contains parameter placeholder {unbound.Description}, which has no value. Placeholders like $1 come from prepared statements or pg_stat_statements; replace each one with a literal value before executing. Estimated Plan shows the generic plan without values.\nNothing was sent to the server and the session stays open. Go to Error selects the first placeholder.";
             QueryStatus.Text = $"Not sent | {Database} | Unbound parameter ${unbound.Number}";
+            if (MessagesTab.Visibility != Visibility.Visible) ApplyOutputLayout(ResultsDestination.Grid);
             OutputTabs.SelectedIndex = 1;
             return;
         }
+        if (ResultsDestination != ResultsDestination.Grid) { await ExecuteAsTextAsync(sql, submittedStart, submittedRevision, timeout); return; }
+        ApplyOutputLayout(ResultsDestination.Grid);
         var notices=new QueryNotices();
         ClearAnalysisReview();
         errorOffset=null;ErrorLocation.IsEnabled=false;
-        var options=new QueryExecutionOptions(timeout,notices);
+        var actualPlans=IncludeActualPlan?new ActualPlanCapture():null;
+        var options=new QueryExecutionOptions(timeout,notices){ActualPlans=actualPlans,DiscardResults=QueryOptions.GridDiscardResults,ReportStatements=IncludeClientStatistics,PagedDisplay=true};
+        string? sessionNote=null;
         QueryTimeout.IsEnabled=false;
         IsBusy = executingQuery = true;
         cancellation = new CancellationTokenSource();
         StateChanged?.Invoke(this, EventArgs.Empty);
         QueryStatus.Text = "Executing query…";
         Messages.Clear();
+        ClearResultPages();
         ResultSets.Items.Clear();
         displayLimited = false;
         resultsIncomplete = true;
         UpdateExport();
-        int displayedRows = 0;
+        long displayedRows = 0;
         var timer = Stopwatch.StartNew();
+        var loader = new GridResultLoader(this, QueryOptions.GridPageRows);
         try
         {
-            var tables = new List<DataTable>();
-            var result = await session.StreamAsync(sql, async (batch, token) =>
-            {
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (batch.Columns is not null)
-                    {
-                        var table = new DataTable();
-                        for (int i = 0; i < batch.Columns.Count; i++)
-                            table.Columns.Add(new DataColumn($"c{i}", typeof(object)) { Caption = batch.Columns[i] });
-                        tables.Add(table);
-                        AddResultGrid(table);
-                        if (ResultSets.Items.Count == 1) { ResultSets.SelectedIndex = 0; OutputTabs.SelectedIndex = 0; }
-                    }
-                    foreach (var values in batch.Rows) tables[batch.ResultIndex].Rows.Add(values);
-                    displayedRows += batch.Rows.Count;
-                    if (batch.DisplayLimited) { displayLimited = true; UpdateExport(); }
-                    QueryStatus.Text = $"Executing query | {Database} | {displayedRows:N0} displayed row(s)" + (displayLimited ? " | Display limited; reading remaining results" : "");
-                }, System.Windows.Threading.DispatcherPriority.Background, token);
-            }, options, cancellation.Token);
+            sessionNote = await ApplySessionOptionsAsync(cancellation.Token);
+            var meter = StartClientTrial(sql);
+            var result = await session.StreamAsync(sql, Measured(meter, (batch, _) => { loader.Accept(batch); return ValueTask.CompletedTask; }), options, cancellation.Token);
+            loader.Drain(everything: true);
+            displayedRows = loader.Received;
+            RecordClientTrial(meter);
             resultsIncomplete = false;
             displayLimited = result.Truncated;
-            if (tables.Count == 0) OutputTabs.SelectedIndex = 1;
+            if (loader.Tables.Count == 0) OutputTabs.SelectedIndex = 1;
             var rows = result.DisplayedRows;
-            Messages.Text = $"Query completed. {rows:N0} displayed row(s).\nRows affected: {result.RecordsAffected}.\nElapsed: {timer.Elapsed.TotalSeconds:F3} s.";
+            // Npgsql reports -1 when the statements changed no rows by definition, such as SELECT.
+            string affected = result.RecordsAffected >= 0 && !QueryOptions.NoCount ? $"Rows affected: {result.RecordsAffected}.\n" : "";
+            string outcome = options.DiscardResults ? $"Results discarded: {rows:N0} row(s) read." : $"{rows:N0} displayed row(s).";
+            Messages.Text = $"Query completed. {outcome}\n{affected}Elapsed: {timer.Elapsed.TotalSeconds:F3} s.";
             if (result.Truncated) Messages.Text += $"\nDisplay limit reached ({result.LimitReasons}): {QueryDisplayBudget.Description} Remaining rows were read but not displayed. Values are never shortened; an oversized row and subsequent rows are omitted.";
             QueryStatus.Text = $"Query completed | {Database} | {timer.Elapsed.TotalSeconds:F3} s | {rows:N0} rows" + (result.Truncated ? " | Display limited" : "");
         }
         catch (Exception ex) when (ex is NpgsqlException or OperationCanceledException or InvalidOperationException or IOException)
         {
+            loader.Drain(everything: true);
+            displayedRows = loader.Received;
             if(ex is PostgresException positioned)SetErrorPosition(sql,positioned.Position,submittedStart,submittedRevision);
             Messages.Text = ex is PostgresException pg ? QueryErrorFormatter.Format(pg) :
                 ex is OperationCanceledException ? "Query canceled. An explicit transaction may require ROLLBACK before further commands." : ex.Message;
@@ -184,12 +221,16 @@ public partial class QueryView : UserControl, IAsyncDisposable
         }
         finally
         {
+            loader.Drain(everything: true);
+            if(actualPlans is not null)await ShowActualPlansAsync(actualPlans,submittedRevision);
             IsBusy = executingQuery = false;
             QueryTimeout.IsEnabled=true;
             foreach(var notice in notices.Items)
                 Messages.AppendText($"\n{notice.Severity} {notice.SqlState}: {notice.Message}");
             if(notices.Omitted>0)
                 Messages.AppendText($"\n{notices.Omitted:N0} server notice(s) omitted: limit 100 notices, 4096 characters each, 65536 characters total.");
+            if(sessionNote is not null)Messages.AppendText("\n"+sessionNote);
+            if(QueryOptions.ShowCompletionTime)Messages.AppendText("\n\n"+TextResultsWriter.CompletionLine(DateTimeOffset.Now));
             cancellation.Dispose();
             cancellation = null;
             UpdateExport();
@@ -197,16 +238,23 @@ public partial class QueryView : UserControl, IAsyncDisposable
         }
     }
 
-    private void AddResultGrid(DataTable table)
+    private void AddResultGrid(DataTable table, IReadOnlyList<string>? types = null)
     {
         var grid = new DataGrid { IsReadOnly = true, AutoGenerateColumns = false, CanUserAddRows = false,
-            EnableRowVirtualization = true, EnableColumnVirtualization = true, RowHeight = 23,
-            HeadersVisibility = DataGridHeadersVisibility.All, GridLinesVisibility = DataGridGridLinesVisibility.All,
-            FontFamily = new System.Windows.Media.FontFamily("Segoe UI"), FontSize = 12,
+            EnableRowVirtualization = true, EnableColumnVirtualization = true,
             SelectionUnit = DataGridSelectionUnit.CellOrRowHeader, ClipboardCopyMode = DataGridClipboardCopyMode.IncludeHeader };
+        // SSMS look (user's captures, 08/11/2026): 19 px rows, light grid lines, numbered rows, NULL in yellow.
+        ResultGridStyle.Apply(grid);
+        table.RowChanged += (_, _) => { if (table.Rows.Count is 1000 or 10000 or 100000) ResultGridStyle.FitRowHeaders(grid, table.Rows.Count); };
         foreach (DataColumn column in table.Columns)
-            grid.Columns.Add(new DataGridTextColumn { Header = column.Caption, SortMemberPath = column.ColumnName,
-                Binding = new Binding($"[{column.ColumnName}]") { Converter = new DatabaseValueConverter() } });
+        {
+            string path = $"[{column.ColumnName}]";
+            var text = new DataGridTextColumn { Header = column.Caption, SortMemberPath = column.ColumnName, CellStyle = ResultGridStyle.NullAwareCell(path),
+                Binding = new Binding(path) { Converter = new DatabaseValueConverter() } };
+            if (QueryOptions.DisplayJsonAsLink && types is not null && column.Ordinal < types.Count && ResultJson.MayHoldJson(types[column.Ordinal]))
+                text.ElementStyle = ResultGridStyle.JsonLinkText(path, OpenJsonLink);
+            grid.Columns.Add(text);
+        }
         grid.ItemsSource = table.DefaultView;
         DataGridRowNames.SetEnabled(grid, true);
         grid.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy,
@@ -227,7 +275,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
     internal string PrepareSelectedResultCopy(DataGrid grid, bool includeHeaders)
     {
         if (IsBusy) throw new InvalidOperationException("Wait for the current operation before copying results.");
-        return ResultGridCopy.Prepare(grid, includeHeaders);
+        return ResultGridCopy.Prepare(grid, includeHeaders, QueryOptions.RetainLineBreaks);
     }
     internal string DescribeCopiedSelection(DataGrid grid, bool includeHeaders) =>
         $"Copied {grid.SelectedCells.Count:N0} selected cell(s) " + (includeHeaders ? "with headers." : "without headers.") +
@@ -267,6 +315,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
     private void ResultSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateExport();
     private void UpdateExport()
     {
+        UpdatePager();
         CommandManager.InvalidateRequerySuggested();
         if (ExportCsvButton is null || ExplainButton is null || PlanCancelButton is null || PlanExportButton is null) return;
         ExplainButton.IsEnabled=IsConnected && !IsBusy;
@@ -289,6 +338,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
         CancelQueryButton.IsEnabled = executingQuery && cancellation?.IsCancellationRequested == false;
         CancelExportButton.Visibility = exporting ? Visibility.Visible : Visibility.Collapsed;
         ExportScope.Text = executingQuery ? (displayLimited ? "Display limit reached - reading remaining results. Export available after execution." : "Receiving results - export available after execution.") : resultsIncomplete ? "Partial results - query did not complete. Displayed rows only." : displayLimited ? "Displayed rows only — display limit reached" : (json?"Displayed rows only · JSON strings/null; columns + rows":"Displayed rows only · NULL = unquoted \\N");
+        if (SelectedGridState is { Pages.PageCount: > 1 }) ExportScope.Text = "Current page only · " + ExportScope.Text;
     }
     private async void ExportCsv(object sender, RoutedEventArgs e)
     {
@@ -317,7 +367,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
         try
         {
             // Snapshot the selected view on the UI thread; disk work runs off-thread.
-            using var snapshot = await ResultExportSnapshot.CreateAsync(grid,selectedRowsOnly,cancellation.Token);
+            using var snapshot = await ResultExportSnapshot.CreateAsync(grid,selectedRowsOnly,cancellation.Token,QueryOptions.RetainLineBreaks);
             QueryStatus.Text="Exporting displayed results…";
             await Task.Run(() => json?JsonResults.SaveAsync(snapshot,path,overwrite,cancellation.Token):CsvResults.SaveAsync(snapshot, path, options, overwrite, cancellation.Token));
             QueryStatus.Text = $"Exported {snapshot.Rows.Count:N0} {(selectedRowsOnly?"selected":"displayed")} row(s) to {(json?"JSON":"CSV")}." + (resultsIncomplete ? " Partial results: query did not complete." : displayLimited ? " Query display limit reached; displayed rows only." : "");
@@ -329,7 +379,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
             UpdateExport(); StateChanged?.Invoke(this, EventArgs.Empty);
         }
     }
-    public async ValueTask DisposeAsync() { if (session is not null) await session.DisposeAsync(); }
+    public async ValueTask DisposeAsync() { ClearResultPages(); if (session is not null) await session.DisposeAsync(); }
 }
 
 public sealed class DatabaseValueConverter : IValueConverter

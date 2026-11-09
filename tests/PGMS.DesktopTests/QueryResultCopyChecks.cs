@@ -141,7 +141,8 @@ internal static class QueryResultCopyChecks
             QueryView.CopyWithoutHeaders.Execute(null, grid);
             check(writes[^1] == "\"600\"\r\n", "Routed copy writes an unrealized selected row");
             check(grid.ItemContainerGenerator.ContainerFromItem(last) is null, "Routed copy does not realize a virtualized row");
-            editor.Text = "SELECT i FROM generate_series(1,12000)i; SELECT pg_sleep(30);";
+            // The third value is over the limit per cell, the one display limit a grid result still has.
+            editor.Text = "SELECT CASE WHEN g = 3 THEN repeat('x', 70000) ELSE g::text END AS i FROM generate_series(1,3) g; SELECT pg_sleep(30);";
             var pending = query.ExecuteAsync();
             try
             {

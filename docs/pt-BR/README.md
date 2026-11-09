@@ -7,7 +7,7 @@
 3. [Desenvolvimento](development.md): testes isolados, empacotamento e contribuições.
 4. [Arquitetura](architecture.md): projetos existentes e limites importantes.
 5. [Validação e limites](validation.md): provas M1008 e aceites históricos.
-6. [Licenças](licensing.md): MIT, dependências, logo e materiais da referência.
+6. [Licenças](licensing.md): Apache-2.0, dependências, logo e materiais da referência.
 
 7. [Distribuição portátil](distribution.md): licença, runtime e scripts de instalação do pacote.
 

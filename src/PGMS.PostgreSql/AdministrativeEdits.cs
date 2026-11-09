@@ -6,6 +6,7 @@ namespace PGMS.PostgreSql;
 public interface IAdministrativeEdit
 {
     string ToSql();
+    int CommandTimeoutSeconds => 30;
     Task ValidateAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, CancellationToken token = default) => Task.CompletedTask;
     Task VerifyAppliedAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, CancellationToken token = default) => Task.CompletedTask;
 }
@@ -48,7 +49,7 @@ public sealed class AdministrativeEditService(string connectionString)
         string? notice = null;
         c.Notice += (_, e) => notice = e.Notice.MessageText;
         await edit.ValidateAsync(c, transaction, token).ConfigureAwait(false);
-        await using var command = new NpgsqlCommand(sql, c, transaction) { CommandTimeout = 30 };
+        await using var command = new NpgsqlCommand(sql, c, transaction) { CommandTimeout = edit.CommandTimeoutSeconds };
         await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         await edit.VerifyAppliedAsync(c, transaction, token).ConfigureAwait(false);
         if (notice is not null) throw new InvalidOperationException("Operation was rolled back after PostgreSQL notice: " + notice);

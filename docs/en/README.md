@@ -7,7 +7,7 @@ English | [Português (Brasil)](../pt-BR/README.md)
 3. [Development](development.md): isolated tests, packaging and contribution workflow.
 4. [Architecture](architecture.md): actual projects and important boundaries.
 5. [Validation and limits](validation.md): M1008 evidence and historical acceptance.
-6. [Licensing](licensing.md): MIT, dependencies, logo and reference materials.
+6. [Licensing](licensing.md): Apache-2.0, dependencies, logo and reference materials.
 
 7. [Portable distribution](distribution.md): packaged license, runtime and install scripts.
 

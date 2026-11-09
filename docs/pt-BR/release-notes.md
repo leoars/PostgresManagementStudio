@@ -1,56 +1,61 @@
-# v0.1.0-alpha.4 — Windows x64
+# v0.1.0-alpha.5 — Windows x64
 
 [English](../en/release-notes.md) | Português (Brasil)
 
-Quarta pré-release pública do PGMS. É uma versão alpha para avaliação com dados sintéticos/descartáveis. Rótulo de build: M1030. Esta release refaz o Activity Monitor como aba de documento com os painéis do SSMS, acrescenta detach concorrente e subpartições ao diálogo Partitions e passa a suportar o PostgreSQL 16. Os binários são compilados e atestados pelo mesmo [workflow de release](../../.github/workflows/release.yml) da alpha.2 e da alpha.3. Trabalho próprio MIT; avisos e licenças das dependências acompanham o pacote.
+Quinta pré-release pública do PGMS. É uma alpha para avaliação com dados sintéticos ou descartáveis. Rótulo de build: M1053. Os binários são gerados e atestados pelo mesmo [workflow de release](../../.github/workflows/release.yml) das versões anteriores. **Mudança de licença:** a partir desta versão, o trabalho próprio está sob Apache-2.0, com créditos no `NOTICE`; as versões até a alpha.4 continuam sob MIT.
 
-## O que mudou desde a v0.1.0-alpha.3
+## O que mudou desde a v0.1.0-alpha.4
 
-- **Activity Monitor em aba de documento, com seis painéis.** **View → Activity Monitor** (`Ctrl+Alt+A`) abre uma aba por servidor e role, reaproveitada ao abrir de novo. Painéis recolhíveis como no SSMS: **Overview** (gráficos de sessões ativas, sessões em espera, I/O do banco via `pg_stat_io` e transações por segundo), **Processes**, **Resource Waits** (categorias de espera amostradas), **Data File I/O** (por database), **Recent Expensive Queries** (variação do `pg_stat_statements` entre atualizações) e **Active Expensive Queries** (com **Edit Query Text** e **Show Execution Plan**, plano estimado que não executa a consulta). O menu de contexto do Overview define o intervalo e pausa, retoma ou atualiza o monitor; em pausa, o título mostra "Overview (paused)". Veja o [guia de uso](user-guide.md#activity-monitor).
-- **Lista de sessões mais próxima do SSMS.** Colunas Host, **Blocked by PID** e **Head blocker** (calculado sobre `pg_locks` do servidor inteiro), dicas nos cabeçalhos, menu da linha (**Details…**, **Cancel Query**, **Terminate Session…**), diálogo **Session Details** com a consulta mais recente, filtros no servidor e páginas por PID (First/Previous/Next). A atualização automática começa ligada a cada 10 segundos, com intervalos de 1 segundo a 1 hora.
-- **Partições.** **Detach concurrently** executa `DETACH PARTITION … CONCURRENTLY` fora de transação, sem bloquear consultas, com checagem prévia de partição DEFAULT e de outro detach pendente; uma partição pendente é concluída com `FINALIZE`. O diálogo também cria uma partição já particionada (**Sub-partition by**, com chave de colunas do pai), anexa tabelas particionadas e desanexa partições particionadas preservando a subárvore.
-- **PostgreSQL 16.** O escopo suportado passa a ser PostgreSQL 16 a 18. O Query Statistics e o Recent Expensive Queries leem o `pg_stat_statements` 1.10 do PostgreSQL 16; versões anteriores à 1.10 são recusadas com a indicação do `ALTER EXTENSION … UPDATE` necessário.
-- **Ajustes visuais.** Abas de documento inativas usam texto escuro e a seleção inativa nas grades fica azul, como no SSMS.
+- **Diagramas de banco.** Diagramas como os do SSMS, salvos no servidor: adicionar tabelas e tabelas relacionadas, arrastar uma coluna para criar chave estrangeira, Arrange Tables, zoom, modos de exibição, anotações, tabelas novas e edição de colunas dentro do diagrama. Alterações no banco aparecem antes como script SQL.
+- **Query Designer.** **Query ▸ Design Query in Editor** (`Ctrl+Shift+Q`) com painéis Diagram, Criteria e SQL sincronizados, junções pelas chaves estrangeiras e Change Type (Update, Delete, Insert Values, Insert Results, Make Table). Ele escreve SQL no editor e nunca executa.
+- **IntelliSense.** `Ctrl+Space` e `Ctrl+J` oferecem o que cabe na posição: tabelas, views e funções de tabela depois de `FROM`, buscadas em todos os schemas de usuário; junções inteiras pelas chaves estrangeiras depois de `JOIN`; colunas por alias. A busca ignora acentos.
+- **Table Designer e View Designer** em abas de documento, com script de alteração para revisão.
+- **Planos de execução gráficos.** Planos estimados e reais desenhados com operadores e setas proporcionais, propriedades, Find Node, zoom e abertura de plano salvo.
+- **Resultados mais rápidos.** A thread que lê o servidor não espera mais a tela, na grade e em Results to Text. A grade não corta mais em 10.000 linhas ou 250.000 células: resultados maiores aparecem em páginas de 100.000 linhas, configurável em Query Options.
+- **Results to Text e to File, Query Options e menu Query:** opções por aba com padrões em Tools ▸ Options, Parse, Client Statistics e comandos de Connection.
+- **Cancelar chega ao servidor** mesmo com uma instrução seguinte do script em execução, e não arrisca mais derrubar a conexão no meio da leitura.
+- **Gerar SQL com IA** com Anthropic, OpenAI ou um Ollama local, usando a sua própria chave. O pedido e a estrutura do banco vão para o provedor que você configurar; dados das tabelas nunca são lidos nem enviados.
+- **Configure Server TLS.** Assistente que instala um certificado e liga o TLS, restaurando a configuração anterior se algo falhar. Exige conexão de superusuário a um servidor em Windows.
+- **Object Explorer e administração.** Standard Reports, Registered Servers, Start/Stop/Restart do serviço local, Edit Top e Select Top, Find Missing Foreign Keys e menus de contexto por tipo de nó.
+- **About** agora mostra o autor e os links do projeto.
 
 ## Downloads
 
-Nesta [release](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.4):
+Em [esta release](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.5):
 
 | Arquivo | Finalidade |
 | --- | --- |
-| `PGMS-0.1.0-alpha.4-Setup-x64.exe` | Instalador gráfico (inglês/pt-BR). Por usuário sem direitos de administrador, ou para todos com elevação. Não exige PowerShell nem runtime .NET separado. |
-| `PGMS-0.1.0-alpha.4-win-x64.zip` | Aplicativo portátil com runtime .NET/WPF. Extraia toda a pasta e execute PGMS.exe. Inclui os scripts gerenciados PowerShell 7. |
-| `SHA256SUMS.txt` | SHA256 de todos os assets desta release. Hash confere correspondência, não autoria. |
+| `PGMS-0.1.0-alpha.5-Setup-x64.exe` | Instalador gráfico (inglês/pt-BR). Usuário atual sem administrador, ou todos os usuários com elevação. Não exige PowerShell nem runtime .NET separado. |
+| `PGMS-0.1.0-alpha.5-win-x64.zip` | Aplicativo portátil com runtime .NET/WPF. Extraia a pasta inteira e execute PGMS.exe. Inclui os scripts PowerShell 7 gerenciados. |
+| `SHA256SUMS.txt` | SHA256 de cada arquivo desta release. Hashes conferem correspondência, não autoria. |
 | `package-manifest.json` | Manifesto SHA256 de cada arquivo dentro do ZIP, conferido por `Verify-Package.ps1`. |
 | `RELEASE-NOTES.md`, `RELEASE-NOTES.pt-BR.md` | Estas notas. |
 
-## Verifique o que baixou
+## Confira o que você baixou
 
-Os binários não são assinados digitalmente, então o SmartScreen do Windows pode avisar na primeira execução. Antes de escolher **Executar assim mesmo**, confirme o checksum e a proveniência:
+Os binários não têm assinatura de código, então o Windows SmartScreen pode avisar na primeira execução. Antes de escolher **Executar assim mesmo**, confira o checksum e a origem:
 
 ```powershell
 Get-FileHash .\PGMS-* -Algorithm SHA256
-gh attestation verify .\PGMS-0.1.0-alpha.4-Setup-x64.exe --repo leoars/PostgresManagementStudio
+gh attestation verify .\PGMS-0.1.0-alpha.5-Setup-x64.exe --repo leoars/PostgresManagementStudio
 ```
 
-Compare os hashes com o `SHA256SUMS.txt`. O segundo comando exige o [GitHub CLI](https://cli.github.com/) e confirma que o arquivo foi produzido pelo workflow de release deste repositório no commit da tag; execute-o também para o ZIP. A assinatura de código pelo programa open source da SignPath Foundation está planejada; nenhuma data é prometida.
+Compare os hashes com `SHA256SUMS.txt`. O segundo comando exige o [GitHub CLI](https://cli.github.com/) e confirma que o arquivo foi gerado pelo workflow de release deste repositório no commit da tag; rode também para o ZIP. A assinatura de código pelo programa open source da SignPath Foundation está planejada, sem data prometida.
 
 ## Escopo
 
-Editor SQL e sessões independentes, Object Explorer, Results/Messages com limites e exportação CSV/JSON, administração PostgreSQL revisada (inclusive partições), identity/privilégios, Activity Monitor, estatísticas de consultas e backup/restore lógico. PostgreSQL 16 a 18 e ferramentas da mesma versão principal são necessários para operações com banco e backup/restore; não são incluídos. Query Statistics e Recent Expensive Queries também exigem a extensão `pg_stat_statements` no servidor. SSMS não é exigido nem distribuído.
+Editor SQL com IntelliSense e sessões independentes, Object Explorer, Results em páginas e Results to Text/File, exportação CSV/JSON, diagramas de banco e designers, planos gráficos, administração PostgreSQL revisada, identidade/privilégios, Activity Monitor, estatísticas de consultas e backup/restore lógico. PostgreSQL 16 a 18 e ferramentas cliente da mesma versão principal são necessários para operações no banco e backup/restore; servidor e ferramentas não acompanham o pacote. O SSMS não é exigido nem distribuído.
 
 ## Validação
 
-Comportamento do aplicativo: a fonte M1030 passou na regressão completa PostgreSQL 17.11 deste repositório (**2.318 integração + 3.429 WPF = 5.747 checks**) em cluster isolado em loopback iniciado com `pg_stat_statements` pré-carregado; o serviço PostgreSQL do host não é usado. Na mesma fonte, a suíte focada do Activity Monitor (`Test-Integration.ps1 -ActivityOnly`) passou em 71 checks de integração + 152 WPF no PostgreSQL 16.15 e no 18.6; a do Query Statistics passou no 16.15 e no 18.6 sobre a fonte M1029, e o código do Query Statistics não mudou depois dela. A regressão não roda no CI. O Activity Monitor foi comparado duas vezes com o do SSMS 22.11 sob a mesma carga de bloqueio; as diferenças restantes estão em [validação](validation.md).
+Comportamento do aplicativo: a fonte M1053 passou na regressão completa deste repositório no PostgreSQL 17.11 (**2.834 de integração + 4.337 WPF = 7.171 verificações**), num cluster isolado em loopback; o serviço PostgreSQL do computador não é usado. Os recursos acrescentados desde a alpha.4 não passaram por regressão completa no PostgreSQL 16 ou 18.
 
-Pipeline de release: igual ao da v0.1.0-alpha.2. O workflow valida que a tag corresponde a `installer/release.json`, `Directory.Build.props` e `BuildInfo.cs`; publica com `Publish.ps1 -SelfContained`; roda `Verify-Package.ps1`, `Test-Package.ps1` e `Test-PackageGuides.ps1`; cria o ZIP; compila o instalador com o Inno Setup 7.1.1 fixado e conferido por hash; executa um smoke informacional de abertura no runner; atesta o ZIP e o instalador; e abre uma pré-release em rascunho que o mantenedor revisa antes de publicar. Os assets do rascunho são verificados localmente antes da publicação, e o resultado é relatado no pull request da release.
-
-Instalação para todos os usuários (elevada), instalação em VM Windows limpa, regressão completa no PostgreSQL 16 e 18 e observações físicas de DPI/teclado/leitor de tela das novas telas não recebem nova certificação nesta release.
+Instalação para todos os usuários (com elevação), instalação em VM Windows limpa e observações físicas de DPI, teclado e leitor de tela nas telas novas não são certificadas de novo por esta release. As telas novas foram exercitadas por testes automáticos, não à mão com mouse e teclado nesta fonte.
 
 ## Limites conhecidos
 
-Somente Windows x64. Executável e instalador sem assinatura; o SmartScreen avisa. Sem MSI, atualização automática ou garantia de suporte em produção. Não se declara paridade integral SSMS. Activity Monitor: Data File I/O é por database, não por arquivo (o PostgreSQL não tem estatísticas por arquivo); Resource Waits é amostrado a cada atualização, não acumulado; as páginas de sessões são leituras separadas e a ordenação vale dentro da página; nenhum teste com mais de 1.000 sessões. Query Statistics é um snapshot de contadores acumulados do servidor, não monitoramento contínuo; no `pg_stat_statements` 1.10 uma janela de tempo pode contar a menos um statement removido e rastreado de novo. A detecção de placeholders supõe `standard_conforming_strings = on` e não oferece diálogo de valores de parâmetros. Resultados/recuperação têm limites; linhas SQL grandes podem pausar renderização. Cancelar não comprova rollback. SQL de restore exige confiança e pode controlar transações, reconectar ou executar comandos locais psql. Estado DPAPI depende do usuário Windows. O hash de manifesto congelado em `installer/release.json` descreve um payload compilado localmente, não o do CI; o build no CI compara marco e versão do produto. Veja [validação](validation.md) e [segurança](../../SECURITY.pt-BR.md).
+Somente Windows x64. Executável e instalador sem assinatura; o SmartScreen avisa. Sem MSI, atualização automática ou garantia de suporte em produção. Não se declara paridade completa com o SSMS. Resultados: ordenação, cópia e exportação valem para a página atual; as linhas depois da primeira página ficam num arquivo temporário, sem criptografia, até a próxima execução ou até a aba fechar; Results to Text mantém os limites de 10.000 linhas e 250.000 células, e Results to File não tem nenhum dos dois. O IntelliSense não tem Parameter Info nem Quick Info, e não conhece colunas de CTE, tabelas temporárias nem o `SET search_path` da sessão. Query Designer: `UNION` e `WITH` abrem apenas no painel SQL; Update, Delete e Insert Values aceitam uma tabela. Find Missing Foreign Keys é heurística: um nome igual é indício, não prova.
 
-## Releases anteriores
+## Versões anteriores
 
-A v0.1.0-alpha.3 (02/11/2026, Query Statistics), a v0.1.0-alpha.2 (01/11/2026, primeira compilada pelo CI com atestado) e a v0.1.0-alpha.1 (31/10/2026) continuam disponíveis com seus assets e notas originais.
+v0.1.0-alpha.4 (07/11/2026, Activity Monitor em aba), v0.1.0-alpha.3 (02/11/2026, Query Statistics), v0.1.0-alpha.2 (01/11/2026, primeira release gerada por CI com atestado) e v0.1.0-alpha.1 (31/10/2026) continuam disponíveis com seus arquivos e notas originais, sob MIT.

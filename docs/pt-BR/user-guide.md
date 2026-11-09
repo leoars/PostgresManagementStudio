@@ -16,6 +16,22 @@ Object Explorer carrega pastas sob demanda, filtra e inspeciona objetos. Operaç
 
 Identity e sequences distinguem START configurado de RESTART. Reiniciar pode repetir valores existentes. O diálogo **Partitions** cria, anexa e desanexa partições. Uma filha nova pode ser ela própria particionada (**Sub-partition by**, com chave de colunas do pai), e uma tabela particionada pode ser anexada ou desanexada com sua subárvore. **Detach concurrently** executa `DETACH PARTITION … CONCURRENTLY` fora de transação, sem bloquear consultas; é recusado para partição DEFAULT ou quando já há outro detach pendente, e um detach pendente é concluído com `FINALIZE`. Privilégios, delegação, CASCADE e reconciliação de COMMIT têm regras próprias de revisão e concorrência. Veja o [índice da documentação](../README.md) para os comportamentos suportados.
 
+## Diagramas de banco de dados
+
+No Object Explorer, clique com o botão direito em **Database Diagrams**, dentro de um banco, e escolha **New Database Diagram**. Na primeira vez, o PGMS pede para criar seus objetos de suporte (schema `pgms`). Adicione tabelas com **Add Table** ou **Add Related Tables**, arraste uma coluna sobre outra para criar uma chave estrangeira e use **Arrange Tables** para organizar. Ao salvar, o PGMS mostra o script SQL de qualquer alteração no banco para revisão.
+
+## Query Designer
+
+**Query ▸ Design Query in Editor** (`Ctrl+Shift+Q`) abre a instrução sob o cursor, ou a seleção, nos painéis Diagram, Criteria e SQL. **OK** substitui essa instrução no editor; nada é executado. Numa linha vazia, abre vazio e insere no cursor. `UNION` e `WITH` abrem apenas no painel SQL.
+
+## IntelliSense
+
+`Ctrl+Space` ou `Ctrl+J` abrem a lista; digitar um ponto abre sozinho. `Tab` aceita e `Esc` fecha. **Query ▸ IntelliSense Enabled** (`Ctrl+B`, `Ctrl+I`) desliga na aba, e **Edit ▸ IntelliSense ▸ Refresh Local Cache** (`Ctrl+Shift+R`) relê o catálogo depois de mudanças de schema. Depois de `FROM` e palavras parecidas, busca o nome da tabela em todos os schemas de usuário; depois de `JOIN`, oferece junções inteiras a partir das chaves estrangeiras.
+
+## Resultados grandes
+
+Um resultado na grade maior que **Query Options ▸ Results ▸ Grid ▸ Rows per result page** (100.000 por padrão) aparece em páginas, com uma barra abaixo da grade. As linhas depois da primeira página ficam num arquivo temporário até a próxima execução ou até a aba fechar. Ordenação, cópia e exportação valem para a página atual; **Results to File** grava todas as linhas.
+
 ## Activity Monitor
 
 **View → Activity Monitor** (`Ctrl+Alt+A`) abre uma aba de documento para o servidor e a role conectados (`host:porta (role) - Activity Monitor`); abrir de novo ativa a mesma aba. Tem seis painéis recolhíveis, seguindo o layout do SSMS:

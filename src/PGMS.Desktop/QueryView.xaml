@@ -7,12 +7,14 @@
   <Grid.RowDefinitions><RowDefinition Height="3*" MinHeight="100"/><RowDefinition Height="5"/><RowDefinition Height="2*" MinHeight="200"/><RowDefinition Height="24"/></Grid.RowDefinitions>
   <DockPanel>
    <WrapPanel DockPanel.Dock="Top" Background="#D5E5EF" Margin="0" >
+    <WrapPanel.Resources><Style x:Key="BarIcon" TargetType="Canvas"><Setter Property="Width" Value="16"/><Setter Property="Height" Value="16"/><Setter Property="Margin" Value="0,0,5,0"/><Setter Property="SnapsToDevicePixels" Value="True"/><Style.Triggers><DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType=Button}}" Value="False"><Setter Property="Opacity" Value="0.35"/></DataTrigger></Style.Triggers></Style></WrapPanel.Resources>
     <TextBlock Text="Read timeout (s):" VerticalAlignment="Center" Margin="6,4"/>
     <TextBox x:Name="QueryTimeout" Text="0" Width="65" MaxLength="5" Margin="0,3,6,3" VerticalContentAlignment="Center" AutomationProperties.Name="Query read timeout in seconds" ToolTip="0 disables the Npgsql read timeout. Range: 0–86400 seconds. This is not a total script deadline."/>
     <TextBlock Text="0 = no timeout" VerticalAlignment="Center" Margin="0,4,6,4"/>
-    <Button x:Name="ErrorLocation" Content="Go to Error" IsEnabled="False" Click="NavigateError" Margin="0,3,6,3" Padding="8,1" ToolTip="Available for unchanged SQL without semicolons and a server character position."/>
-    <Button x:Name="ExplainButton" Content="Estimated Plan" IsEnabled="False" Click="ExplainPlan" Margin="0,3,6,3" Padding="8,1" ToolTip="EXPLAIN without ANALYZE for the selected SQL or document. One statement only."/>
-    <Button x:Name="AnalyzeButton" Content="Analyze Plan…" IsEnabled="False" Click="ReviewAnalyze" Margin="0,3,6,3" Padding="8,1" ToolTip="Review SQL before EXPLAIN ANALYZE executes it."/>
+    <Button x:Name="ErrorLocation" IsEnabled="False" Click="NavigateError" ToolTip="Available for unchanged SQL without semicolons and a server character position." Margin="0,3,6,3" Padding="8,1" AutomationProperties.Name="Go to Error"><StackPanel Orientation="Horizontal"><Canvas Style="{StaticResource BarIcon}"><Path Stroke="#4B5964" StrokeThickness="1.4" Data="M0.5,8 H6 M3.8,5.4 L6.4,8 3.8,10.6"/><Ellipse Canvas.Left="6.5" Canvas.Top="3" Width="9.5" Height="10" Fill="#D13438"/><Path Stroke="White" StrokeThickness="1.4" Data="M9.2,6 L13.3,10 M13.3,6 L9.2,10"/></Canvas><TextBlock Text="Go to Error" VerticalAlignment="Center"/></StackPanel></Button>
+    <Button x:Name="ExplainButton" IsEnabled="False" Click="ExplainPlan" ToolTip="EXPLAIN without ANALYZE for the selected SQL or document. One statement only." Margin="0,3,6,3" Padding="8,1" AutomationProperties.Name="Estimated Plan"><StackPanel Orientation="Horizontal"><Canvas Style="{StaticResource BarIcon}"><Path Canvas.Top="1" Stroke="#2B5797" Fill="#DDE8F5" Data="M0,4 L6,4 6,10 0,10 Z M10,0 L16,0 16,5 10,5 Z M10,9 L16,9 16,14 10,14 Z M6,7 L8,7 8,2.5 10,2.5 M8,7 L8,11.5 10,11.5"/></Canvas><TextBlock Text="Estimated Plan" VerticalAlignment="Center"/></StackPanel></Button>
+    <Button x:Name="AnalyzeButton" IsEnabled="False" Click="ReviewAnalyze" ToolTip="Review SQL before EXPLAIN ANALYZE executes it." Margin="0,3,6,3" Padding="8,1" AutomationProperties.Name="Analyze Plan…"><StackPanel Orientation="Horizontal"><Canvas Style="{StaticResource BarIcon}"><Path Canvas.Top="1" Stroke="#2D7D3B" Fill="#DCEFDF" Data="M0,4 L6,4 6,10 0,10 Z M10,0 L16,0 16,5 10,5 Z M10,9 L16,9 16,14 10,14 Z M6,7 L8,7 8,2.5 10,2.5 M8,7 L8,11.5 10,11.5"/></Canvas><TextBlock Text="Analyze Plan…" VerticalAlignment="Center"/></StackPanel></Button>
+    <Button x:Name="DesignQueryButton" Command="{x:Static local:MainWindow.DesignQueryInEditor}" ToolTip="Design Query in Editor (Ctrl+Shift+Q). Opens the selection or the statement at the cursor; on an empty line, starts a new one." Margin="0,3,6,3" Padding="8,1" AutomationProperties.Name="Design Query in Editor"><StackPanel Orientation="Horizontal"><Canvas Style="{StaticResource BarIcon}"><Rectangle Canvas.Left="0.5" Canvas.Top="1.5" Width="12" Height="12" Stroke="#2B5797" Fill="White"/><Rectangle Canvas.Left="0.5" Canvas.Top="1.5" Width="12" Height="3.5" Fill="#2B5797"/><Path Stroke="#9DB4D3" Data="M0.5,8.5 H12.5 M4.5,5 V13.5 M8.5,5 V13.5"/><Path Fill="#E8A33D" Stroke="#8A5A12" StrokeThickness="0.8" Data="M7.5,15.5 L8.1,12.6 13.6,7 15.7,9.1 10.2,14.8 Z"/></Canvas><TextBlock Text="Design Query…" VerticalAlignment="Center"/></StackPanel></Button>
    </WrapPanel>
    <Border x:Name="AnalysisPanel" DockPanel.Dock="Top" Visibility="Collapsed" Background="#F5FAFE" Padding="6" MaxHeight="180" PreviewKeyDown="AnalysisKeyDown"><StackPanel>
     <TextBlock Text="Review EXPLAIN ANALYZE" FontWeight="SemiBold"/>
@@ -37,7 +39,10 @@
   </DockPanel>
   <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="#D6E3ED"/>
   <TabControl Grid.Row="2" x:Name="OutputTabs" BorderThickness="0" Background="White" TabStripPlacement="Bottom">
-   <TabItem Header="Results"><DockPanel>
+   <TabItem Header="Results" x:Name="ResultsTab"><Grid>
+    <!-- Results to Text (M1044): one read-only text with results, counts, notices and errors in order; the Messages tab is hidden, as in SSMS. -->
+    <TextBox x:Name="ResultsText" Visibility="Collapsed" IsReadOnly="True" IsReadOnlyCaretVisible="True" TextWrapping="NoWrap" AcceptsReturn="True" BorderThickness="0" FontFamily="Consolas" FontSize="13" Padding="8,6" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Results as text"/>
+    <DockPanel x:Name="ResultsGridPanel">
     <WrapPanel DockPanel.Dock="Top" Background="#D5E5EF">
      <Button x:Name="ExportCsvButton" Content="Export CSV…" Click="ExportCsv" IsEnabled="False" Padding="8,3" Margin="4,3" ToolTip="Save all displayed rows of the selected result set, using the selected CSV options"/>
      <Button x:Name="CancelQueryButton" Content="Cancel Query" Click="CancelQuery" Visibility="Collapsed" Padding="8,3" Margin="4,3" AutomationProperties.Name="Cancel running query"/>
@@ -52,17 +57,24 @@
      </StackPanel>
      <TextBlock x:Name="ExportScope" TextWrapping="Wrap" Text="Displayed rows only · NULL = unquoted \N · UTF-8" VerticalAlignment="Center" Margin="6,3"/>
     </WrapPanel>
+    <Border x:Name="ResultPager" DockPanel.Dock="Bottom" Visibility="Collapsed" Background="#F5F5F5" BorderBrush="#CCCEDB" BorderThickness="0,1,0,0" AutomationProperties.Name="Result pages">
+     <StackPanel Orientation="Horizontal" Margin="4,2">
+      <Button x:Name="PagerFirst" Content="|&lt;" Width="26" Click="PageFirst" ToolTip="First page" AutomationProperties.Name="First page"/>
+      <Button x:Name="PagerPrevious" Content="&lt;" Width="26" Margin="2,0,0,0" Click="PagePrevious" ToolTip="Previous page" AutomationProperties.Name="Previous page"/>
+      <Button x:Name="PagerNext" Content="&gt;" Width="26" Margin="2,0,0,0" Click="PageNext" ToolTip="Next page" AutomationProperties.Name="Next page"/>
+      <Button x:Name="PagerLast" Content="&gt;|" Width="26" Margin="2,0,0,0" Click="PageLast" ToolTip="Last page" AutomationProperties.Name="Last page"/>
+      <TextBlock x:Name="PagerStatus" Margin="10,0,0,0" VerticalAlignment="Center"/>
+     </StackPanel>
+    </Border>
     <TabControl x:Name="ResultSets" BorderThickness="0" TabStripPlacement="Bottom" SelectionChanged="ResultSelectionChanged"/>
-   </DockPanel></TabItem>
-   <TabItem Header="Messages"><TextBox x:Name="Messages" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" FontFamily="Consolas" Padding="8" VerticalScrollBarVisibility="Auto" Text="Connect to a PostgreSQL server to execute this query."/></TabItem>
-   <TabItem Header="Plan" x:Name="PlanTab"><DockPanel>
+   </DockPanel></Grid></TabItem>
+   <TabItem Header="Messages" x:Name="MessagesTab"><TextBox x:Name="Messages" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" FontFamily="Consolas" Padding="8" VerticalScrollBarVisibility="Auto" Text="Connect to a PostgreSQL server to execute this query."/></TabItem>
+   <TabItem Header="Execution plan" x:Name="PlanTab"><DockPanel>
     <WrapPanel DockPanel.Dock="Top" Background="#D5E5EF"><Button x:Name="PlanExportButton" Content="Export Plan JSON…" Click="ExportPlan" IsEnabled="False" Padding="8,3" Margin="4,3"/><Button x:Name="PlanCancelButton" Content="Cancel operation" Click="CancelQuery" Visibility="Collapsed" Padding="8,3" Margin="4,3"/></WrapPanel>
-    <ScrollViewer DockPanel.Dock="Top" MaxHeight="90" VerticalScrollBarVisibility="Auto"><TextBlock x:Name="PlanStatus" Text="Request an estimated plan to inspect the server plan tree." TextWrapping="Wrap" Margin="6"/></ScrollViewer>
+    <ScrollViewer DockPanel.Dock="Top" MaxHeight="90" VerticalScrollBarVisibility="Auto"><TextBlock x:Name="PlanStatus" Text="Use Estimated Plan or Analyze Plan, or turn on Include Actual Execution Plan (Ctrl+M) before executing." TextWrapping="Wrap" Margin="6"/></ScrollViewer>
     <TextBlock x:Name="PlanStale" DockPanel.Dock="Top" Text="Editor changed since this plan was requested. Request a new plan for current SQL." Visibility="Collapsed" TextWrapping="Wrap" Margin="6,0,6,4" Foreground="#814600"/>
-    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="5"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-    <TreeView x:Name="PlanTree" SelectedItemChanged="SelectedPlanNode" BorderThickness="0" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" AutomationProperties.Name="PostgreSQL plan tree">
-     <TreeView.ItemTemplate><HierarchicalDataTemplate ItemsSource="{Binding Children}"><TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" MaxWidth="800" ToolTip="{Binding Label}"/></HierarchicalDataTemplate></TreeView.ItemTemplate>
-    </TreeView>
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="3*"/><ColumnDefinition Width="5"/><ColumnDefinition Width="*" MinWidth="120"/></Grid.ColumnDefinitions>
+    <local:ExecutionPlanView x:Name="PlanDiagram" SelectionChanged="SelectedPlanOperator" SaveRequested="SavePlanFromDiagram" ShowInNewTabRequested="ShowPlanInNewTab"/>
     <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#D6E3ED"/>
     <DataGrid local:DataGridRowNames.Enabled="True" x:Name="PlanProperties" Grid.Column="2" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" RowHeight="23" HeadersVisibility="Column" AutomationProperties.Name="Selected plan node properties">
      <DataGrid.Columns><DataGridTextColumn Header="Property" Binding="{Binding Key}" Width="130"/><DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/></DataGrid.Columns>
@@ -75,6 +87,7 @@
      <DataGrid.Columns><DataGridTextColumn Header="Property" Binding="{Binding Key}" Width="190"/><DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/></DataGrid.Columns>
     </DataGrid>
    </DockPanel></TabItem>
+   <TabItem Header="Client Statistics" x:Name="ClientStatisticsTab" Visibility="Collapsed"><DataGrid local:DataGridRowNames.Enabled="True" x:Name="ClientStatisticsGrid" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" CanUserSortColumns="False" RowHeight="21" HeadersVisibility="Column" AutomationProperties.Name="Client statistics of this query"/></TabItem>
   </TabControl>
   <Border Grid.Row="3" Background="#FFF6CD" BorderBrush="#D5C777" BorderThickness="0,1,0,0"><TextBlock x:Name="QueryStatus" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Text="Not connected" Margin="6,2"/></Border>
  </Grid>

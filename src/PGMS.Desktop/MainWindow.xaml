@@ -15,6 +15,7 @@
    <MenuItem Header="_File">
     <MenuItem Header="New _Query" Command="New" InputGestureText="Ctrl+N"/>
     <MenuItem Header="_Open…" Command="Open" InputGestureText="Ctrl+O"/>
+    <MenuItem x:Name="OpenPlanFileMenu" Header="Open Execution _Plan…" Click="OpenPlanFile"/>
     <Separator/>
     <MenuItem Header="_Save" Command="Save" InputGestureText="Ctrl+S"/>
     <MenuItem Header="Save _As…" Click="SaveAs"/>
@@ -27,13 +28,54 @@
     <MenuItem Header="Go To _Line…" Command="{x:Static local:QueryView.GoToLineCommand}" InputGestureText="Ctrl+G"/>
     <MenuItem x:Name="ReplaceMenu" Header="_Replace…" Command="Replace" InputGestureText="Ctrl+H"/>
     <Separator/><MenuItem x:Name="CommentSelectionMenu" Header="Comment Selection" Command="{x:Static local:SqlEditorCommands.Comment}" InputGestureText="Ctrl+K, Ctrl+C"/>
+    <MenuItem x:Name="IntelliSenseEditMenu" Header="_IntelliSense">
+     <MenuItem x:Name="ListMembersMenu" Header="List _Members" InputGestureText="Ctrl+J" Click="ListMembers"/>
+     <MenuItem x:Name="CompleteWordMenu" Header="Complete _Word" InputGestureText="Ctrl+Space" Click="ListMembers"/>
+     <MenuItem x:Name="RefreshCacheMenu" Header="_Refresh Local Cache" InputGestureText="Ctrl+Shift+R" Click="RefreshLocalCache"/>
+    </MenuItem>
     <MenuItem x:Name="UncommentSelectionMenu" Header="Uncomment Selection" Command="{x:Static local:SqlEditorCommands.Uncomment}" InputGestureText="Ctrl+K, Ctrl+U"/>
    </MenuItem>
-   <MenuItem Header="_View" SubmenuOpened="ViewMenuOpened"><MenuItem Header="Object _Explorer" Click="ShowExplorer" InputGestureText="F8"/><MenuItem x:Name="ActivityMonitorMenu" Header="Activity _Monitor" Click="ShowActivity" InputGestureText="Ctrl+Alt+A" ToolTip="Opens a document tab; a tab already monitoring the same server and user is activated"/><MenuItem Header="Query Statistics…" Click="ShowQueryStatistics" ToolTip="Read-only pg_stat_statements view; the extension must already be loaded and created"/><Separator/><MenuItem x:Name="WordWrapMenu" Header="Word Wrap" IsCheckable="True" Click="ToggleWordWrap" ToolTip="Wrap SQL visually without inserting line breaks"/><MenuItem x:Name="WhiteSpaceMenu" Header="Show White Space" IsCheckable="True" Click="ToggleWhiteSpace" ToolTip="Show spaces and tabs in the active SQL document"/></MenuItem>
+   <MenuItem Header="_View" SubmenuOpened="ViewMenuOpened"><MenuItem Header="Object _Explorer" Click="ShowExplorer" InputGestureText="F8"/><MenuItem Header="Re_gistered Servers" Click="ShowRegisteredServers" InputGestureText="Ctrl+Alt+G" ToolTip="Saved connection profiles organized in server groups"/><MenuItem x:Name="ActivityMonitorMenu" Header="Activity _Monitor" Click="ShowActivity" InputGestureText="Ctrl+Alt+A" ToolTip="Opens a document tab; a tab already monitoring the same server and user is activated"/><MenuItem Header="Query Statistics…" Click="ShowQueryStatistics" ToolTip="Read-only pg_stat_statements view; the extension must already be loaded and created"/><Separator/><MenuItem x:Name="WordWrapMenu" Header="Word Wrap" IsCheckable="True" Click="ToggleWordWrap" ToolTip="Wrap SQL visually without inserting line breaks"/><MenuItem x:Name="WhiteSpaceMenu" Header="Show White Space" IsCheckable="True" Click="ToggleWhiteSpace" ToolTip="Show spaces and tabs in the active SQL document"/></MenuItem>
    <MenuItem Header="_Query">
-    <MenuItem Header="_Connect…" Click="Connect"/>
-    <MenuItem Header="_Execute" Click="Execute" InputGestureText="F5" x:Name="ExecuteMenu" IsEnabled="False"/>
-    <MenuItem Header="_Cancel Executing Query" Click="CancelQuery" x:Name="CancelMenu" IsEnabled="False"/>
+    <MenuItem x:Name="ConnectionMenu" Header="Co_nnection" SubmenuOpened="ConnectionMenuOpened">
+     <MenuItem x:Name="QueryConnectMenu" Header="_Connect…" Click="QueryConnect"/>
+     <MenuItem x:Name="QueryDisconnectMenu" Header="_Disconnect" Click="QueryDisconnect"/>
+     <MenuItem x:Name="QueryChangeConnectionMenu" Header="Change C_onnection…" Click="QueryChangeConnection"/>
+    </MenuItem>
+    <MenuItem x:Name="OpenServerMenu" Header="Open Ser_ver in Object Explorer" InputGestureText="Alt+F8" Click="OpenServerInExplorer" IsEnabled="False"/>
+    <Separator/>
+    <MenuItem Header="_Execute" Click="Execute" InputGestureText="Alt+X" x:Name="ExecuteMenu" IsEnabled="False"/>
+    <MenuItem Header="_Cancel Executing Query" Click="CancelQuery" InputGestureText="Alt+Break" x:Name="CancelMenu" IsEnabled="False"/>
+    <Separator/>
+    <MenuItem x:Name="ParseMenu" Header="Pa_rse" InputGestureText="Ctrl+F5" Click="ParseQuery" IsEnabled="False"/>
+    <MenuItem x:Name="EstimatedPlanMenu" Header="Display E_stimated Execution Plan" InputGestureText="Ctrl+L" Click="DisplayEstimatedPlan" IsEnabled="False"/>
+    <MenuItem x:Name="IntelliSenseMenu" Header="_IntelliSense Enabled" InputGestureText="Ctrl+B, Ctrl+I" Click="ToggleIntelliSense" IsEnabled="False"/>
+    <Separator/>
+    <MenuItem x:Name="DesignQueryMenu" Header="_Design Query in Editor…" Command="{x:Static local:MainWindow.DesignQueryInEditor}" InputGestureText="Ctrl+Shift+Q"/>
+    <Separator/>
+    <MenuItem x:Name="ActualPlanMenu" Header="Include Actual Execution _Plan" InputGestureText="Ctrl+M" Click="ToggleActualPlan" IsEnabled="False"/>
+    <MenuItem x:Name="ClientStatisticsMenu" Header="Include C_lient Statistics" InputGestureText="Shift+Alt+S" Click="ToggleClientStatistics" IsEnabled="False"/>
+    <MenuItem x:Name="ResetClientStatisticsMenu" Header="Reset Client Statistics" Click="ResetClientStatistics" IsEnabled="False"/>
+    <Separator/>
+    <MenuItem x:Name="ResultsToMenu" Header="Results _To" SubmenuOpened="ResultsToMenuOpened">
+     <MenuItem x:Name="ResultsToTextMenu" Header="Results to _Text" InputGestureText="Ctrl+T" Icon="{StaticResource ResultsTextIcon}" Click="ResultsToText"/>
+     <MenuItem x:Name="ResultsToGridMenu" Header="Results to _Grid" InputGestureText="Ctrl+D" Icon="{StaticResource ResultsGridIcon}" Click="ResultsToGrid"/>
+     <MenuItem x:Name="ResultsToFileMenu" Header="Results to _File" InputGestureText="Ctrl+Shift+F" Icon="{StaticResource ResultsFileIcon}" Click="ResultsToFile"/>
+    </MenuItem>
+    <MenuItem x:Name="QueryOptionsMenu" Header="Query _Options…" Command="{x:Static local:MainWindow.ShowQueryOptions}" Icon="{StaticResource QueryOptionsIcon}"/>
+    <Separator/>
+    <MenuItem x:Name="GenerateSqlMenu" Header="Generate SQL with _AI…" Command="{x:Static local:MainWindow.GenerateSqlWithAi}" InputGestureText="Ctrl+I"/>
+   </MenuItem>
+   <MenuItem x:Name="TableDesignerMenu" Header="Table _Designer" Visibility="Collapsed" SubmenuOpened="TableDesignerMenuOpened">
+    <MenuItem x:Name="DesignerPrimaryKeyMenu" Header="Set Primary Key" Icon="{StaticResource DesignerIconKey}" Click="DesignerPrimaryKey"/>
+    <MenuItem x:Name="DesignerInsertMenu" Header="Insert Column" Icon="{StaticResource DesignerIconInsert}" Click="DesignerInsertColumn"/>
+    <MenuItem x:Name="DesignerDeleteMenu" Header="Delete Column" Icon="{StaticResource DesignerIconDelete}" Click="DesignerDeleteColumn"/>
+    <Separator/>
+    <MenuItem Header="Relationships…" Icon="{StaticResource DesignerIconRelationships}" Click="DesignerRelationships"/>
+    <MenuItem Header="Indexes/Keys…" Icon="{StaticResource DesignerIconIndexes}" Click="DesignerIndexes"/>
+    <MenuItem Header="Check Constraints…" Icon="{StaticResource DesignerIconChecks}" Click="DesignerChecks"/>
+    <Separator/>
+    <MenuItem x:Name="DesignerScriptMenu" Header="Generate Change Script…" Icon="{StaticResource DesignerIconScript}" Click="DesignerScript"/>
    </MenuItem>
    <MenuItem Header="_Tools">
     <MenuItem x:Name="NewDatabaseMenu" Header="New _Database…" Click="NewDatabase" IsEnabled="False"/>
@@ -55,7 +97,8 @@
     <MenuItem x:Name="BackupGlobalsMenu" Header="Back Up Global Objects…" Click="BackupGlobals" IsEnabled="False"/>
     <MenuItem x:Name="RestoreGlobalsMenu" Header="Restore Global Objects…" Click="RestoreGlobals" IsEnabled="False"/>
     <Separator/>
-    <MenuItem Header="Options…" IsEnabled="False" ToolTip="Not implemented in this development build"/>
+    <MenuItem x:Name="AiSettingsMenu" Header="AI Assistant Settings…" Click="AiAssistantSettings"/>
+    <MenuItem x:Name="OptionsMenu" Header="_Options…" Click="ShowOptions"/>
    </MenuItem>
    <MenuItem Header="_Permissions"><MenuItem Header="Object Permissions…" Click="ObjectPermissions"/><MenuItem x:Name="DefaultPermissionsMenu" Header="Default Permissions…" Click="DefaultPermissions"/><MenuItem Header="Role Properties…" Click="RoleProperties"/><MenuItem Header="Role Memberships…" Click="RoleMemberships"/><MenuItem Header="Rename Role…" Click="RenameRole"/><MenuItem Header="Drop Role…" Click="DropRole"/><MenuItem Header="Set Role Password…" Click="SetRolePassword"/></MenuItem>
    <MenuItem Header="_Window"><MenuItem Header="Reset Window _Layout" Click="ResetLayout"/></MenuItem>
@@ -71,9 +114,18 @@
    <ToolBar Band="1" BandIndex="0">
     <Button Click="Connect" Content="Connect…" ToolTip="Connect to PostgreSQL"/>
     <Separator/>
-    <TextBox x:Name="DatabaseName" Text="No active query" IsReadOnly="True" Width="172" Padding="4,2" BorderBrush="#A9BCC9" ToolTip="Activate a query tab to see its database and session status. Object Explorer uses a separate connection."/>
+    <ComboBox x:Name="DatabaseName" Width="172" IsEnabled="False" ToolTipService.ShowOnDisabled="True" DropDownOpened="DatabaseBoxOpened" DropDownClosed="DatabaseBoxClosed" AutomationProperties.Name="Available Databases"/>
     <Button x:Name="ExecuteButton" Click="Execute" IsEnabled="False" ToolTip="Execute (F5)"><StackPanel Orientation="Horizontal"><Path Width="10" Height="12" Stretch="Fill" Fill="#2D7D3B" Data="M0,0 L10,6 0,12 Z"/><TextBlock Text="Execute" Margin="5,0"/></StackPanel></Button>
     <Button x:Name="CancelButton" Click="CancelQuery" IsEnabled="False" ToolTip="Cancel Executing Query"><Path Width="10" Height="10" Fill="#AB3E3E" Data="M0,0 L10,0 10,10 0,10 Z"/></Button>
+    <Separator/>
+    <Button x:Name="EstimatedPlanButton" Click="DisplayEstimatedPlan" IsEnabled="False" ToolTip="Display Estimated Execution Plan (Ctrl+L)" AutomationProperties.Name="Display Estimated Execution Plan"><Path Width="16" Height="14" Stretch="Fill" Stroke="#2B5797" Fill="#DDE8F5" Data="M0,4 L6,4 6,10 0,10 Z M10,0 L16,0 16,5 10,5 Z M10,9 L16,9 16,14 10,14 Z M6,7 L8,7 8,2.5 10,2.5 M8,7 L8,11.5 10,11.5"/></Button>
+    <ToggleButton x:Name="ActualPlanButton" Click="ToggleActualPlan" IsEnabled="False" ToolTip="Include Actual Execution Plan (Ctrl+M)" AutomationProperties.Name="Include Actual Execution Plan"><Path Width="16" Height="14" Stretch="Fill" Stroke="#2D7D3B" Fill="#DCEFDF" Data="M0,4 L6,4 6,10 0,10 Z M10,0 L16,0 16,5 10,5 Z M10,9 L16,9 16,14 10,14 Z M6,7 L8,7 8,2.5 10,2.5 M8,7 L8,11.5 10,11.5"/></ToggleButton>
+    <Separator/>
+    <!-- SSMS order: Results to Text, Results to Grid, Results to File; the mode of the active query is checked. -->
+    <ToggleButton x:Name="ResultsToTextButton" Click="ResultsToText" IsEnabled="False" ToolTip="Results to Text (Ctrl+T)" AutomationProperties.Name="Results to Text" Content="{StaticResource ResultsTextIcon}"/>
+    <ToggleButton x:Name="ResultsToGridButton" Click="ResultsToGrid" IsEnabled="False" ToolTip="Results to Grid (Ctrl+D)" AutomationProperties.Name="Results to Grid" Content="{StaticResource ResultsGridIcon}"/>
+    <ToggleButton x:Name="ResultsToFileButton" Click="ResultsToFile" IsEnabled="False" ToolTip="Results to File (Ctrl+Shift+F)" AutomationProperties.Name="Results to File" Content="{StaticResource ResultsFileIcon}"/>
+    <Button x:Name="QueryOptionsButton" Command="{x:Static local:MainWindow.ShowQueryOptions}" ToolTip="Query Options" AutomationProperties.Name="Query Options" Content="{StaticResource QueryOptionsIcon}"/>
    </ToolBar>
   </ToolBarTray>
   <StatusBar DockPanel.Dock="Bottom" Background="#425C6C" Foreground="White">
@@ -99,31 +151,41 @@
      <ad:LayoutAnchorablePane DockWidth="300">
       <ad:LayoutAnchorable Title="Object Explorer" ContentId="explorer" CanClose="False" CanHide="True">
        <DockPanel x:Name="ExplorerContent" Background="{StaticResource PanelBrush}">
-        <ToolBar DockPanel.Dock="Top">
-         <Button Content="Connect…" Click="Connect"/>
-         <Separator/>
-         <Button Content="Refresh" Click="RefreshExplorer" ToolTip="Refresh (F5 when Object Explorer has focus)"/>
-         <Button x:Name="CancelExplorerLoadButton" Content="Cancel Load" Click="CancelExplorerLoad" IsEnabled="{Binding SelectedItem.LoadTarget.IsBusy, ElementName=ExplorerTree, FallbackValue=False}" AutomationProperties.Name="Cancel selected folder load"/>
-        </ToolBar>
-        <StackPanel DockPanel.Dock="Top" Margin="5" x:Name="ExplorerFilterPanel" IsEnabled="False">
-         <Label Content="Filter selected folder by _name:" Target="{Binding ElementName=ExplorerFilter}" Padding="0,2"/>
-         <TextBox x:Name="ExplorerFilter" KeyDown="ExplorerFilterKeyDown" AutomationProperties.Name="Filter selected folder by name" ToolTip="Literal contains, ignoring case; direct children only. No wildcard syntax."/>
-         <WrapPanel Margin="0,3,0,0"><Button x:Name="ApplyExplorerFilterButton" Content="_Apply Filter" AutomationProperties.Name="Apply folder name filter" Click="ApplyExplorerFilter"/><Button x:Name="ClearExplorerFilterButton" Content="_Clear Filter" AutomationProperties.Name="Clear folder name filter" Click="ClearExplorerFilter" Margin="4,0,0,0"/></WrapPanel>
-         <TextBlock x:Name="ExplorerFilterSummary" Text="{Binding SelectedItem.FilterSummary, ElementName=ExplorerTree}" TextWrapping="Wrap" Margin="0,3,0,0"/>
-        </StackPanel>
-        <TreeView x:Name="ExplorerTree" SelectedItemChanged="ExplorerSelectionChanged" BorderThickness="0" Background="{StaticResource PanelBrush}" Padding="5" AutomationProperties.Name="Object Explorer Hierarchy" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.CacheLengthUnit="Item" VirtualizingPanel.CacheLength="8" TreeViewItem.Expanded="ExplorerExpanded" PreviewMouseRightButtonDown="ExplorerRightClick">
-         <TreeView.ItemContainerStyle><Style TargetType="TreeViewItem"><Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/><Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/></Style></TreeView.ItemContainerStyle>
+        <DockPanel x:Name="ExplorerToolbar" DockPanel.Dock="Top" Margin="4,3,4,2" LastChildFill="False">
+         <DockPanel.Resources>
+          <Style x:Key="ExplorerToolButton" TargetType="Button" BasedOn="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"><Setter Property="Padding" Value="4,3"/><Setter Property="Margin" Value="1,0"/><Setter Property="ToolTipService.ShowOnDisabled" Value="True"/></Style>
+          <Style TargetType="Image"><Setter Property="Width" Value="16"/><Setter Property="Height" Value="16"/><Style.Triggers><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.35"/></Trigger></Style.Triggers></Style>
+         </DockPanel.Resources>
+         <Button x:Name="ExplorerToolbarOptionsButton" DockPanel.Dock="Right" Style="{StaticResource ExplorerToolButton}" Click="OpenExplorerToolbarOptions" ToolTip="SQL Server Object Explorer Toolbar Options" AutomationProperties.Name="Object Explorer Toolbar Options"><TextBlock Text="⋯" FontWeight="Bold" VerticalAlignment="Center"/></Button>
+         <Button x:Name="ExplorerConnectMenuButton" Style="{StaticResource ExplorerToolButton}" Click="Connect" ToolTip="Connect" AutomationProperties.Name="Connect"><TextBlock Text="Connect" VerticalAlignment="Center" Margin="0,0,2,0"/></Button>
+         <Button x:Name="ExplorerConnectButton" Style="{StaticResource ExplorerToolButton}" Click="Connect" ToolTip="Connect Object Explorer" AutomationProperties.Name="Connect Object Explorer"><Image x:Name="ExplorerConnectIcon"/></Button>
+         <Button x:Name="DisconnectExplorerButton" Style="{StaticResource ExplorerToolButton}" Click="DisconnectExplorer" IsEnabled="False" ToolTip="Disconnect" AutomationProperties.Name="Disconnect"><Image x:Name="ExplorerDisconnectIcon"/></Button>
+         <Button x:Name="CancelExplorerLoadButton" Style="{StaticResource ExplorerToolButton}" Click="CancelExplorerLoad" IsEnabled="{Binding SelectedItem.LoadTarget.IsBusy, ElementName=ExplorerTree, FallbackValue=False}" ToolTip="Stop" AutomationProperties.Name="Stop"><Image x:Name="ExplorerStopIcon" Opacity="1"/></Button>
+         <Button x:Name="ExplorerFilterButton" Style="{StaticResource ExplorerToolButton}" Click="OpenExplorerFilter" IsEnabled="False" ToolTip="Filter" AutomationProperties.Name="Filter"><Image x:Name="ExplorerFilterIcon"/></Button>
+         <Button x:Name="ExplorerRefreshButton" Style="{StaticResource ExplorerToolButton}" Click="RefreshExplorer" ToolTip="Refresh (F5)" AutomationProperties.Name="Refresh"><Image x:Name="ExplorerRefreshIcon"/></Button>
+        </DockPanel>
+        <TreeView x:Name="ExplorerTree" SelectedItemChanged="ExplorerSelectionChanged" BorderThickness="0" Background="{StaticResource PanelBrush}" Padding="5" AutomationProperties.Name="Object Explorer Hierarchy" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.CacheLengthUnit="Item" VirtualizingPanel.CacheLength="8" TreeViewItem.Expanded="ExplorerExpanded" PreviewMouseRightButtonDown="ExplorerRightClick" ContextMenuOpening="ExplorerMenuOpening" MouseDoubleClick="ExplorerDoubleClick" PreviewMouseLeftButtonDown="ExplorerLeftClick" KeyDown="ExplorerKeyDown">
+         <TreeView.ItemContainerStyle><Style TargetType="TreeViewItem" BasedOn="{StaticResource SsmsTreeViewItem}"><Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/><Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/></Style></TreeView.ItemContainerStyle>
          <TreeView.ItemTemplate>
           <HierarchicalDataTemplate DataType="{x:Type vm:CatalogNode}" ItemsSource="{Binding Children}">
            <StackPanel Orientation="Horizontal" ToolTip="{Binding Error}">
-            <Image Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" IsHitTestVisible="False" Focusable="False">
+            <Image Width="16" Height="16" Margin="0,0,3,0" VerticalAlignment="Center" IsHitTestVisible="False" Focusable="False">
              <Image.Source><MultiBinding Converter="{StaticResource CatalogIcon}"><Binding Path="Entry"/><Binding Path="IsExpanded"/></MultiBinding></Image.Source>
             </Image>
-            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+            <Grid>
+             <Border x:Name="ExplorerLabel" Style="{StaticResource SsmsTreeLabel}"><TextBlock Text="{Binding Name}" VerticalAlignment="Center"/></Border>
+             <TextBox x:Name="ExplorerRenameBox" Visibility="Collapsed" Text="{Binding RenameText, UpdateSourceTrigger=PropertyChanged}" MinWidth="100" Height="18" Padding="0" VerticalContentAlignment="Center" AutomationProperties.Name="Rename" KeyDown="ExplorerRenameKeyDown" LostKeyboardFocus="ExplorerRenameLostFocus" IsVisibleChanged="ExplorerRenameShown"/>
+            </Grid>
            </StackPanel>
+           <HierarchicalDataTemplate.Triggers>
+            <DataTrigger Binding="{Binding IsRenaming}" Value="True">
+             <Setter TargetName="ExplorerLabel" Property="Visibility" Value="Collapsed"/>
+             <Setter TargetName="ExplorerRenameBox" Property="Visibility" Value="Visible"/>
+            </DataTrigger>
+           </HierarchicalDataTemplate.Triggers>
           </HierarchicalDataTemplate>
          </TreeView.ItemTemplate>
-         <TreeView.ContextMenu><ContextMenu DataContext="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource Self}}"><MenuItem Header="New _Query" Click="QueryFromExplorer"/><Separator/><MenuItem x:Name="ExplorerObjectProperties" Header="Object _Properties…" Click="ObjectProperties" IsEnabled="{Binding Entry.CanInspectObjectProperties, FallbackValue=False}"/><MenuItem x:Name="ExplorerDomainConstraints" Header="Domain Constraints…" Click="DomainFromExplorer" IsEnabled="{Binding Entry.CanManageDomain, FallbackValue=False}"/><MenuItem x:Name="ExplorerEnumValues" Header="Enum Values…" Click="EnumFromExplorer" IsEnabled="{Binding Entry.CanManageEnum, FallbackValue=False}"/><MenuItem x:Name="ExplorerRoutinePermissions" Header="Routine Permissions…" Click="RoutinePermissionsFromExplorer" IsEnabled="{Binding Entry.CanManageRoutinePermissions, FallbackValue=False}"/><MenuItem x:Name="ExplorerSequenceOperations" Header="Sequence Operations..." Click="SequenceOperations" IsEnabled="{Binding Entry.CanInspectSequence, FallbackValue=False}"/><MenuItem x:Name="ExplorerTableProperties" Header="Table Properties…" Click="TableProperties" IsEnabled="{Binding Entry.CanInspectTable, FallbackValue=False}"/><MenuItem x:Name="ExplorerPendingIndex" Header="Pending Index Operation…" Click="PendingIndexFromExplorer"/><MenuItem x:Name="ExplorerExpressionIndex" Header="Expression / Partial Index…" Click="ExpressionIndexFromExplorer" IsEnabled="{Binding Entry.CanEditTable, FallbackValue=False}"/><MenuItem x:Name="ExplorerRangeExclusion" Header="Range Exclusion Constraint…" Click="RangeExclusionFromExplorer" IsEnabled="{Binding Entry.CanEditTable, FallbackValue=False}"/><MenuItem x:Name="ExplorerPartitions" Header="Partitions…" Click="PartitionsFromExplorer" IsEnabled="{Binding Entry.CanManagePartitions, FallbackValue=False}"/><MenuItem x:Name="ExplorerTableOperations" Header="Table Operations…" Click="TableOperationsFromExplorer" IsEnabled="{Binding Entry.CanEditTable, FallbackValue=False}"/><Separator/><MenuItem Header="New _Database…" Click="NewDatabase"/><MenuItem Header="New Enum / Domain…" Click="NewTypeFromExplorer"/><MenuItem Header="New _Schema…" Click="NewSchema"/><MenuItem Header="New Login/Group _Role…" Click="NewRole"/><Separator/><MenuItem Header="Back Up Database…" Click="BackupDatabase"/><MenuItem Header="Restore Database…" Click="RestoreDatabase"/><Separator/><MenuItem Header="_Refresh" Click="RefreshExplorer"/></ContextMenu></TreeView.ContextMenu>
+         <TreeView.ContextMenu><ContextMenu x:Name="ExplorerMenu" Opened="ExplorerMenuOpened"/></TreeView.ContextMenu>
         </TreeView>
        </DockPanel>
       </ad:LayoutAnchorable>

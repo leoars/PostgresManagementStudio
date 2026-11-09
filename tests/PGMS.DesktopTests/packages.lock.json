@@ -2,6 +2,14 @@
   "version": 1,
   "dependencies": {
     "net10.0-windows7.0": {
+      "Anthropic": {
+        "type": "Transitive",
+        "resolved": "13.5.0",
+        "contentHash": "Chj4tZ3tYFNjJ0A1n8zboAJ7sxhd70HvYG6Ob438PwQztv4bq23CIXBjMcAp0yGJ15j2ES2GM+KWk6ZudFhl/w==",
+        "dependencies": {
+          "Microsoft.Extensions.AI.Abstractions": "10.5.1"
+        }
+      },
       "AvalonEdit": {
         "type": "Transitive",
         "resolved": "6.3.1.120",
@@ -36,6 +44,11 @@
           "Dirkster.AvalonDock": "5.0.1"
         }
       },
+      "Microsoft.Extensions.AI.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.5.1",
+        "contentHash": "nB0l3IlsVbNeUxsE7nZNb9GY8rP1OSeqpj0pseORPejt474HNKEauTWTLdSJPkSvPlRMxowZNMo6nyp7APAiSg=="
+      },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {
         "type": "Transitive",
         "resolved": "10.0.0",
@@ -60,6 +73,7 @@
       "PGMS": {
         "type": "Project",
         "dependencies": {
+          "Anthropic": "[13.5.0, )",
           "AvalonEdit": "[6.3.1.120, )",
           "Dirkster.AvalonDock": "[5.0.1, )",
           "Dirkster.AvalonDock.Serializer.Xml": "[5.0.1, )",

@@ -99,7 +99,7 @@ internal static class InspectionEditChecks
                         if (selectedColumn)
                         {
                             ((TabControl)properties.FindName("Details")).SelectedIndex = 1;
-                            ((DataGrid)properties.FindName("ColumnsGrid")).SelectedItem = properties.Snapshot!.Columns.Single(c => c.Name == "note");
+                            ((DataGrid)properties.FindName("ColumnsGrid")).SelectedItem = properties.ColumnRows.Single(c => c.Name == "note");
                             TableEditChecks.Capture(properties, "m41-properties-actions");
                         }
                         ((Button)properties.FindName(selectedColumn ? "ColumnOperationsButton" : "TableOperationsButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

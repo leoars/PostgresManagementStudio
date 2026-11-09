@@ -1,0 +1,115 @@
+<UserControl x:Class="PGMS.Desktop.TableDesignerView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop"
+  x:Name="Root" Background="White" Loaded="OnLoaded">
+ <UserControl.Resources>
+  <Style x:Key="DesignerHeader" TargetType="DataGridColumnHeader">
+   <Setter Property="HorizontalContentAlignment" Value="Center"/>
+   <Setter Property="Background" Value="White"/>
+   <Setter Property="BorderBrush" Value="#E3E3E3"/>
+   <Setter Property="BorderThickness" Value="0,0,1,1"/>
+   <Setter Property="Height" Value="23"/>
+  </Style>
+  <!-- A selected row is light blue, as measured in SSMS 22.11; a selected cell alone keeps the row white. -->
+  <Style x:Key="DesignerRow" TargetType="DataGridRow">
+   <Setter Property="Background" Value="White"/>
+   <Style.Triggers>
+    <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="#A6D1F0"/></Trigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="DesignerCell" TargetType="DataGridCell">
+   <Setter Property="BorderThickness" Value="0"/>
+   <Setter Property="VerticalContentAlignment" Value="Center"/>
+   <Setter Property="Template">
+    <Setter.Value>
+     <ControlTemplate TargetType="DataGridCell">
+      <Border x:Name="Frame" Background="Transparent" BorderThickness="0,0,0,1" BorderBrush="Transparent" SnapsToDevicePixels="True">
+       <ContentPresenter VerticalAlignment="Center" Margin="4,0,2,0"/>
+      </Border>
+      <ControlTemplate.Triggers>
+       <Trigger Property="IsFocused" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="#3B6EA5"/></Trigger>
+       <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="#3B6EA5"/></Trigger>
+      </ControlTemplate.Triggers>
+     </ControlTemplate>
+    </Setter.Value>
+   </Setter>
+   <Style.Triggers>
+    <Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="Black"/></Trigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="DesignerRowHeader" TargetType="DataGridRowHeader">
+   <Setter Property="Width" Value="20"/>
+   <Setter Property="Template">
+    <Setter.Value>
+     <ControlTemplate TargetType="DataGridRowHeader">
+      <Border Background="White" BorderBrush="#E3E3E3" BorderThickness="0,0,1,1">
+       <Grid>
+        <Path x:Name="Pointer" Data="M0,0 L5,4.5 0,9 Z" Fill="Black" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0" Visibility="Collapsed"/>
+        <Canvas x:Name="Key" Width="10" Height="12" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,1,0" Visibility="Collapsed">
+         <Ellipse Width="7" Height="7" Canvas.Left="1.5" Canvas.Top="0" Stroke="#8C6A00" Fill="#F2C94C"/>
+         <Path Data="M5,7 L5,12 M5,9.5 L7.5,9.5 M5,11.5 L7,11.5" Stroke="#8C6A00" StrokeThickness="1.2"/>
+        </Canvas>
+       </Grid>
+      </Border>
+      <ControlTemplate.Triggers>
+       <DataTrigger Binding="{Binding IsCurrent}" Value="True"><Setter TargetName="Pointer" Property="Visibility" Value="Visible"/></DataTrigger>
+       <DataTrigger Binding="{Binding IsPrimaryKey}" Value="True"><Setter TargetName="Key" Property="Visibility" Value="Visible"/></DataTrigger>
+      </ControlTemplate.Triggers>
+     </ControlTemplate>
+    </Setter.Value>
+   </Setter>
+  </Style>
+ </UserControl.Resources>
+ <DockPanel>
+  <Border x:Name="ReadOnlyBanner" DockPanel.Dock="Top" Background="#FFF4CE" BorderBrush="#E0D090" BorderThickness="0,0,0,1" Padding="8,4" Visibility="Collapsed">
+   <TextBlock x:Name="ReadOnlyText" TextWrapping="Wrap"/>
+  </Border>
+  <DockPanel x:Name="FeedbackBar" DockPanel.Dock="Bottom" Margin="8,4" Visibility="Collapsed">
+   <Button x:Name="CancelSaveButton" DockPanel.Dock="Right" Content="_Cancel" Padding="12,1" Margin="8,0,0,0" Click="CancelOperation" Visibility="Collapsed"/>
+   <TextBlock x:Name="Feedback" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+  </DockPanel>
+  <Grid>
+   <Grid.RowDefinitions><RowDefinition MinHeight="90"/><RowDefinition Height="5"/><RowDefinition Height="270" MinHeight="120"/></Grid.RowDefinitions>
+   <DataGrid local:DataGridRowNames.Enabled="True" x:Name="ColumnGrid" AutoGenerateColumns="False" CanUserAddRows="True" CanUserDeleteRows="False" CanUserSortColumns="False" CanUserReorderColumns="False" CanUserResizeRows="False"
+     SelectionUnit="CellOrRowHeader" SelectionMode="Extended" HeadersVisibility="All" RowHeaderWidth="20" GridLinesVisibility="All" HorizontalGridLinesBrush="#E3E3E3" VerticalGridLinesBrush="#E3E3E3"
+     BorderThickness="0" Background="White" RowHeight="23" ColumnHeaderStyle="{StaticResource DesignerHeader}" RowStyle="{StaticResource DesignerRow}"
+     CellStyle="{StaticResource DesignerCell}" RowHeaderStyle="{StaticResource DesignerRowHeader}" CurrentCellChanged="CurrentCellChanged" PreviewMouseRightButtonDown="RowRightClick" PreviewKeyDown="GridKeyDown"
+     HorizontalAlignment="Left" AutomationProperties.Name="Columns">
+    <DataGrid.Columns>
+     <DataGridTextColumn Header="Column Name" Width="156" Binding="{Binding Name, UpdateSourceTrigger=LostFocus}"/>
+     <DataGridTemplateColumn Header="Data Type" Width="127" ClipboardContentBinding="{Binding DataType}">
+      <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding DataType}" TextTrimming="CharacterEllipsis"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+      <DataGridTemplateColumn.CellEditingTemplate>
+       <DataTemplate>
+        <ComboBox IsEditable="True" Text="{Binding DataType, UpdateSourceTrigger=LostFocus}" ItemsSource="{Binding TypeChoices, ElementName=Root}" BorderThickness="0" Padding="1,0" Loaded="TypeEditorLoaded" AutomationProperties.Name="Data Type"/>
+       </DataTemplate>
+      </DataGridTemplateColumn.CellEditingTemplate>
+     </DataGridTemplateColumn>
+     <DataGridTemplateColumn Header="Allow Nulls" Width="85" ClipboardContentBinding="{Binding AllowNulls}">
+      <DataGridTemplateColumn.CellTemplate>
+       <DataTemplate><CheckBox IsChecked="{Binding AllowNulls, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanAllowNulls}" HorizontalAlignment="Center" Focusable="False" AutomationProperties.Name="Allow Nulls"/></DataTemplate>
+      </DataGridTemplateColumn.CellTemplate>
+     </DataGridTemplateColumn>
+    </DataGrid.Columns>
+    <DataGrid.ContextMenu>
+     <ContextMenu x:Name="RowMenu" Opened="RowMenuOpened">
+      <MenuItem x:Name="PrimaryKeyItem" Header="Set Primary Key" Icon="{StaticResource DesignerIconKey}" Click="TogglePrimaryKey"/>
+      <MenuItem x:Name="InsertItem" Header="Insert Column" Icon="{StaticResource DesignerIconInsert}" Click="InsertColumnClick"/>
+      <MenuItem x:Name="DeleteItem" Header="Delete Column" Icon="{StaticResource DesignerIconDelete}" Click="DeleteColumnClick"/>
+      <Separator/>
+      <MenuItem Header="Relationships…" Icon="{StaticResource DesignerIconRelationships}" Click="RelationshipsClick"/>
+      <MenuItem Header="Indexes/Keys…" Icon="{StaticResource DesignerIconIndexes}" Click="IndexesClick"/>
+      <MenuItem Header="Check Constraints…" Icon="{StaticResource DesignerIconChecks}" Click="ChecksClick"/>
+      <Separator/>
+      <MenuItem x:Name="ScriptItem" Header="Generate Change Script…" Icon="{StaticResource DesignerIconScript}" Click="ScriptClick"/>
+      <Separator/>
+      <MenuItem Header="Properties" Icon="{StaticResource DesignerIconProperties}" InputGestureText="Alt+Enter" Click="PropertiesClick"/>
+     </ContextMenu>
+    </DataGrid.ContextMenu>
+   </DataGrid>
+   <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#D6DBE9" AutomationProperties.Name="Resize properties"/>
+   <TabControl x:Name="PropertyTabs" Grid.Row="2" Margin="8,4,8,8" BorderBrush="#C8C8C8" Background="White">
+    <TabItem x:Name="ColumnTab" Header="Column Properties"><local:DesignerPropertyGrid x:Name="ColumnProperties" Margin="6"/></TabItem>
+    <TabItem x:Name="TableTab" Header="Table Properties"><local:DesignerPropertyGrid x:Name="TableProperties" Margin="6"/></TabItem>
+   </TabControl>
+  </Grid>
+ </DockPanel>
+</UserControl>

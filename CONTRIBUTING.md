@@ -10,6 +10,6 @@ Changes to public documentation must update both `docs/en` and `docs/pt-BR` (and
 
 New behavior, administration or UI changes should include proportional validation. Do not claim SSMS parity or certify platforms based only on synthetic tests. Desktop and database checks require Windows and PostgreSQL tools; state any checks you could not run.
 
-PGMS's original code and documentation use the [MIT license](LICENSE); third-party components retain their own licenses. Submit only material you may contribute under these terms. Never include proprietary binaries, copied vendor icons or secrets. Follow the [security reporting policy](SECURITY.md) for vulnerabilities.
+PGMS's original code and documentation use the [Apache-2.0 license](LICENSE) (releases through 0.1.0-alpha.4 remain under MIT); third-party components retain their own licenses. Submit only material you may contribute under these terms. Never include proprietary binaries, copied vendor icons or secrets. Follow the [security reporting policy](SECURITY.md) for vulnerabilities.
 
 Codex-created commit messages must start with `[Codex]`, as required by the repository's author. This prefix is not required of human contributors.
