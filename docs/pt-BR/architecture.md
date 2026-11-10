@@ -21,4 +21,4 @@ Controles WPF e renderização pertencem à thread de UI. I/O e várias etapas d
 
 Perfis, layout, rascunhos e diários administrativos ficam em diretório local configurável. Segredos e payloads de recuperação usam DPAPI do usuário Windows atual. Formatos são versionados; binários antigos não têm compatibilidade retroativa universal. Ferramentas PostgreSQL externas executam como processos filhos, com argumentos revisados e staging temporário protegido quando aplicável.
 
-Observações SSMS e provas REA orientam somente desenvolvimento. Nenhum assembly SSMS ou componente REA é exigido pelo aplicativo distribuído. Veja [licenças](licensing.md), [validação](validation.md) para comportamento suportado e limites.
+Observações SSMS orientam somente desenvolvimento. Nenhum assembly SSMS é exigido pelo aplicativo distribuído. Veja [licenças](licensing.md), [validação](validation.md) para comportamento suportado e limites.

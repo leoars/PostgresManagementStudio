@@ -21,4 +21,4 @@ WPF controls and rendering belong to the UI thread. File I/O and several prepara
 
 Profiles, layout, drafts and administrative journals live in a configurable local state directory. Secrets and recovery payloads use Windows DPAPI for the current user. Recovery formats are versioned; old binaries are not universally backward-compatible. External PostgreSQL tools run as child processes with reviewed arguments and protected temporary staging where applicable.
 
-SSMS observations and REA evidence guide development only. No SSMS assembly or REA component is required by the distributed application. See [licensing](licensing.md), [validation](validation.md) for the supported behavior and limits.
+SSMS observations guide development only. No SSMS assembly is required by the distributed application. See [licensing](licensing.md), [validation](validation.md) for the supported behavior and limits.
