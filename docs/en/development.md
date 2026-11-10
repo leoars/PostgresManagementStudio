@@ -4,7 +4,7 @@ English | [Português (Brasil)](../pt-BR/development.md)
 
 ## Build and run
 
-Use Windows x64, PowerShell 7 and the SDK selected by `global.json`. Run commands from the repository root. `Build.ps1` restores with locked dependencies, then builds the solution. Nullable analysis and warnings-as-errors are enabled. Neither SSMS nor REA is required to build or run PGMS.
+Use Windows x64, PowerShell 7 and the SDK selected by `global.json`. Run commands from the repository root. `Build.ps1` restores with locked dependencies, then builds the solution. Nullable analysis and warnings-as-errors are enabled. SSMS is not required to build or run PGMS.
 
 ```powershell
 ./scripts/Build.ps1 -Configuration Release

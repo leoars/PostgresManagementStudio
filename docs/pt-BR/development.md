@@ -4,7 +4,7 @@
 
 ## Compilar e executar
 
-Use Windows x64, PowerShell 7 e o SDK selecionado por `global.json`. Execute na raiz do repositório. `Build.ps1` faz restore com dependências travadas e compila a solução. Nullable e warnings-as-errors estão habilitados. SSMS e REA não são necessários para compilar ou executar PGMS.
+Use Windows x64, PowerShell 7 e o SDK selecionado por `global.json`. Execute na raiz do repositório. `Build.ps1` faz restore com dependências travadas e compila a solução. Nullable e warnings-as-errors estão habilitados. O SSMS não é necessário para compilar ou executar PGMS.
 
 ```powershell
 ./scripts/Build.ps1 -Configuration Release
