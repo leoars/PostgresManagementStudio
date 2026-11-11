@@ -70,6 +70,8 @@ public partial class QueryView
         displayLimited = false; resultsIncomplete = true;
         UpdateExport();
         int displayedRows = 0, noticeIndex = 0, shown = 0;
+        DateTime startedUtc = DateTime.UtcNow;
+        Exception? failure = null; bool canceled = false; long? affectedRows = null;
         var timer = Stopwatch.StartNew();
         var screen = new StringWriter();
         StringWriter? messagesOut = toFile ? new StringWriter() : null;
@@ -106,7 +108,7 @@ public partial class QueryView
             var lastStatus = Stopwatch.StartNew();
             int nextFlush = 100;
             var meter = StartClientTrial(sql);
-            await session!.StreamAsync(sql, Measured(meter, async (batch, token) =>
+            var completion = await session!.StreamAsync(sql, Measured(meter, async (batch, token) =>
             {
                 if (toFile)
                 {
@@ -132,6 +134,7 @@ public partial class QueryView
                 }, System.Windows.Threading.DispatcherPriority.Background, token);
             }), options, cancellation.Token);
             RecordClientTrial(meter);
+            affectedRows = completion.RecordsAffected >= 0 ? completion.RecordsAffected : null;
             succeeded = true;
             resultsIncomplete = false;
             DrainNotices();
@@ -142,6 +145,7 @@ public partial class QueryView
         }
         catch (Exception ex) when (ex is NpgsqlException or OperationCanceledException or InvalidOperationException or IOException or UnauthorizedAccessException)
         {
+            failure = ex; canceled = ex is OperationCanceledException || cancellation?.IsCancellationRequested == true;
             if (ex is PostgresException positioned) SetErrorPosition(sql, positioned.Position, submittedStart, submittedRevision);
             string error = ex is PostgresException pg ? QueryErrorFormatter.Format(pg) :
                 ex is OperationCanceledException ? "Query canceled. An explicit transaction may require ROLLBACK before further commands." : ex.Message;
@@ -168,6 +172,7 @@ public partial class QueryView
             cancellation = null;
             UpdateExport();
             StateChanged?.Invoke(this, EventArgs.Empty);
+            RecordHistory(sql, startedUtc, timer.Elapsed, failure, canceled, displayedRows, affectedRows);
         }
     }
 }

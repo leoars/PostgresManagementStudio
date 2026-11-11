@@ -921,9 +921,12 @@ public sealed class QueryDesignerControl : UserControl
         await LeaveSqlFirstAsync();
         using var cancellation = operation = new CancellationTokenSource();
         cancelButton.Visibility = Visibility.Visible; resultStatus.Text = "Executing…";
+        string sql = sqlEditor.Text; DateTime startedUtc = DateTime.UtcNow; var timer = System.Diagnostics.Stopwatch.StartNew();
+        Exception? failure = null; long? rows = null;
         try
         {
-            var result = await service.ExecuteAsync(sqlEditor.Text, cancellation.Token);
+            var result = await service.ExecuteAsync(sql, cancellation.Token);
+            rows = result.Table.Rows.Count;
             results.Columns.Clear();
             foreach (System.Data.DataColumn column in result.Table.Columns)
                 results.Columns.Add(new DataGridTextColumn { Header = column.Caption, CellStyle = ResultGridStyle.NullAwareCell($"[{column.ColumnName}]"), Binding = new Binding($"[{column.ColumnName}]") { Converter = new DatabaseValueConverter() } });
@@ -931,10 +934,16 @@ public sealed class QueryDesignerControl : UserControl
             resultStatus.Text = $"{result.Table.Rows.Count} row(s)" + (result.Truncated ? $"; only the first {QueryDesignService.MaxRows} are shown." : "");
             changedMark.Visibility = Visibility.Collapsed;
         }
-        catch (OperationCanceledException) { resultStatus.Text = "Canceled."; }
-        catch (Exception ex) when (ex is NpgsqlException or IOException or TimeoutException or ArgumentException or InvalidOperationException) { resultStatus.Text = Message(ex); }
-        finally { operation = null; cancelButton.Visibility = Visibility.Collapsed; }
+        catch (OperationCanceledException ex) { failure = ex; resultStatus.Text = "Canceled."; }
+        catch (Exception ex) when (ex is NpgsqlException or IOException or TimeoutException or ArgumentException or InvalidOperationException) { failure = ex; resultStatus.Text = Message(ex); }
+        finally
+        {
+            operation = null; cancelButton.Visibility = Visibility.Collapsed;
+            if (sql.Trim().Length > 0) ExecutionObserved?.Invoke(sql, startedUtc, timer.Elapsed, failure, failure is OperationCanceledException || cancellation.IsCancellationRequested, rows);
+        }
     }
+    /// <summary>Each Execute SQL after it ends (SQL, start in UTC, duration, error, canceled, rows shown); the query tab hands it to Query History (PGMS-043).</summary>
+    internal Action<string, DateTime, TimeSpan, Exception?, bool, long?>? ExecutionObserved { get; set; }
 
     /// <summary>Verify SQL Syntax against the server; nothing runs.</summary>
     public async Task<bool> VerifyAsync()

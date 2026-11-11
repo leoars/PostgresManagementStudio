@@ -90,7 +90,7 @@ public partial class ConnectionDialog : Window
     }
     private void NewProfile(object sender, RoutedEventArgs e)
     {
-        Profiles.SelectedItem = null; selectedId = null; ProfileName.Clear(); Password.Clear(); RememberPassword.IsChecked = false; DeleteProfileButton.IsEnabled = false; Error.Text = "New profile. Enter settings and choose Save Profile.";
+        Profiles.SelectedItem = null; selectedId = null; ProfileName.Clear(); Password.Clear(); RememberPassword.IsChecked = false; DisableHistory.IsChecked = false; DeleteProfileButton.IsEnabled = false; Error.Text = "New profile. Enter settings and choose Save Profile.";
     }
     private void SelectProfile(object sender, SelectionChangedEventArgs e)
     {
@@ -98,6 +98,7 @@ public partial class ConnectionDialog : Window
         if (rememberChoice) preferences.Update(d => d with { LastProfile = p.Id });
         selectedId = p.Id; ProfileName.Text = p.Name; Host.Text = p.Host; Port.Text = p.Port.ToString(); Database.Text = p.Database; Username.Text = p.Username;
         Ssl.SelectedItem = Ssl.Items.OfType<ComboBoxItem>().First(i => (string)i.Content == p.SslMode); RootCertificate.Text = p.RootCertificate ?? "";
+        DisableHistory.IsChecked = p.DisableQueryHistory;
         Password.Clear(); RememberPassword.IsChecked = false; DeleteProfileButton.IsEnabled = true; Error.Text = "";
         try { Password.Password = p.RevealPassword(); RememberPassword.IsChecked = p.ProtectedPassword is not null; }
         catch (Exception ex) when (IsProfileError(ex)) { Error.Text = "Saved password is unavailable. Re-enter it and save the profile to replace it."; }
@@ -108,7 +109,7 @@ public partial class ConnectionDialog : Window
         try
         {
             string? group = selectedId is { } existing ? store.Load().FirstOrDefault(p => p.Id == existing)?.Group : newProfileGroup;
-            var profile = new ConnectionProfile(selectedId ?? Guid.NewGuid(), ProfileName.Text.Trim(), settings.Host!, settings.Port, settings.Database!, settings.Username!, settings.SslMode.ToString(), RootCertificate: string.IsNullOrEmpty(settings.RootCertificate) ? null : settings.RootCertificate, Group: group);
+            var profile = new ConnectionProfile(selectedId ?? Guid.NewGuid(), ProfileName.Text.Trim(), settings.Host!, settings.Port, settings.Database!, settings.Username!, settings.SslMode.ToString(), RootCertificate: string.IsNullOrEmpty(settings.RootCertificate) ? null : settings.RootCertificate, Group: group, DisableQueryHistory: DisableHistory.IsChecked == true);
             profile.Validate();
             profile = profile.WithPassword(Password.Password, RememberPassword.IsChecked == true);
             string sessionPassword = Password.Password;
@@ -158,7 +159,7 @@ public partial class ConnectionDialog : Window
     }
     private void SetTesting(bool testing)
     {
-        foreach (var control in new Control[] { Profiles, ProfileName, NewProfileButton, Host, Port, Database, Username, Password, Ssl, RootCertificate, BrowseRootButton, RememberPassword, SaveProfileButton, TestButton, ConnectButton })
+        foreach (var control in new Control[] { Profiles, ProfileName, NewProfileButton, Host, Port, Database, Username, Password, Ssl, RootCertificate, BrowseRootButton, RememberPassword, DisableHistory, SaveProfileButton, TestButton, ConnectButton })
             control.IsEnabled = !testing;
         DeleteProfileButton.IsEnabled = !testing && selectedId is not null;
         CancelTestButton.Visibility = testing ? Visibility.Visible : Visibility.Collapsed;

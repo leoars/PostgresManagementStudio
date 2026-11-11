@@ -9,6 +9,7 @@
    <TreeViewItem Header="Query Execution" IsExpanded="True">
     <TreeViewItem x:Name="ExecutionGeneralPage" Header="General"/>
     <TreeViewItem x:Name="ExecutionAdvancedPage" Header="Advanced"/>
+    <TreeViewItem x:Name="HistoryPage" Header="Query History"/>
    </TreeViewItem>
    <TreeViewItem Header="Query Results" IsExpanded="True">
     <TreeViewItem x:Name="QueryResultsPage" Header="General"/>
@@ -49,6 +50,27 @@
      </Grid>
      <TextBlock Text="Number of rows read by Select Top Rows and edited by Edit Top Rows on a table or view in Object Explorer. Defaults: 1000 and 200." TextWrapping="Wrap" Foreground="#5A5A5A" Margin="0,8,0,0"/>
      <TextBlock x:Name="CommandsError" Foreground="#B00020" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
+    </StackPanel>
+    <StackPanel x:Name="HistoryPanel" Visibility="Collapsed">
+     <TextBlock Text="Query History" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="HistoryEnabledBox" Content="_Record executed queries in Query History"/>
+     <Grid Margin="0,10,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Label Content="_Keep executions for (days):" Target="{Binding ElementName=HistoryDaysBox}" Padding="0" VerticalAlignment="Center"/>
+      <TextBox x:Name="HistoryDaysBox" Grid.Column="1" TextAlignment="Right" Padding="2,1" AutomationProperties.Name="Keep executions for days"/>
+      <Label Grid.Row="1" Content="_Maximum executions kept:" Target="{Binding ElementName=HistoryCountBox}" Padding="0" VerticalAlignment="Center" Margin="0,8,0,0"/>
+      <TextBox x:Name="HistoryCountBox" Grid.Row="1" Grid.Column="1" TextAlignment="Right" Padding="2,1" Margin="0,8,0,0" AutomationProperties.Name="Maximum executions kept"/>
+      <Label Grid.Row="2" Content="Maximum _SQL kept per execution (KiB):" Target="{Binding ElementName=HistorySizeBox}" Padding="0" VerticalAlignment="Center" Margin="0,8,0,0"/>
+      <TextBox x:Name="HistorySizeBox" Grid.Row="2" Grid.Column="1" TextAlignment="Right" Padding="2,1" Margin="0,8,0,0" AutomationProperties.Name="Maximum SQL kept per execution in KiB"/>
+     </Grid>
+     <TextBlock TextWrapping="Wrap" Foreground="#5A5A5A" Margin="0,8,0,0" Text="Defaults: 90 days, 10,000 executions, 64 KiB (65,536 characters; longer SQL is cut and marked). Limits apply when PGMS starts and while it records. Past the count limit the oldest executions are removed until 95% of it is left. The newest execution of a pinned query is always kept."/>
+     <TextBlock TextWrapping="Wrap" Foreground="#5A5A5A" Margin="0,8,0,0" Text="Query History is stored only on this computer, encrypted for this Windows user (DPAPI), in the PGMS folder of your local application data. It is never written to a server. A saved connection profile can turn recording off for its server."/>
+     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+      <Button x:Name="ClearHistoryButton" Content="_Clear History…" Click="ClearHistory" Padding="10,3" AutomationProperties.Name="Clear query history"/>
+      <TextBlock x:Name="ClearHistoryStatus" VerticalAlignment="Center" Margin="10,0,0,0" TextWrapping="Wrap" AutomationProperties.Name="Clear history status"/>
+     </StackPanel>
+     <TextBlock x:Name="HistoryError" Foreground="#B00020" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
     </StackPanel>
     <local:QueryOptionsPages x:Name="QueryPages" Visibility="Collapsed"/>
    </Grid>
