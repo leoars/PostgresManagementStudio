@@ -22,14 +22,14 @@ public partial class DatabaseDiagramView
     public bool IndexesShown => showIndexes;
 
     /// <summary>Find Unindexed Foreign Keys… from the warning of a table or the table menu; the main window opens the window on this database.</summary>
-    public event Action? UnindexedForeignKeysRequested;
+    public event Action<DiagramTableModel?>? UnindexedForeignKeysRequested;
 
     public void ToggleIndexes() { showIndexes = !showIndexes; Rebuild(); Touch(); }
 
     /// <summary>Opens or closes the Indexes section of a table; the table keeps its place, so the tables below may be covered until moved or arranged.</summary>
     public void ToggleIndexSection(DiagramTableModel table) { table.IndexesExpanded = !table.IndexesExpanded; Rebuild(); Touch(); }
 
-    public void RequestUnindexedForeignKeys() => UnindexedForeignKeysRequested?.Invoke();
+    public void RequestUnindexedForeignKeys(DiagramTableModel? table = null) => UnindexedForeignKeysRequested?.Invoke(table);
 
     /// <summary>Refresh of the diagram menu: reads the tables without pending changes and the indexes of every table again.</summary>
     public Task RefreshAsync() => RefreshTablesAsync();

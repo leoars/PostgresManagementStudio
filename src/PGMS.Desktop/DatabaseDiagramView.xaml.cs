@@ -623,7 +623,7 @@ public partial class DatabaseDiagramView : UserControl
         // The Indexes header opens and closes on a click (a second click of a double click does nothing); the warning opens Find Unindexed Foreign Keys
         // after the click is over, so the window never opens under a pressed button.
         if (!extend && hit is DiagramHit { Part: DiagramHitPart.IndexHeader } header) { drag = DragMode.None; if (clicks == 1) ToggleIndexSection(header.Table); return; }
-        if (!extend && hit is DiagramHit { Part: DiagramHitPart.Warning }) { drag = DragMode.None; if (clicks == 1) Dispatcher.BeginInvoke(RequestUnindexedForeignKeys); return; }
+        if (!extend && hit is DiagramHit { Part: DiagramHitPart.Warning } warned) { drag = DragMode.None; if (clicks == 1) Dispatcher.BeginInvoke(() => RequestUnindexedForeignKeys(warned.Table)); return; }
         // Double click on a line opens its properties (pedido do usuário, 08/11/2026), as Alt+Enter does.
         if (clicks == 2 && DoubleClick(hit)) { drag = DragMode.None; return; }
         dragStart = point; moved = false; dragOrigins.Clear(); drag = DragMode.None;
@@ -887,7 +887,7 @@ public partial class DatabaseDiagramView : UserControl
                 Add("Indexes/Keys…", () => ShowIndexes(table, onIndex), "DiagramIndexes", "DesignerIconIndexes", single);
                 Add("Check Constraints…", () => ShowChecks(table), "DiagramChecks", "DesignerIconChecks", single);
                 // Only on a table with the warning (PGMS-044); not in the SSMS menu.
-                if (ShowsWarning(table)) Add("Find Unindexed Foreign Keys…", RequestUnindexedForeignKeys, "DiagramUnindexedForeignKeys");
+                if (ShowsWarning(table)) Add("Find Unindexed Foreign Keys…", () => RequestUnindexedForeignKeys(table), "DiagramUnindexedForeignKeys");
                 Separator();
                 Add("Generate Change Script…", ShowChangeScript, "DiagramScript", "DesignerIconScript", HasSchemaChanges);
                 Separator();

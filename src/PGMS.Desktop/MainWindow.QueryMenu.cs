@@ -141,9 +141,9 @@ public partial class MainWindow
 
     /// <summary>Find Unindexed Foreign Keys… on a database, from Object Explorer or from the warning of a diagram (PGMS-044). True when indexes were created;
     /// the diagrams open on that database then read their indexes again.</summary>
-    internal async Task<bool> ShowUnindexedForeignKeysAsync(string connection)
+    internal async Task<bool> ShowUnindexedForeignKeysAsync(string connection, (string Schema, string Table)? focus = null)
     {
-        var window = new ForeignKeyIndexScanWindow(connection)
+        var window = new ForeignKeyIndexScanWindow(connection, focus)
         {
             Owner = this,
             OpenInQuery = async script =>

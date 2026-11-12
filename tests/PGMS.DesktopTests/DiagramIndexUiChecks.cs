@@ -115,12 +115,26 @@ internal static class DiagramIndexUiChecks
         check(warning!.ToolTip is string warningTip && warningTip.Contains("ixui_child_parent_fk (parent_id)") && warningTip.Contains("Find Unindexed Foreign Keys"), "The warning names the key and says how to fix it");
         check(Has(view.FillMenu(new ContextMenu(), new DiagramHit(child, null, DiagramHitPart.Title)), "DiagramUnindexedForeignKeys"), "The table menu has Find Unindexed Foreign Keys… when the warning shows");
         ForeignKeyIndexScanWindow? scan = null;
-        window.UnindexedForeignKeysShown = w => { scan = w; w.Loaded += (_, _) => w.Dispatcher.BeginInvoke(w.Close); };
+        int scanned = -1, checkedRows = -1, otherTables = -1; string? scanTitle = null;
+        window.UnindexedForeignKeysShown = w =>
+        {
+            scan = w;
+            w.Loaded += async (_, _) =>
+            {
+                for (int i = 0; i < 200 && w.Rows.Count == 0; i++) await Task.Delay(30);
+                scanned = w.Rows.Count; checkedRows = w.Rows.Count(r => r.Selected);
+                otherTables = w.Rows.Count(r => r.Key.Key.Table != "ixui_child");
+                scanTitle = w.Title;
+                w.Close();
+            };
+        };
         Click(warning);
-        for (int i = 0; i < 100 && scan is null; i++) await Task.Delay(30);
+        for (int i = 0; i < 300 && (scan is null || scan.IsVisible || scanned < 0); i++) await Task.Delay(30);
         await Idle();
         window.UnindexedForeignKeysShown = null;
         check(scan is not null && scan.Owner == window, "A click on the warning opens Find Unindexed Foreign Keys");
+        check(scanned > 0 && checkedRows == 0, "Opened from the warning, the window scans by itself and checks nothing");
+        check(otherTables == 0 && scanTitle?.EndsWith(".ixui_child", StringComparison.Ordinal) == true, "The window is about the clicked table only, named in the title");
         view.SelectAt(new Point(child.X + 10, child.Y + 8));
         view.SetTableView(DiagramTableView.NameOnly);
         await Idle(); view.UpdateLayout();

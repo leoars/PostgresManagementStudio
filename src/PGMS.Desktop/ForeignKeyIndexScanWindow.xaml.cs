@@ -54,11 +54,27 @@ public partial class ForeignKeyIndexScanWindow : Window
     internal IReadOnlyList<UnindexedForeignKeyRow> Rows => rows;
     internal bool CreateConcurrently { get => Concurrently.IsChecked == true; set { Concurrently.IsChecked = value; RefreshScript(); } }
 
-    public ForeignKeyIndexScanWindow(string connection)
+    /// <summary>The table the window is about, when opened from the warning of a diagram table; null for the whole database (Object Explorer).</summary>
+    internal (string Schema, string Table)? Table { get; }
+
+    public ForeignKeyIndexScanWindow(string connection) : this(connection, null) { }
+
+    /// <summary>With a table: only its foreign keys, scanned as the window opens (none is checked); without one, the whole database after Scan.</summary>
+    public ForeignKeyIndexScanWindow(string connection, (string Schema, string Table)? table)
     {
         InitializeComponent();
         this.connection = connection;
+        Table = table;
+        if (table is { } t)
+        {
+            string name = $"{t.Schema}.{t.Table}";
+            Title = "Unindexed Foreign Keys - " + name;
+            Intro.Text = $"Lists the foreign keys of {name} whose columns have no index. PostgreSQL does not create one, so deleting a row of the referenced table, or changing its key, scans the whole of {name}. Scan reads the catalog and the statistics only, never the rows. Not every key needs an index: a small table, or a parent that is never deleted, may not be worth the cost on writes.";
+            Loaded += async (_, _) => await ScanAsync();
+        }
     }
+
+    private bool InScope(ScanForeignKey key) => Table is not { } t || (key.Schema == t.Schema && key.Table == t.Table);
 
     private async void Scan(object sender, RoutedEventArgs e) => await ScanAsync();
     private void OnClosing(object? sender, CancelEventArgs e) => scan?.Cancel();
@@ -74,10 +90,13 @@ public partial class ForeignKeyIndexScanWindow : Window
         ScanStatus.Text = "Reading the catalog…";
         try
         {
-            var (keys, names) = await ForeignKeyIndexScan.ReadAsync(connection, token);
-            rows.AddRange(ForeignKeyIndexScan.FindUnindexed(keys, names).Select(k => new UnindexedForeignKeyRow(k) { SelectionChanged = RefreshScript }));
+            var (all, names) = await ForeignKeyIndexScan.ReadAsync(connection, token);
+            // The index names avoid every name of the database, so the scan reads it all and only the rows are limited to the table.
+            var keys = all.Where(InScope).ToList();
+            rows.AddRange(ForeignKeyIndexScan.FindUnindexed(all, names).Where(k => InScope(k.Key)).Select(k => new UnindexedForeignKeyRow(k) { SelectionChanged = RefreshScript }));
             Keys.ItemsSource = rows.ToList();
-            ScanStatus.Text = keys.Count == 0 ? "This database has no foreign keys."
+            string scope = Table is null ? "This database" : "This table";
+            ScanStatus.Text = keys.Count == 0 ? $"{scope} has no foreign keys."
                 : rows.Count == 0 ? $"Every one of the {keys.Count:N0} foreign key(s) has an index."
                 : $"{rows.Count:N0} of {keys.Count:N0} foreign key(s) have no index. Choose by table size and by how often the parent changes.";
         }
