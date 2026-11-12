@@ -19,7 +19,7 @@ public sealed record DiagramDescription(string Object, string? Name, string Text
 /// <summary>Descriptions of the tables of a diagram: reading them from the catalog, the limit of the diagram, and the change of a table that is only descriptions.</summary>
 public static class DiagramDescriptions
 {
-    /// <summary>The limit of one description edited in a diagram (decisão do usuário, docs/PEDIDO-PGMS-044-045.md): 4 KiB of UTF-8.</summary>
+    /// <summary>The limit of one description edited in a diagram (decisão do usuário, 11/11/2026): 4 KiB of UTF-8.</summary>
     public const int MaxBytes = 4096;
 
     public static string? LimitError(string? text) =>
