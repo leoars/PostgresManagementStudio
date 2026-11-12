@@ -154,7 +154,7 @@ internal static class DiagramIndexUiChecks
         using (var saved = JsonDocument.Parse((string)(await Scalar($"SELECT definition::text FROM pgms.diagrams WHERE diagram_id={id}"))!))
         {
             var placements = saved.RootElement.GetProperty("tables").EnumerateArray().ToDictionary(t => t.GetProperty("name").GetString()!);
-            check(saved.RootElement.GetProperty("format").GetInt32() == 2 && saved.RootElement.GetProperty("showIndexes").GetBoolean() && placements["ixui_parent"].GetProperty("indexesExpanded").GetBoolean() && !placements["ixui_child"].GetProperty("indexesExpanded").GetBoolean()
+            check(saved.RootElement.GetProperty("format").GetInt32() == DiagramLayout.CurrentFormat && saved.RootElement.GetProperty("showIndexes").GetBoolean() && placements["ixui_parent"].GetProperty("indexesExpanded").GetBoolean() && !placements["ixui_child"].GetProperty("indexesExpanded").GetBoolean()
                 && placements["ixui_parent"].GetProperty("indexes").GetArrayLength() == 3 && placements["ixui_child"].GetProperty("unindexedForeignKeys")[0].GetProperty("name").GetString() == "ixui_child_parent_fk",
                 "The saved diagram keeps Show Indexes, the open section and the indexes of each table");
         }

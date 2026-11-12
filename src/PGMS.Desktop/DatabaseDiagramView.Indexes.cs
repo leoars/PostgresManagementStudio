@@ -37,14 +37,15 @@ public partial class DatabaseDiagramView
     private bool ShowsIndexSection(DiagramTableModel table) => showIndexes && !table.IsNew && table.View != DiagramTableView.NameOnly;
     private bool ShowsWarning(DiagramTableModel table) => showIndexes && !table.IsNew && table.Catalog.UnindexedForeignKeys.Count > 0;
 
-    /// <summary>The title of a table: the caption and, when a foreign key of the table has no index, the warning on the right.</summary>
+    /// <summary>The title of a table: the caption, the mark of its description (PGMS-045) and, when a foreign key of the table has no index, the warning on the right.</summary>
     private UIElement TitleContent(DiagramTableModel table, TextBlock caption)
     {
-        if (!ShowsWarning(table)) return caption;
+        var note = MarkFor(table, DiagramDescription.TableObject, null);
+        if (!ShowsWarning(table) && note is null) return caption;
         var panel = new DockPanel();
-        var warning = WarningGlyph(table);
-        DockPanel.SetDock(warning, Dock.Right);
-        panel.Children.Add(warning); panel.Children.Add(caption);
+        if (ShowsWarning(table)) { var warning = WarningGlyph(table); DockPanel.SetDock(warning, Dock.Right); panel.Children.Add(warning); }
+        if (note is not null) { note.Margin = new Thickness(6, 0, 0, 0); DockPanel.SetDock(note, Dock.Right); panel.Children.Add(note); }
+        panel.Children.Add(caption);
         return panel;
     }
 

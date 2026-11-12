@@ -20,6 +20,10 @@ public sealed record DiagramTablePlacement(string Schema, string Name, double X,
     public IReadOnlyList<DiagramIndex>? Indexes { get; init; }
     /// <summary>Foreign keys of the table that no index serves, when the diagram was saved.</summary>
     public IReadOnlyList<DiagramUnindexedKey>? UnindexedForeignKeys { get; init; }
+    /// <summary>The descriptions (COMMENT ON) of the table, its columns and foreign keys when the diagram was saved (PGMS-045): a copy for tools and AI agents,
+    /// written by every save from the catalog; opening a diagram reads the catalog again and shows where this copy differs. Items with Applied false are
+    /// descriptions the user had no privilege to apply; the tab keeps them in its layout, so they survive saves until the catalog has them.</summary>
+    public IReadOnlyList<DiagramDescription>? Descriptions { get; init; }
 }
 
 /// <summary>A text annotation placed on a diagram.</summary>
@@ -32,13 +36,13 @@ public sealed record DiagramRelationshipRoute(string Schema, string Table, strin
 /// <summary>What a diagram stores: which tables it shows and where, and the lines placed by hand. Never table data (decision of 07/11/2026, docs/MARCO-M1043.md).</summary>
 public sealed record DiagramLayout
 {
-    /// <summary>1: layout only (M1043). 2: the indexes of each table, Show Indexes and IndexesExpanded (PGMS-044). A diagram of format 1 opens as it was
-    /// and is written as format 2 by the next save; older versions of PGMS ignore what they do not know.</summary>
-    public const int CurrentFormat = 2;
+    /// <summary>1: layout only (M1043). 2: the indexes of each table, Show Indexes and IndexesExpanded (PGMS-044). 3: the descriptions of each table (PGMS-045).
+    /// A diagram of an older format opens as it was and is written in the current format by the next save; older versions of PGMS ignore what they do not know.</summary>
+    public const int CurrentFormat = 3;
     public int Format { get; init; } = CurrentFormat;
     /// <summary>Show Indexes of the diagram menu (PGMS-044), on by default and kept by diagram.</summary>
     public bool ShowIndexes { get; init; } = true;
-    /// <summary>When the save read the indexes written in Tables; null when they were not read (a layout not saved yet, or format 1).</summary>
+    /// <summary>When the save read the indexes and descriptions written in Tables; null when they were not read (a layout not saved yet, or format 1).</summary>
     public DateTimeOffset? CatalogRead { get; init; }
     public IReadOnlyList<DiagramTablePlacement> Tables { get; init; } = [];
     /// <summary>Only the lines moved by hand; the others are routed automatically. Older versions of PGMS ignore this list.</summary>
@@ -86,10 +90,19 @@ public sealed record NewTableForeignKeysEdit(TableDesign Table) : IAdministrativ
 /// its new key before another table references it, a foreign key goes away before the key it uses, the foreign keys of new tables follow, and dropped tables come last.</summary>
 public static class DiagramSchemaChanges
 {
-    public sealed record Result(IReadOnlyList<IAdministrativeEdit> Edits, TableDesignChange Script);
-
-    public static Result Build(IReadOnlyList<(TableDesign Original, TableDesign Current)> tables, IReadOnlyList<TableDesign> dropped)
+    public sealed record Result(IReadOnlyList<IAdministrativeEdit> Edits, TableDesignChange Script)
     {
+        /// <summary>Description changes left out of the save because the user does not own the table (PGMS-045): kept in the diagram as not applied,
+        /// with the statements to send to someone who can run them.</summary>
+        public IReadOnlyList<UnappliedDescriptions> Unapplied { get; init; } = [];
+    }
+    public sealed record UnappliedDescriptions(uint Oid, string Schema, string Table, IReadOnlyList<DiagramDescription> Items, IReadOnlyList<string> Statements);
+
+    /// <param name="notOwned">Tables the user does not own. A table whose only change is descriptions is left out of the save when it is here; a table with
+    /// other changes still goes in, and PostgreSQL refuses it as before.</param>
+    public static Result Build(IReadOnlyList<(TableDesign Original, TableDesign Current)> tables, IReadOnlyList<TableDesign> dropped, IReadOnlySet<uint>? notOwned = null)
+    {
+        foreach (var (original, current) in tables) DiagramDescriptions.CheckLimits(original.Oid == 0 ? null : original, current);
         // Columns renamed in one table are renamed in the foreign keys of the others by PostgreSQL itself: those keys are compared, and checked
         // before saving, with the new names, so they are not rebuilt.
         var fresh = tables.Where(t => t.Original.Oid == 0).Select(t => t.Current).ToArray();
@@ -97,11 +110,15 @@ public static class DiagramSchemaChanges
         var renamed = tables.Select(t => (t.Original, Renames: TableDesignColumns.Renames(t.Original, t.Current.Columns))).Where(r => r.Renames.Count > 0).ToArray();
         TableDesign Adjusted(TableDesign original) => renamed.Aggregate(original, (design, r) => TableDesignColumns.WithReferencedRenames(design, r.Original.Schema, r.Original.Name, r.Renames));
         var changed = new List<(TableDesign Original, TableDesign Current, TableDesignChange Change)>();
+        var described = new List<(TableDesign Original, TableDesign Current, TableDesignChange Change)>();
         foreach (var (read, current) in tables)
         {
             var original = Adjusted(read);
             var change = TableDesignScript.Build(original, current);
-            if (change.Statements.Count > 0) changed.Add((original, current, change));
+            if (change.Statements.Count == 0) continue;
+            // Only descriptions: COMMENT ON runs without locking and comparing the whole table (PGMS-045).
+            if (TableDesignScript.Build(original, DiagramDescriptions.WithoutDescriptionChanges(original, current)).Statements.Count == 0) described.Add((original, current, change));
+            else changed.Add((original, current, change));
         }
         static string Key(DesignForeignKey f) => string.Join("\u0001", [string.Join(",", f.Columns), f.ReferencedSchema, f.ReferencedTable, string.Join(",", f.ReferencedColumns), f.OnUpdate.ToString(), f.OnDelete.ToString(), f.CheckExisting.ToString()]);
         static IEnumerable<DesignForeignKey> Added(TableDesign before, TableDesign after) =>
@@ -146,6 +163,22 @@ public static class DiagramSchemaChanges
             statements.Add($"-- {changed[i].Original.Schema}.{changed[i].Original.Name}");
             statements.AddRange(changed[i].Change.Statements); warnings.AddRange(changed[i].Change.Warnings);
         }
+        var unapplied = new List<UnappliedDescriptions>();
+        foreach (var (original, current, change) in described.OrderBy(d => d.Original.Schema, StringComparer.Ordinal).ThenBy(d => d.Original.Name, StringComparer.Ordinal))
+        {
+            string table = original.Schema + "." + original.Name;
+            if (notOwned?.Contains(original.Oid) == true)
+            {
+                unapplied.Add(new(original.Oid, original.Schema, original.Name, DiagramDescriptions.Changed(original, current).Select(d => d with { Applied = false }).ToArray(), change.Statements));
+                statements.Add($"-- {table}: not applied. Only the owner of the table can change its descriptions; they are kept in the diagram, marked as not applied.");
+                statements.AddRange(change.Statements.Select(s => "-- " + s.Replace("\n", "\n-- ", StringComparison.Ordinal)));
+                warnings.Add($"You do not own {table}: its descriptions are saved only in the diagram, marked as not applied, and the script to send to the owner is shown after the save.");
+                continue;
+            }
+            edits.Add(new DescriptionEdit(original, current));
+            statements.Add($"-- {table}");
+            statements.AddRange(change.Statements);
+        }
         foreach (var table in fresh.Where(t => t.ForeignKeys.Count > 0))
         {
             edits.Add(new NewTableForeignKeysEdit(table));
@@ -158,7 +191,7 @@ public static class DiagramSchemaChanges
             edits.Add(drop); statements.Add(drop.ToSql());
             warnings.Add($"Deleting table {table.Schema}.{table.Name} deletes it and its data.");
         }
-        return new(edits, new(statements, warnings));
+        return new(edits, new(statements, warnings)) { Unapplied = unapplied };
     }
 }
 
@@ -197,12 +230,15 @@ public sealed class DiagramService(string connectionString)
         return await IsInstalledAsync(connection, null, token).ConfigureAwait(false);
     }
 
-    /// <summary>Creates the schema and table. Needs CREATE on the database (or an existing pgms schema the user can create in).</summary>
-    public async Task InstallAsync(CancellationToken token = default)
+    /// <summary>Creates the schema and table and, when asked, the optional function pgms.diagram_markdown for AI agents (PGMS-045), in one transaction.
+    /// Needs CREATE on the database (or an existing pgms schema the user can create in).</summary>
+    public async Task InstallAsync(CancellationToken token = default) => await InstallAsync(false, token).ConfigureAwait(false);
+    public async Task InstallAsync(bool withMarkdownFunction, CancellationToken token = default)
     {
         await using var connection = await OpenAsync(token).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false);
-        await using (var command = new NpgsqlCommand(InstallSql, connection, transaction) { CommandTimeout = 30 }) await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+        string sql = InstallSql + (withMarkdownFunction ? "\n" + DiagramMarkdown.CreateFunctionSql : "");
+        await using (var command = new NpgsqlCommand(sql, connection, transaction) { CommandTimeout = 30 }) await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         await transaction.CommitAsync(token).ConfigureAwait(false);
     }
 
@@ -276,7 +312,11 @@ public sealed class DiagramService(string connectionString)
         return (read.Tables, read.Missing);
     }
 
-    public sealed record TablesRead(IReadOnlyList<TableDesign> Tables, IReadOnlyList<string> Missing, IReadOnlyDictionary<uint, DiagramTableIndexes> Indexes);
+    public sealed record TablesRead(IReadOnlyList<TableDesign> Tables, IReadOnlyList<string> Missing, IReadOnlyDictionary<uint, DiagramTableIndexes> Indexes)
+    {
+        /// <summary>Tables read whose owner the user is not: their descriptions cannot be changed by this user (PGMS-045).</summary>
+        public IReadOnlySet<uint> NotOwned { get; init; } = new HashSet<uint>();
+    }
 
     /// <summary>The tables as <see cref="ReadTablesAsync"/> reads them and, in the same snapshot, the indexes of those tables and of alsoIndexesOf
     /// (tables of the diagram with pending changes, whose design is not read again but whose indexes are).</summary>
@@ -300,8 +340,9 @@ public sealed class DiagramService(string connectionString)
             tables.Add(await TableDesignService.ReadAsync(connection, transaction, schema, name, token).ConfigureAwait(false));
         }
         var indexes = await DiagramIndexReader.ReadAsync(connection, transaction, tables.Select(t => t.Oid).Concat(alsoIndexesOf).ToArray(), token).ConfigureAwait(false);
+        var notOwned = await DiagramDescriptions.NotOwnedAsync(connection, transaction, tables.Select(t => t.Oid).Concat(alsoIndexesOf).ToArray(), token).ConfigureAwait(false);
         await transaction.CommitAsync(token).ConfigureAwait(false);
-        return new(tables, missing, indexes);
+        return new(tables, missing, indexes) { NotOwned = notOwned };
     }
 
     /// <summary>The layout with the indexes each table has now, read inside the save transaction after the schema changes ran, so the saved diagram
@@ -320,6 +361,7 @@ public sealed class DiagramService(string connectionString)
             while (await reader.ReadAsync(token).ConfigureAwait(false)) found[reader.GetInt32(0) - 1] = reader.GetFieldValue<uint>(1);
         }
         var indexes = await DiagramIndexReader.ReadAsync(connection, transaction, found.Values.ToArray(), token).ConfigureAwait(false);
+        var descriptions = await DiagramDescriptions.ReadAsync(connection, transaction, found.Values.ToArray(), token).ConfigureAwait(false);
         DateTimeOffset read;
         await using (var now = new NpgsqlCommand("SELECT statement_timestamp()", connection, transaction) { CommandTimeout = 15 })
             read = new DateTimeOffset(DateTime.SpecifyKind((DateTime)(await now.ExecuteScalarAsync(token).ConfigureAwait(false))!, DateTimeKind.Utc));
@@ -327,8 +369,12 @@ public sealed class DiagramService(string connectionString)
         {
             Format = DiagramLayout.CurrentFormat, CatalogRead = read,
             Tables = layout.Tables.Select((t, i) => found.TryGetValue(i, out var oid) && indexes.TryGetValue(oid, out var table)
-                ? t with { Oid = oid, Indexes = table.Indexes, UnindexedForeignKeys = table.UnindexedForeignKeys }
-                : t with { Indexes = null, UnindexedForeignKeys = null }).ToArray()
+                ? t with
+                {
+                    Oid = oid, Indexes = table.Indexes, UnindexedForeignKeys = table.UnindexedForeignKeys,
+                    Descriptions = DiagramDescriptions.Merge(descriptions.GetValueOrDefault(oid) ?? [], t.Descriptions ?? [])
+                }
+                : t with { Indexes = null, UnindexedForeignKeys = null, Descriptions = null }).ToArray()
         };
     }
     private static async Task<bool> ExistsAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string schema, string name, CancellationToken token)
@@ -340,7 +386,13 @@ public sealed class DiagramService(string connectionString)
 
     /// <summary>Applies the schema changes and writes the diagram in one transaction (decision of 07/11/2026). A null existing creates the diagram.
     /// The version guard refuses a save over a diagram changed or deleted elsewhere since it was read.</summary>
-    public async Task<DiagramInfo> SaveAsync(DiagramInfo? existing, string name, DiagramLayout layout, IReadOnlyList<IAdministrativeEdit> edits, CancellationToken token = default)
+    public async Task<DiagramInfo> SaveAsync(DiagramInfo? existing, string name, DiagramLayout layout, IReadOnlyList<IAdministrativeEdit> edits, CancellationToken token = default) =>
+        (await SaveWithLayoutAsync(existing, name, layout, edits, token).ConfigureAwait(false)).Info;
+
+    public sealed record Saved(DiagramInfo Info, DiagramLayout Layout);
+
+    /// <summary>As <see cref="SaveAsync"/>, with the layout as written: the indexes and descriptions read from the catalog inside the save.</summary>
+    public async Task<Saved> SaveWithLayoutAsync(DiagramInfo? existing, string name, DiagramLayout layout, IReadOnlyList<IAdministrativeEdit> edits, CancellationToken token = default)
     {
         name = ValidName(name);
         await using var connection = await OpenAsync(token).ConfigureAwait(false);
@@ -371,7 +423,7 @@ public sealed class DiagramService(string connectionString)
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { throw new InvalidOperationException($"A diagram named {name} already exists in this database. Nothing was saved.", ex); }
         await transaction.CommitAsync(token).ConfigureAwait(false);
-        return saved;
+        return new(saved, layout);
     }
 
     /// <summary>Renames a saved diagram. With expectedVersion (the version an open tab read), a diagram changed or deleted since then is not renamed,

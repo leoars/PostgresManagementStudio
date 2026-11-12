@@ -341,13 +341,13 @@ internal static class DatabaseDiagramChecks
             string[] Items(object? target) => view.FillMenu(new ContextMenu(), target).Items.OfType<MenuItem>().Select(m => m.Name).ToArray();
             view.SelectAt(new Point(T("customers").X + 10, T("customers").Y + 8));
             check(view.SelectedTables.Single() == T("customers"), "Clicking a table title selects the table");
-            check(Items(new DiagramHit(T("customers"), null, DiagramHitPart.Title)).SequenceEqual(["DiagramTableView", "DiagramSetPrimaryKey", "DiagramInsertColumn", "DiagramDeleteColumn", "DiagramDeleteTables", "DiagramRemoveTables", "DiagramAddRelated", "DiagramRelationships", "DiagramIndexes", "DiagramChecks", "DiagramScript", "DiagramProperties", "DiagramDesign"]), "Table menu follows SSMS, plus Design at the end");
+            check(Items(new DiagramHit(T("customers"), null, DiagramHitPart.Title)).SequenceEqual(["DiagramTableView", "DiagramSetPrimaryKey", "DiagramInsertColumn", "DiagramDeleteColumn", "DiagramDeleteTables", "DiagramRemoveTables", "DiagramAddRelated", "DiagramRelationships", "DiagramIndexes", "DiagramChecks", "DiagramTableDescription", "DiagramScript", "DiagramProperties", "DiagramDesign"]), "Table menu follows SSMS, plus Table Description (PGMS-045) and Design at the end");
             var hitLine = view.Lines.Children.OfType<Polyline>().Single(p => p.Tag is DiagramRelation);
             int half = hitLine.Points.Count / 2; var middle = new Point((hitLine.Points[half - 1].X + hitLine.Points[half].X) / 2, (hitLine.Points[half - 1].Y + hitLine.Points[half].Y) / 2);
             check(view.SelectAt(middle) is DiagramRelation && view.SelectedRelation is not null && view.Lines.Children.Contains(hitLine)
                 && view.Lines.Children.OfType<Polyline>().Any(p => p.Tag is null && p.Stroke is SolidColorBrush { Color: { R: 0x00, G: 0x78, B: 0xD7 } }), "Clicking a line selects it in blue and keeps the clicked line, so its context menu opens (found by mouse piloting)");
-            check(Items(view.Relations.Single()).SequenceEqual(["DiagramDeleteRelationship", "DiagramRelationshipProperties"]), "Relationship menu: Delete Relationships from Database, Properties");
-            check(Items(null).SequenceEqual(["DiagramNewTable", "DiagramAddTable", "DiagramNewAnnotation", "DiagramSelectAll", "DiagramShowLabels", "DiagramShowIndexes", "DiagramArrange", "DiagramZoom", "DiagramViewPageBreaks", "DiagramRecalculatePageBreaks", "DiagramCopy", "DiagramRefresh"]), "Empty area menu follows SSMS (capture m4), without Paste, plus Show Indexes and Refresh of PGMS-044");
+            check(Items(view.Relations.Single()).SequenceEqual(["DiagramDeleteRelationship", "DiagramRelationshipDescription", "DiagramRelationshipProperties"]), "Relationship menu: Delete Relationships from Database, Relationship Description (PGMS-045), Properties");
+            check(Items(null).SequenceEqual(["DiagramNewTable", "DiagramAddTable", "DiagramNewAnnotation", "DiagramSelectAll", "DiagramShowLabels", "DiagramShowIndexes", "DiagramArrange", "DiagramZoom", "DiagramViewPageBreaks", "DiagramRecalculatePageBreaks", "DiagramCopy", "DiagramExportForAi", "DiagramMarkdownFunction", "DiagramRefresh"]), "Empty area menu follows SSMS (capture m4), without Paste, plus Show Indexes and Refresh of PGMS-044 and the AI export of PGMS-045");
 
             // Ctrl: the hand drags the visible area; Ctrl + wheel zooms (pedidos do usuário de 07/11/2026).
             var scroller = (ScrollViewer)view.FindName("Scroller");
@@ -801,6 +801,7 @@ internal static class DatabaseDiagramChecks
             check(await window.RenameDiagramAsync(connection, id, "Quarterly"), "The diagram name goes back for the next checks");
             await DiagramEditingChecks.RunAsync(window, connection, check);
             await DiagramIndexUiChecks.RunAsync(window, connection, check);
+            await DiagramDescriptionUiChecks.RunAsync(window, connection, check);
             await ViewDesignerChecks.RunAsync(window, connection, check);
             await QueryDesignerChecks.RunAsync(window, connection, check);
             check(await window.DeleteDiagramAsync(connection, id, "Renamed") && (await service.ListAsync()).Count == 0 && await Scalar("SELECT to_regclass('public.customers') IS NOT NULL") is true, "Delete removes the diagram and keeps its tables");

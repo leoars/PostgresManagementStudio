@@ -165,13 +165,19 @@ public partial class DatabaseDiagramView : UserControl
             Say("Reading diagram…", cancellable: true);
             var service = new DiagramService(connection);
             var diagram = await service.ReadAsync(info?.Id ?? openId!.Value, cancellation.Token);
-            var (designs, missing, indexes) = await service.ReadTablesAndIndexesAsync(diagram.Layout.Tables, [], cancellation.Token);
+            var read = await service.ReadTablesAndIndexesAsync(diagram.Layout.Tables, [], cancellation.Token);
+            var (designs, missing, indexes) = read;
             info = diagram.Info; name = diagram.Info.Name;
             tables.Clear(); dropped.Clear(); selected.Clear(); selectedRelation = null;
             var found = diagram.Layout.Tables.Where(p => !missing.Contains(p.Schema + "." + p.Name)).ToArray();
             for (int i = 0; i < designs.Count && i < found.Length; i++)
             {
-                var table = new DiagramTableModel(designs[i], found[i].X, found[i].Y) { Catalog = indexes.GetValueOrDefault(designs[i].Oid) ?? DiagramTableIndexes.Empty };
+                var table = new DiagramTableModel(designs[i], found[i].X, found[i].Y)
+                {
+                    Catalog = indexes.GetValueOrDefault(designs[i].Oid) ?? DiagramTableIndexes.Empty, CanComment = !read.NotOwned.Contains(designs[i].Oid), SavedDescriptions = found[i].Descriptions
+                };
+                // A description not applied that the catalog now has was applied by someone else: nothing is pending any more.
+                table.Unapplied.AddRange((found[i].Descriptions ?? []).Where(d => !d.Applied && DiagramDescriptions.Text(designs[i], d.Object, d.Name) != (d.Text.Length == 0 ? null : d.Text)));
                 ApplyPlacement(table, found[i]); tables.Add(table);
             }
             showIndexes = diagram.Layout.ShowIndexes;
@@ -194,12 +200,15 @@ public partial class DatabaseDiagramView : UserControl
     }
 
     // ---- State ----
-    private DiagramLayout CurrentLayout() => new()
+    /// <param name="unapplied">Descriptions that the save about to run leaves out (not the owner), by table, added to those the tables already keep.</param>
+    private DiagramLayout CurrentLayout(IReadOnlyDictionary<uint, IReadOnlyList<DiagramDescription>>? unapplied = null) => new()
     {
         Tables = tables.Select(t => new DiagramTablePlacement(t.Schema, t.Name, Math.Round(t.X), Math.Round(t.Y))
         {
             Oid = t.Original.Oid, View = t.View == DiagramTableView.ColumnNames ? null : t.View.ToString(), CustomColumns = t.CustomColumns.SequenceEqual(DiagramColumnFields.Standard) ? null : t.CustomColumns.ToArray(),
-            IndexesExpanded = t.IndexesExpanded
+            IndexesExpanded = t.IndexesExpanded,
+            // Only the descriptions not applied: the save writes the copy of the others from the catalog, so they never make the tab look changed.
+            Descriptions = t.Unapplied.Concat(unapplied?.GetValueOrDefault(t.Original.Oid) ?? []).ToArray() is { Length: > 0 } kept ? DiagramDescriptions.Sorted(kept.Reverse().DistinctBy(d => (d.Object, d.Name))) : null
         }).ToArray(),
         // The indexes are written by DiagramService.SaveAsync from the catalog, so they never make the tab look changed.
         Zoom = zoom, ShowRelationshipLabels = showLabels, ShowIndexes = showIndexes,
@@ -321,12 +330,15 @@ public partial class DatabaseDiagramView : UserControl
                 ToolTip = "Drag to a column of another table to create a relationship."
             };
             // The whole row starts a relationship (pedido do usuário, 08/11/2026); before, only the selector did.
-            row.ToolTip = selector.ToolTip;
+            row.ToolTip = column.Comment is { } described ? described + "\n\n" + selector.ToolTip : selector.ToolTip;
             if (key.Contains(column.Name)) selector.Child = KeyGlyph();
             var text = new TextBlock { Text = column.Name, Margin = new Thickness(5, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center, Tag = new DiagramHit(table, column.Name, DiagramHitPart.Column, DiagramColumnFields.Name) };
             Grid.SetColumn(text, 1);
             row.Children.Add(selector); row.Children.Add(text);
             AddFieldCells(row, table, column, fields, key.Contains(column.Name));
+            // The mark of a described column, in a last column shared by the rows, so the marks line up (PGMS-045).
+            row.ColumnDefinitions.Add(new() { Width = GridLength.Auto, SharedSizeGroup = "DiagramNote" });
+            if (MarkFor(table, DiagramDescription.ColumnObject, column.Name) is { } note) { note.Margin = new Thickness(2, 0, 4, 0); Grid.SetColumn(note, row.ColumnDefinitions.Count - 1); row.Children.Add(note); }
             rowVisuals[(table, column.Name)] = (row, text);
             AutomationProperties.SetName(row, column.Name + (key.Contains(column.Name) ? ", primary key" : ""));
             stack.Children.Add(row);
@@ -464,7 +476,7 @@ public partial class DatabaseDiagramView : UserControl
                 var visible = new Polyline { Points = points, Stroke = on ? SelectedLineBrush : LineBrush, StrokeThickness = 4, StrokeLineJoin = PenLineJoin.Miter, IsHitTestVisible = false };
                 var core = new Polyline { Points = points, Stroke = Brushes.White, StrokeThickness = 2, StrokeLineJoin = PenLineJoin.Miter, IsHitTestVisible = false };
                 LinesLayer.Children.Add(visible); LinesLayer.Children.Add(core); lineVisuals.Add((relation, visible));
-                var hit = new Polyline { Points = points, Stroke = Brushes.Transparent, StrokeThickness = 9, Tag = relation, ToolTip = $"Relationship '{relation.Key.Name}' between '{relation.Primary.Caption}' and '{relation.Foreign.Caption}'" };
+                var hit = new Polyline { Points = points, Stroke = Brushes.Transparent, StrokeThickness = 9, Tag = relation, ToolTip = RelationToolTip(relation) };
                 AutomationProperties.SetName(hit, "Relationship " + relation.Key.Name);
                 LinesLayer.Children.Add(hit);
                 // Each segment can be dragged sideways; the cursor shows the direction (inferred: the SSMS cursor was not captured).
@@ -481,6 +493,7 @@ public partial class DatabaseDiagramView : UserControl
                 // Key at the primary key table, ∞ at the foreign key table.
                 LinesLayer.Children.Add(EndGlyph(route.Points[0], route.PrimaryOut, key: true, relation));
                 LinesLayer.Children.Add(EndGlyph(route.Points[^1], route.ForeignOut, key: false, relation));
+                DrawRelationMark(relation, route);
                 if (showLabels)
                 {
                     int middle = route.Points.Count / 2;
@@ -563,7 +576,7 @@ public partial class DatabaseDiagramView : UserControl
         DependencyObject? found = null;
         VisualTreeHelper.HitTest(Surface, null, result => { found = result.VisualHit; return HitTestResultBehavior.Stop; }, new PointHitTestParameters(point));
         for (var element = found; element is not null && element != Surface; element = VisualTreeHelper.GetParent(element))
-            if (element is FrameworkElement { Tag: DiagramHit or DiagramRelation or DiagramLineEnd or DiagramAnnotation } tagged) return tagged.Tag;
+            if (element is FrameworkElement { Tag: DiagramHit or DiagramRelation or DiagramLineEnd or DiagramAnnotation or DiagramDescriptionHit } tagged) return tagged.Tag;
         return null;
     }
 
@@ -573,6 +586,10 @@ public partial class DatabaseDiagramView : UserControl
         var hit = HitAt(point);
         // An end of a line selects the line, like the line itself.
         if (hit is DiagramLineEnd end) hit = end.Relation;
+        // The mark of a description selects what it describes.
+        if (hit is DiagramDescriptionHit described)
+            hit = described.Object == DiagramDescription.ForeignKeyObject ? Relations.FirstOrDefault(r => r.Foreign == described.Table && r.Key.Name == described.Name)
+                : described.Object == DiagramDescription.ColumnObject ? new DiagramHit(described.Table, described.Name, DiagramHitPart.Column) : new DiagramHit(described.Table, null, DiagramHitPart.Title);
         if (!add || hit is DiagramAnnotation) selectedAnnotation = null;
         switch (hit)
         {
@@ -618,6 +635,8 @@ public partial class DatabaseDiagramView : UserControl
         CancelSlowClick();
         var end = HitAt(point) as DiagramLineEnd;
         var selectedBefore = selectedColumnTable is { } before && selectedColumns.Count == 1 ? (before, selectedColumns.First()) : default((DiagramTableModel, string)?);
+        // A click on the mark of a description opens it after the click is over (PGMS-045).
+        if (!extend && HitAt(point) is DiagramDescriptionHit described) { SelectAt(point); drag = DragMode.None; if (clicks == 1) Dispatcher.BeginInvoke(() => EditDescription(described)); return; }
         var hit = SelectAt(point, extend);
         pendingCell = clicks == 1 && !extend && hit is DiagramHit { Column: { } clicked, Part: DiagramHitPart.Column } cell && selectedBefore == (cell.Table, clicked) ? cell : null;
         // The Indexes header opens and closes on a click (a second click of a double click does nothing); the warning opens Find Unindexed Foreign Keys
@@ -889,6 +908,12 @@ public partial class DatabaseDiagramView : UserControl
                 // Only on a table with the warning (PGMS-044); not in the SSMS menu.
                 if (ShowsWarning(table)) Add("Find Unindexed Foreign Keys…", () => RequestUnindexedForeignKeys(table), "DiagramUnindexedForeignKeys");
                 Separator();
+                // SSMS edits descriptions in the Properties window; the diagram of PGMS edits them here (PGMS-045).
+                Add("Table Description…", () => EditDescription(table, DiagramDescription.TableObject, null), "DiagramTableDescription", enabled: single && !IsBusy);
+                if (target is DiagramHit { Column: { } describedColumn, Part: DiagramHitPart.Column or DiagramHitPart.Selector } && table.Column(describedColumn) is not null)
+                    Add("Column Description…", () => EditDescription(table, DiagramDescription.ColumnObject, describedColumn), "DiagramColumnDescription", enabled: !IsBusy);
+                if (table.Unapplied.Count > 0) Add("Script Unapplied Descriptions…", () => ShowUnappliedScript(table), "DiagramUnappliedDescriptions");
+                Separator();
                 Add("Generate Change Script…", ShowChangeScript, "DiagramScript", "DesignerIconScript", HasSchemaChanges);
                 Separator();
                 Add("Properties", ShowProperties, "DiagramProperties", "DesignerIconProperties", single && !table.IsNew, "Alt+Enter");
@@ -898,6 +923,7 @@ public partial class DatabaseDiagramView : UserControl
             case DiagramRelation relation:
                 Add("Delete Relationships from Database", () => DeleteRelationship(relation), "DiagramDeleteRelationship", "DesignerIconDelete", !relation.Foreign.IsReadOnly);
                 Separator();
+                Add("Relationship Description…", () => EditDescription(relation.Foreign, DiagramDescription.ForeignKeyObject, relation.Key.Name), "DiagramRelationshipDescription", enabled: !IsBusy);
                 Add("Properties", ShowProperties, "DiagramRelationshipProperties", "DesignerIconProperties", gesture: "Alt+Enter");
                 break;
             case DiagramAnnotation note:
@@ -929,6 +955,9 @@ public partial class DatabaseDiagramView : UserControl
                 Add("Recalculate Page Breaks", RecalculatePageBreaks, "DiagramRecalculatePageBreaks");
                 Separator();
                 Add("Copy Diagram to Clipboard", () => CopyDiagram(), "DiagramCopy", enabled: ContentRects().Length > 0);
+                // Export for AI and the optional function are PGMS additions (PGMS-045).
+                Add("Export for AI…", () => _ = ExportForAiAsync(), "DiagramExportForAi", enabled: !IsBusy && tables.Any(t => !t.IsNew));
+                Add("AI Export Function…", () => _ = ManageMarkdownFunctionAsync(), "DiagramMarkdownFunction", enabled: !IsBusy);
                 Separator();
                 Add("Refresh", () => _ = RefreshAsync(), "DiagramRefresh", enabled: !IsBusy && tables.Any(t => !t.IsNew));
                 break;
@@ -966,8 +995,9 @@ public partial class DatabaseDiagramView : UserControl
         {
             Say("Reading tables…", cancellable: true);
             var known = tables.Select(t => t.Original.Oid).ToHashSet();
-            var (designs, missing, indexes) = await new DiagramService(connection).ReadTablesAndIndexesAsync(chosen.Where(c => !known.Contains(c.Oid)).Select(c => new DiagramTablePlacement(c.Schema, c.Name, 0, 0) { Oid = c.Oid }).ToArray(), [], cancellation.Token);
-            var added = designs.Where(d => !known.Contains(d.Oid)).Select(d => new DiagramTableModel(d, 0, 0) { Catalog = indexes.GetValueOrDefault(d.Oid) ?? DiagramTableIndexes.Empty }).ToList();
+            var read = await new DiagramService(connection).ReadTablesAndIndexesAsync(chosen.Where(c => !known.Contains(c.Oid)).Select(c => new DiagramTablePlacement(c.Schema, c.Name, 0, 0) { Oid = c.Oid }).ToArray(), [], cancellation.Token);
+            var (designs, missing, indexes) = read;
+            var added = designs.Where(d => !known.Contains(d.Oid)).Select(d => new DiagramTableModel(d, 0, 0) { Catalog = indexes.GetValueOrDefault(d.Oid) ?? DiagramTableIndexes.Empty, CanComment = !read.NotOwned.Contains(d.Oid) }).ToList();
             tables.AddRange(added);
             Rebuild();
             if (added.Count == 1)
@@ -1302,11 +1332,12 @@ public partial class DatabaseDiagramView : UserControl
             var routes = CurrentLayout().Relationships ?? [];
             bool wasDirty = IsDirty;
             // The indexes of every table are read again, also of tables with pending changes: they come from the catalog and are not edited here.
-            var (designs, _, indexes) = await new DiagramService(connection).ReadTablesAndIndexesAsync(clean.Select(t => new DiagramTablePlacement(t.Schema, t.Name, t.X, t.Y) { Oid = t.Original.Oid }).ToArray(),
+            var reread = await new DiagramService(connection).ReadTablesAndIndexesAsync(clean.Select(t => new DiagramTablePlacement(t.Schema, t.Name, t.X, t.Y) { Oid = t.Original.Oid }).ToArray(),
                 tables.Except(clean).Where(t => !t.IsNew).Select(t => t.Original.Oid).ToArray(), cancellation.Token);
+            var (designs, _, indexes) = reread;
             var byOid = designs.ToDictionary(d => d.Oid);
             foreach (var table in clean) if (byOid.TryGetValue(table.Original.Oid, out var read)) table.Reset(read);
-            foreach (var table in tables) table.Catalog = indexes.GetValueOrDefault(table.Original.Oid) ?? DiagramTableIndexes.Empty;
+            foreach (var table in tables.Where(t => !t.IsNew)) { table.Catalog = indexes.GetValueOrDefault(table.Original.Oid) ?? DiagramTableIndexes.Empty; table.CanComment = !reread.NotOwned.Contains(table.Original.Oid); }
             // Reset makes new key rows: the lines placed by hand are found again by name.
             ApplyRoutes(routes);
             if (!wasDirty) layoutBaseline = LayoutFingerprint();
@@ -1323,7 +1354,7 @@ public partial class DatabaseDiagramView : UserControl
     public DiagramSchemaChanges.Result? BuildChanges()
     {
         CommitEdit();
-        try { return DiagramSchemaChanges.Build(tables.Select(t => (t.Original, t.Current())).ToArray(), dropped); }
+        try { return DiagramSchemaChanges.Build(tables.Select(t => (t.Original, t.Current())).ToArray(), dropped, NotOwned()); }
         catch (ArgumentException ex) { Say(ex.Message); return null; }
     }
     public void ShowChangeScript()
@@ -1355,23 +1386,35 @@ public partial class DatabaseDiagramView : UserControl
         try
         {
             var service = new DiagramService(connection);
-            var saved = await service.SaveAsync(info, chosen, CurrentLayout(), changes.Edits, cancellation.Token);
+            // Descriptions the user cannot apply go into the layout as not applied (PGMS-045); the save writes the copy of the others from the catalog.
+            var written = await service.SaveWithLayoutAsync(info, chosen, CurrentLayout(changes.Unapplied.ToDictionary(u => u.Oid, u => u.Items)), changes.Edits, cancellation.Token);
+            var saved = written.Info;
             info = saved; name = saved.Name;
             var savedLayout = CurrentLayout();
-            var (designs, _, indexes) = await service.ReadTablesAndIndexesAsync(savedLayout.Tables, [], CancellationToken.None);
+            var reread = await service.ReadTablesAndIndexesAsync(savedLayout.Tables, [], CancellationToken.None);
+            var (designs, _, indexes) = reread;
+            var copies = written.Layout.Tables.ToDictionary(t => t.Schema + "." + t.Name, t => t.Descriptions, StringComparer.Ordinal);
             var byOid = designs.ToDictionary(d => d.Oid);
             var byName = designs.ToDictionary(d => d.Schema + "." + d.Name, StringComparer.Ordinal);
             // A table created by this save had no OID when the layout was read: it is found by name.
             var read = tables.ToDictionary(t => t, t => t.IsNew ? byName.GetValueOrDefault(t.Key) : byOid.GetValueOrDefault(t.Original.Oid));
             tables.RemoveAll(t => read[t] is null);
-            foreach (var table in tables) { table.Reset(read[table]!); table.Catalog = indexes.GetValueOrDefault(table.Original.Oid) ?? DiagramTableIndexes.Empty; }
+            foreach (var table in tables)
+            {
+                table.Reset(read[table]!); table.Catalog = indexes.GetValueOrDefault(table.Original.Oid) ?? DiagramTableIndexes.Empty; table.CanComment = !reread.NotOwned.Contains(table.Original.Oid);
+                table.SavedDescriptions = copies.GetValueOrDefault(table.Key);
+                table.Unapplied.Clear(); table.Unapplied.AddRange((table.SavedDescriptions ?? []).Where(d => !d.Applied));
+            }
             // Reset makes new key rows: the lines placed by hand are found again by name.
             ApplyRoutes(savedLayout.Relationships);
             dropped.Clear();
             layoutBaseline = LayoutFingerprint();
             Rebuild();
-            Say("Diagram saved.");
+            Say(changes.Unapplied.Count == 0 ? "Diagram saved." : "Diagram saved. Descriptions of tables you do not own were kept only in the diagram, marked as not applied.");
             Saved?.Invoke(changes.Edits.Count > 0);
+            if (changes.Unapplied.Count > 0)
+                ShowUnappliedScript("These descriptions were not applied: only the owner of a table can change its descriptions. They are kept in the diagram, marked as not applied. Send this script to the owner, or to someone who can run it.",
+                    changes.Unapplied.SelectMany(u => u.Statements).ToArray());
             return true;
         }
         catch (OperationCanceledException) { Say("Save canceled. The transaction was rolled back."); return false; }

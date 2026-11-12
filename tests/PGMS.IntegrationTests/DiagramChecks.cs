@@ -70,8 +70,8 @@ internal static class DiagramChecks
         var first = await diagrams.SaveAsync(null, " Diagram_0 ", layout, []);
         check(first.Name == "Diagram_0" && first.Version == 1 && first.Owner == new NpgsqlConnectionStringBuilder(connection).Username, "A new diagram is saved with its trimmed name, owner and version 1");
         var read = await diagrams.ReadAsync(first.Id);
-        // The save adds the indexes of each table from the catalog (PGMS-044); the rest comes back as written.
-        check(read.Layout.Tables.Select(t => t with { Indexes = null, UnindexedForeignKeys = null }).SequenceEqual(layout.Tables) && read.Layout.Tables.All(t => t.Indexes is not null) && read.Layout.Zoom == 0.75 && read.Layout.ShowRelationshipLabels, "Reading a diagram returns the same tables, positions and zoom");
+        // The save adds the indexes (PGMS-044) and descriptions (PGMS-045) of each table from the catalog; the rest comes back as written.
+        check(read.Layout.Tables.Select(t => t with { Indexes = null, UnindexedForeignKeys = null, Descriptions = null }).SequenceEqual(layout.Tables) && read.Layout.Tables.All(t => t.Indexes is not null && t.Descriptions is not null) && read.Layout.Zoom == 0.75 && read.Layout.ShowRelationshipLabels, "Reading a diagram returns the same tables, positions and zoom");
         string definition = (string)(await Scalar($"SELECT definition::text FROM pgms.diagrams WHERE diagram_id={first.Id}"))!;
         check(!definition.Contains("secret") && definition.Contains("\"tables\"") && definition.Contains("\"customers\""), "The stored definition has the layout and never table data");
         var listed = await catalog.ChildrenAsync(folders[0]);
@@ -179,6 +179,7 @@ internal static class DiagramChecks
         check(DiagramLayout.FromJson("{\"tables\":[{\"schema\":\"public\",\"name\":\"a\",\"x\":1,\"y\":2}],\"zoom\":1}") is { Annotations.Count: 0, ShowPageBreaks: false } old && old.Tables[0].View is null, "A diagram saved before stage 2 still opens");
 
         await DiagramIndexChecks.RunAsync(connection, check);
+        await DiagramDescriptionChecks.RunAsync(connection, check);
 
         // Delete.
         await diagrams.DeleteAsync(other.Id);

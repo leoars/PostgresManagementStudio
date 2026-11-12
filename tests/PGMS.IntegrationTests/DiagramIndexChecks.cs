@@ -89,8 +89,8 @@ internal static class DiagramIndexChecks
         {
             var root = document.RootElement;
             var first = root.GetProperty("tables")[0];
-            check(root.GetProperty("format").GetInt32() == 2 && root.GetProperty("catalogRead").ValueKind == JsonValueKind.String && !root.GetProperty("showIndexes").GetBoolean() && first.GetProperty("indexesExpanded").GetBoolean(),
-                "The saved diagram is format 2, with when the indexes were read, Show Indexes and the open sections");
+            check(root.GetProperty("format").GetInt32() == DiagramLayout.CurrentFormat && root.GetProperty("catalogRead").ValueKind == JsonValueKind.String && !root.GetProperty("showIndexes").GetBoolean() && first.GetProperty("indexesExpanded").GetBoolean(),
+                "The saved diagram is in the current format, with when the indexes were read, Show Indexes and the open sections");
             var trgmJson = first.GetProperty("indexes").EnumerateArray().Single(i => i.GetProperty("name").GetString() == "authors_name_trgm");
             check(trgmJson.GetProperty("method").GetString() == "gin" && trgmJson.GetProperty("keys")[0].GetProperty("operatorClass").GetString() == "gin_trgm_ops" && trgmJson.GetProperty("definition").GetString()!.Contains("gin_trgm_ops"),
                 "The saved diagram has each index with method, keys, operator class and definition");
@@ -99,7 +99,7 @@ internal static class DiagramIndexChecks
             check(!saved0.TryGetProperty("methodLabel", out _) && !saved0.TryGetProperty("kind", out _) && !saved0.TryGetProperty("flags", out _) && !saved0.GetProperty("keys")[0].TryGetProperty("text", out _), "Only catalog facts are saved, not the labels of the screen");
         }
         var reread = await diagrams.ReadAsync(saved.Id);
-        check(reread.Layout is { Format: 2, ShowIndexes: false } && reread.Layout.Tables[0].IndexesExpanded && reread.Layout.Tables[0].Indexes!.Count == authors.Count && reread.Layout.Tables[0].Indexes![0].Keys[0].Column == "id", "Reading the diagram returns the saved indexes");
+        check(reread.Layout is { Format: DiagramLayout.CurrentFormat, ShowIndexes: false } && reread.Layout.Tables[0].IndexesExpanded && reread.Layout.Tables[0].Indexes!.Count == authors.Count && reread.Layout.Tables[0].Indexes![0].Keys[0].Column == "id", "Reading the diagram returns the saved indexes");
 
         // The same catalog gives the same JSON; a schema change saved with the diagram is in the JSON of that save.
         var again = await diagrams.SaveAsync(saved, "Indexes", reread.Layout, []);
@@ -118,8 +118,8 @@ internal static class DiagramIndexChecks
         check(old.Layout is { Format: 1, ShowIndexes: true, CatalogRead: null } && old.Layout.Tables.Single() is { IndexesExpanded: false, Indexes: null, UnindexedForeignKeys: null }, "A format 1 diagram opens with Show Indexes on, sections closed and no saved indexes");
         await diagrams.SaveAsync(old.Info, "Old", old.Layout, []);
         var upgraded = await diagrams.ReadAsync(oldId);
-        check(upgraded.Layout.Format == 2 && upgraded.Layout.Tables.Single().Indexes!.Single().Name == "reviews_book" && upgraded.Layout.Tables.Single().Oid != 0, "The next save writes it as format 2 with the indexes and the OID of the table");
-        check(DiagramLayout.FromJson("""{"format":3,"tables":[],"zoom":1,"later":{"a":1}}""").Format == 3, "A diagram from a newer format still opens");
+        check(upgraded.Layout.Format == DiagramLayout.CurrentFormat && upgraded.Layout.Tables.Single().Indexes!.Single().Name == "reviews_book" && upgraded.Layout.Tables.Single().Oid != 0, "The next save writes it in the current format with the indexes and the OID of the table");
+        check(DiagramLayout.FromJson("""{"format":99,"tables":[],"zoom":1,"later":{"a":1}}""").Format == 99, "A diagram from a newer format still opens");
         await diagrams.DeleteAsync(oldId); await diagrams.DeleteAsync(saved.Id);
         await Sql("DROP SCHEMA ix CASCADE");
     }

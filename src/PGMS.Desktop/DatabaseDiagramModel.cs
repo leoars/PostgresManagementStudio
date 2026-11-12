@@ -55,6 +55,14 @@ public sealed class DiagramTableModel
     public DiagramTableIndexes Catalog { get; set; } = DiagramTableIndexes.Empty;
     /// <summary>The Indexes section is open; it starts closed (decisão do usuário, 11/11/2026).</summary>
     public bool IndexesExpanded { get; set; }
+    /// <summary>The description of the table (COMMENT ON TABLE) as edited in the diagram (PGMS-045); Save writes it.</summary>
+    public string? Comment { get; set; }
+    /// <summary>The user owns the table (or is a member of its owner), so PostgreSQL lets them change its descriptions.</summary>
+    public bool CanComment { get; set; } = true;
+    /// <summary>The copy of the descriptions saved in the diagram, as the diagram was opened or last saved; null when the diagram had none (older format, or not saved).</summary>
+    public IReadOnlyList<DiagramDescription>? SavedDescriptions { get; set; }
+    /// <summary>Descriptions the user could not apply (not the owner), kept in the diagram until the catalog has them or the user discards them.</summary>
+    public List<DiagramDescription> Unapplied { get; } = [];
 
     public DiagramTableModel(TableDesign design, double x, double y) { Original = design; X = x; Y = y; Reset(design); }
 
@@ -86,6 +94,7 @@ public sealed class DiagramTableModel
     public void Reset(TableDesign design)
     {
         Original = design;
+        Comment = design.Comment;
         Columns.Clear(); Indexes.Clear(); ForeignKeys.Clear(); Checks.Clear();
         Columns.AddRange(design.Columns);
         Indexes.AddRange(design.Indexes.Select(i => new DesignerIndexRow(i)));
@@ -96,7 +105,7 @@ public sealed class DiagramTableModel
 
     public TableDesign Current() => Original with
     {
-        Columns = Columns.ToArray(), Indexes = Indexes.Select(i => i.ToDesign()).ToArray(), ForeignKeys = ForeignKeys.Select(f => f.ToDesign()).ToArray(), Checks = Checks.Select(c => c.ToDesign()).ToArray()
+        Comment = Comment, Columns = Columns.ToArray(), Indexes = Indexes.Select(i => i.ToDesign()).ToArray(), ForeignKeys = ForeignKeys.Select(f => f.ToDesign()).ToArray(), Checks = Checks.Select(c => c.ToDesign()).ToArray()
     };
     public bool SchemaChanged => IsNew || Current().Fingerprint != baseline;
     public string UniqueName(string name) => DesignerObjectKinds.UniqueName(name, Indexes, ForeignKeys, Checks);
