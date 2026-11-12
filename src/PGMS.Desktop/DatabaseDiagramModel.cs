@@ -51,6 +51,10 @@ public sealed class DiagramTableModel
     public double Y { get; set; }
     public DiagramTableView View { get; set; }
     public List<string> CustomColumns { get; } = [.. DiagramColumnFields.Standard];
+    /// <summary>The indexes of the table as the catalog has them (PGMS-044): what the Indexes section shows. Pending changes of Indexes/Keys are not here until saved.</summary>
+    public DiagramTableIndexes Catalog { get; set; } = DiagramTableIndexes.Empty;
+    /// <summary>The Indexes section is open; it starts closed (decisão do usuário, 11/11/2026).</summary>
+    public bool IndexesExpanded { get; set; }
 
     public DiagramTableModel(TableDesign design, double x, double y) { Original = design; X = x; Y = y; Reset(design); }
 
@@ -63,14 +67,15 @@ public sealed class DiagramTableModel
     /// <summary>Made with New Table in this diagram and not saved yet.</summary>
     public bool IsNew => Original.Oid == 0;
     public IReadOnlyList<string> Fields => View switch { DiagramTableView.Standard => DiagramColumnFields.Standard, DiagramTableView.Custom => CustomColumns, _ => [] };
-    /// <summary>The rows of the current Table View. Keys shows the columns of the primary key, the unique keys and the foreign keys (inferred).</summary>
+    /// <summary>The rows of the current Table View. Keys shows the columns of the keys and of every index, as SSMS 22.11 does (pilotagem de 11/11/2026,
+    /// docs/MARCO-M1061.md: a column used only in the WHERE of a filtered index stays out); the columns of the foreign keys are inferred.</summary>
     public IReadOnlyList<DesignColumn> VisibleColumns
     {
         get
         {
             if (View == DiagramTableView.NameOnly) return [];
             if (View != DiagramTableView.Keys) return Columns;
-            var keys = Indexes.Where(i => i.Kind != DesignIndexKind.Index).SelectMany(i => i.Columns.Select(c => c.Name)).Concat(ForeignKeys.SelectMany(k => k.Columns)).ToHashSet(StringComparer.Ordinal);
+            var keys = Indexes.SelectMany(i => i.Columns.Select(c => c.Name)).Concat(ForeignKeys.SelectMany(k => k.Columns)).ToHashSet(StringComparer.Ordinal);
             return Columns.Where(c => keys.Contains(c.Name)).ToArray();
         }
     }

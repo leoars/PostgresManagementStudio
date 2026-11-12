@@ -1,0 +1,35 @@
+<Window x:Class="PGMS.Desktop.ForeignKeyIndexScanWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop" Title="Unindexed Foreign Keys" Width="1180" Height="640" MinWidth="820" MinHeight="460" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#F5F5F5" Closing="OnClosing">
+ <Grid Margin="10">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="120"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel>
+   <TextBlock TextWrapping="Wrap" Text="Lists foreign keys whose columns have no index. PostgreSQL does not create one, so deleting a parent row, or changing its key, scans the whole child table. Scan reads the catalog and the statistics only, never the rows. Not every key needs an index: a small table, or a parent that is never deleted, may not be worth the cost on writes."/>
+   <StackPanel Orientation="Horizontal" Margin="0,8">
+    <Button x:Name="ScanButton" Content="_Scan" Click="Scan" Padding="16,3"/>
+    <Button x:Name="SelectAllButton" Content="Select _All" Click="SelectAll" IsEnabled="False" Padding="12,3" Margin="18,0,0,0"/>
+    <CheckBox x:Name="Concurrently" Content="Create _concurrently" IsChecked="True" Click="ConcurrentlyChanged" VerticalAlignment="Center" Margin="18,0,0,0" ToolTip="Checked: one index at a time, without blocking writes; a failure stops there. Unchecked: all in one transaction, blocking writes on each table while its index is built."/>
+    <TextBlock x:Name="ScanStatus" VerticalAlignment="Center" Margin="12,0,0,0" TextTrimming="CharacterEllipsis" Text="Not scanned."/>
+   </StackPanel>
+  </StackPanel>
+  <DataGrid local:DataGridRowNames.Enabled="True" x:Name="Keys" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" RowHeight="23" SelectionMode="Single" AutomationProperties.Name="Foreign keys without an index">
+   <DataGrid.Columns>
+    <DataGridCheckBoxColumn Header="" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Width="28"/>
+    <DataGridTextColumn Header="Table and columns" Binding="{Binding Source}" IsReadOnly="True" Width="2*"/>
+    <DataGridTextColumn Header="Foreign key" Binding="{Binding Key.Key.Name}" IsReadOnly="True" Width="*"/>
+    <DataGridTextColumn Header="References" Binding="{Binding Target}" IsReadOnly="True" Width="*"/>
+    <DataGridTextColumn Header="Table size" Binding="{Binding Size}" IsReadOnly="True" Width="80" SortMemberPath="Key.Key.TableBytes"/>
+    <DataGridTextColumn Header="Rows (estimate)" Binding="{Binding EstimatedRows}" IsReadOnly="True" Width="100" SortMemberPath="Key.Key.EstimatedRows"/>
+    <DataGridTextColumn Header="Parent deletes" Binding="{Binding ParentDeletes}" IsReadOnly="True" Width="95" SortMemberPath="Key.Key.ParentDeletes"/>
+    <DataGridTextColumn Header="Parent updates" Binding="{Binding ParentUpdates}" IsReadOnly="True" Width="95" SortMemberPath="Key.Key.ParentUpdates"/>
+    <DataGridTextColumn Header="Indexes that do not cover it" Binding="{Binding NearIndexes}" IsReadOnly="True" Width="2*"/>
+    <DataGridTextColumn Header="Result" Binding="{Binding Result}" IsReadOnly="True" Width="2*"/>
+   </DataGrid.Columns>
+  </DataGrid>
+  <TextBlock Grid.Row="2" Text="Script of the selected indexes" FontWeight="SemiBold" Margin="0,8,0,3"/>
+  <TextBox x:Name="Script" Grid.Row="3" IsReadOnly="True" FontFamily="Consolas" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Script of the selected indexes"/>
+  <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+   <Button x:Name="OpenScriptButton" Content="_Open Script in Query" Click="OpenScript" IsEnabled="False" Padding="12,4"/>
+   <Button x:Name="ApplyButton" Content="A_pply…" Click="Apply" IsEnabled="False" Padding="20,4" Margin="8,0,0,0"/>
+   <Button Content="Close" IsCancel="True" Padding="16,4" Margin="8,0,0,0"/>
+  </StackPanel>
+ </Grid>
+</Window>

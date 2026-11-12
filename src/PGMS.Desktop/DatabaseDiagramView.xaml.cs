@@ -12,7 +12,7 @@ using Path = System.Windows.Shapes.Path;
 
 namespace PGMS.Desktop;
 
-public enum DiagramHitPart { Title, Column, Selector, Body }
+public enum DiagramHitPart { Title, Column, Selector, Body, IndexHeader, Index, Warning }
 /// <summary>What the mouse is over in a diagram: a part of a table box, with the column when it is a row.</summary>
 public sealed record DiagramHit(DiagramTableModel Table, string? Column, DiagramHitPart Part, string? Field = null);
 /// <summary>The key (Key = true) or ∞ end of a relationship line, dragged to change the side of the table it meets.</summary>
@@ -45,7 +45,7 @@ public partial class DatabaseDiagramView : UserControl
     private DiagramRelation? selectedRelation;
     private DiagramInfo? info;
     private string name, layoutBaseline = "";
-    private bool showLabels, loadedOnce, updatingZoom;
+    private bool showLabels, loadedOnce, updatingZoom, showIndexes = true;
     private double zoom = 1;
     private int cascade;
     private CancellationTokenSource? operation;
@@ -165,11 +165,16 @@ public partial class DatabaseDiagramView : UserControl
             Say("Reading diagram…", cancellable: true);
             var service = new DiagramService(connection);
             var diagram = await service.ReadAsync(info?.Id ?? openId!.Value, cancellation.Token);
-            var (designs, missing) = await service.ReadTablesAsync(diagram.Layout.Tables, cancellation.Token);
+            var (designs, missing, indexes) = await service.ReadTablesAndIndexesAsync(diagram.Layout.Tables, [], cancellation.Token);
             info = diagram.Info; name = diagram.Info.Name;
             tables.Clear(); dropped.Clear(); selected.Clear(); selectedRelation = null;
             var found = diagram.Layout.Tables.Where(p => !missing.Contains(p.Schema + "." + p.Name)).ToArray();
-            for (int i = 0; i < designs.Count && i < found.Length; i++) { var table = new DiagramTableModel(designs[i], found[i].X, found[i].Y); ApplyPlacement(table, found[i]); tables.Add(table); }
+            for (int i = 0; i < designs.Count && i < found.Length; i++)
+            {
+                var table = new DiagramTableModel(designs[i], found[i].X, found[i].Y) { Catalog = indexes.GetValueOrDefault(designs[i].Oid) ?? DiagramTableIndexes.Empty };
+                ApplyPlacement(table, found[i]); tables.Add(table);
+            }
+            showIndexes = diagram.Layout.ShowIndexes;
             annotations.Clear(); annotations.AddRange((diagram.Layout.Annotations ?? []).Select(a => new DiagramAnnotation(a.Text, a.X, a.Y)));
             showPageBreaks = diagram.Layout.ShowPageBreaks;
             pageSize = diagram.Layout.PageWidth > 0 && diagram.Layout.PageHeight > 0 ? new Size(diagram.Layout.PageWidth, diagram.Layout.PageHeight) : null;
@@ -180,7 +185,8 @@ public partial class DatabaseDiagramView : UserControl
             Rebuild(); ApplyZoom();
             // Tables dropped elsewhere leave the layout changed, so the tab shows * until the diagram is saved again.
             layoutBaseline = missing.Count == 0 ? LayoutFingerprint() : "";
-            Say(missing.Count == 0 ? "" : "Tables no longer in the database were removed from the diagram: " + string.Join(", ", missing) + ".");
+            string newer = diagram.Layout.Format > DiagramLayout.CurrentFormat ? $"This diagram was saved by a newer version of PGMS (format {diagram.Layout.Format}); saving it here keeps only what this version knows. " : "";
+            Say(newer + (missing.Count == 0 ? "" : "Tables no longer in the database were removed from the diagram: " + string.Join(", ", missing) + "."));
         }
         catch (OperationCanceledException) { Say("Reading canceled."); }
         catch (Exception ex) when (ex is NpgsqlException or IOException or TimeoutException or InvalidOperationException) { Say("The diagram could not be read: " + Message(ex)); }
@@ -192,9 +198,11 @@ public partial class DatabaseDiagramView : UserControl
     {
         Tables = tables.Select(t => new DiagramTablePlacement(t.Schema, t.Name, Math.Round(t.X), Math.Round(t.Y))
         {
-            Oid = t.Original.Oid, View = t.View == DiagramTableView.ColumnNames ? null : t.View.ToString(), CustomColumns = t.CustomColumns.SequenceEqual(DiagramColumnFields.Standard) ? null : t.CustomColumns.ToArray()
+            Oid = t.Original.Oid, View = t.View == DiagramTableView.ColumnNames ? null : t.View.ToString(), CustomColumns = t.CustomColumns.SequenceEqual(DiagramColumnFields.Standard) ? null : t.CustomColumns.ToArray(),
+            IndexesExpanded = t.IndexesExpanded
         }).ToArray(),
-        Zoom = zoom, ShowRelationshipLabels = showLabels,
+        // The indexes are written by DiagramService.SaveAsync from the catalog, so they never make the tab look changed.
+        Zoom = zoom, ShowRelationshipLabels = showLabels, ShowIndexes = showIndexes,
         Annotations = annotations.Select(a => new DiagramAnnotationPlacement(a.Text, Math.Round(a.X), Math.Round(a.Y))).ToArray(),
         ShowPageBreaks = showPageBreaks, PageWidth = pageSize?.Width ?? 0, PageHeight = pageSize?.Height ?? 0,
         Relationships = Relations.Where(r => manualRoutes.ContainsKey(r.Key)).Select(r =>
@@ -297,7 +305,7 @@ public partial class DatabaseDiagramView : UserControl
     {
         var stack = new StackPanel();
         var caption = new TextBlock { Text = TableTitle(table), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
-        var title = new Border { Background = TitleBrush, Padding = new Thickness(5, 2, 8, 3), Child = caption, Tag = new DiagramHit(table, null, DiagramHitPart.Title), Cursor = Cursors.SizeAll };
+        var title = new Border { Background = TitleBrush, Padding = new Thickness(5, 2, 8, 3), Child = TitleContent(table, caption), Tag = new DiagramHit(table, null, DiagramHitPart.Title), Cursor = Cursors.SizeAll };
         stack.Children.Add(title);
         var key = table.PrimaryKey.ToHashSet(StringComparer.Ordinal);
         var fields = table.Fields;
@@ -323,6 +331,7 @@ public partial class DatabaseDiagramView : UserControl
             AutomationProperties.SetName(row, column.Name + (key.Contains(column.Name) ? ", primary key" : ""));
             stack.Children.Add(row);
         }
+        if (ShowsIndexSection(table)) AddIndexSection(stack, table);
         var box = new Border { BorderBrush = FrameBrush, BorderThickness = new Thickness(FrameWidth), Background = Brushes.White, Child = stack, MinWidth = 130, MaxWidth = fields.Count > 0 ? 760 : 360, SnapsToDevicePixels = true, Tag = new DiagramHit(table, null, DiagramHitPart.Body) };
         AutomationProperties.SetName(box, "Table " + table.Caption);
         return (box, title, caption);
@@ -611,13 +620,18 @@ public partial class DatabaseDiagramView : UserControl
         var selectedBefore = selectedColumnTable is { } before && selectedColumns.Count == 1 ? (before, selectedColumns.First()) : default((DiagramTableModel, string)?);
         var hit = SelectAt(point, extend);
         pendingCell = clicks == 1 && !extend && hit is DiagramHit { Column: { } clicked, Part: DiagramHitPart.Column } cell && selectedBefore == (cell.Table, clicked) ? cell : null;
+        // The Indexes header opens and closes on a click (a second click of a double click does nothing); the warning opens Find Unindexed Foreign Keys
+        // after the click is over, so the window never opens under a pressed button.
+        if (!extend && hit is DiagramHit { Part: DiagramHitPart.IndexHeader } header) { drag = DragMode.None; if (clicks == 1) ToggleIndexSection(header.Table); return; }
+        if (!extend && hit is DiagramHit { Part: DiagramHitPart.Warning }) { drag = DragMode.None; if (clicks == 1) Dispatcher.BeginInvoke(RequestUnindexedForeignKeys); return; }
         // Double click on a line opens its properties (pedido do usuário, 08/11/2026), as Alt+Enter does.
         if (clicks == 2 && DoubleClick(hit)) { drag = DragMode.None; return; }
         dragStart = point; moved = false; dragOrigins.Clear(); drag = DragMode.None;
         if (extend && hit is not null) return;
         pressedTable = (hit as DiagramHit)?.Table;
         if (hit is DiagramHit { Column: not null, Part: DiagramHitPart.Selector or DiagramHitPart.Column } column) { drag = DragMode.Column; StartColumnDrag(column, point); }
-        else if (hit is DiagramHit { Part: DiagramHitPart.Title } && selected.Count > 0) { drag = DragMode.Move; foreach (var table in selected) dragOrigins[table] = new(table.X, table.Y); }
+        // An index row moves the table like its title: it is read only, so there is nothing else to drag.
+        else if (hit is DiagramHit { Part: DiagramHitPart.Title or DiagramHitPart.Index } && selected.Count > 0) { drag = DragMode.Move; foreach (var table in selected) dragOrigins[table] = new(table.X, table.Y); }
         else if (hit is DiagramRelation relation && StartLineDrag(relation, point, end?.Key)) drag = DragMode.Line;
         else if (hit is DiagramAnnotation note) { drag = DragMode.Annotation; noteOrigin = new(note.X, note.Y); }
         else if (hit is null) { drag = DragMode.Marquee; marqueeBase = selected.ToArray(); }
@@ -632,6 +646,11 @@ public partial class DatabaseDiagramView : UserControl
         switch (hit)
         {
             case DiagramRelation relation: selected.Clear(); selectedRelation = relation; break;
+            case DiagramHit { Part: DiagramHitPart.Index, Field: { } index } row:
+                // A double click on an index opens Indexes/Keys on it, the dialog where indexes are changed.
+                selectedRelation = null; selected.Clear(); selected.Add(row.Table); RefreshTitles(); RefreshLineSelection();
+                ShowIndexes(row.Table, index);
+                return true;
             case DiagramHit table: selectedRelation = null; selected.Clear(); selected.Add(table.Table); break;
             case DiagramAnnotation note: BeginNoteEdit(note); return true;
             default: return false;
@@ -864,8 +883,11 @@ public partial class DatabaseDiagramView : UserControl
                 Add("Add Related Tables", () => _ = AddRelatedTablesAsync(), "DiagramAddRelated", enabled: !IsBusy);
                 Separator();
                 Add("Relationships…", () => ShowRelationships(table), "DiagramRelationships", "DesignerIconRelationships", single);
-                Add("Indexes/Keys…", () => ShowIndexes(table), "DiagramIndexes", "DesignerIconIndexes", single);
+                string? onIndex = target is DiagramHit { Part: DiagramHitPart.Index, Field: var clickedIndex } ? clickedIndex : null;
+                Add("Indexes/Keys…", () => ShowIndexes(table, onIndex), "DiagramIndexes", "DesignerIconIndexes", single);
                 Add("Check Constraints…", () => ShowChecks(table), "DiagramChecks", "DesignerIconChecks", single);
+                // Only on a table with the warning (PGMS-044); not in the SSMS menu.
+                if (ShowsWarning(table)) Add("Find Unindexed Foreign Keys…", RequestUnindexedForeignKeys, "DiagramUnindexedForeignKeys");
                 Separator();
                 Add("Generate Change Script…", ShowChangeScript, "DiagramScript", "DesignerIconScript", HasSchemaChanges);
                 Separator();
@@ -890,6 +912,8 @@ public partial class DatabaseDiagramView : UserControl
                 Separator();
                 Add("Select All", SelectAll, "DiagramSelectAll", enabled: tables.Count > 0, gesture: "Ctrl+A");
                 Add("Show Relationship Labels", ToggleLabels, "DiagramShowLabels").IsChecked = showLabels;
+                // Show Indexes and Refresh are PGMS additions (PGMS-044): SSMS shows no index in a diagram and has no Refresh in this menu.
+                Add("Show Indexes", ToggleIndexes, "DiagramShowIndexes").IsChecked = showIndexes;
                 Separator();
                 Add("Arrange Tables", ArrangeTables, "DiagramArrange", enabled: tables.Count > 0);
                 var zoomMenu = new MenuItem { Header = "Zoom", Name = "DiagramZoom" };
@@ -905,6 +929,8 @@ public partial class DatabaseDiagramView : UserControl
                 Add("Recalculate Page Breaks", RecalculatePageBreaks, "DiagramRecalculatePageBreaks");
                 Separator();
                 Add("Copy Diagram to Clipboard", () => CopyDiagram(), "DiagramCopy", enabled: ContentRects().Length > 0);
+                Separator();
+                Add("Refresh", () => _ = RefreshAsync(), "DiagramRefresh", enabled: !IsBusy && tables.Any(t => !t.IsNew));
                 break;
         }
         return menu;
@@ -940,8 +966,8 @@ public partial class DatabaseDiagramView : UserControl
         {
             Say("Reading tables…", cancellable: true);
             var known = tables.Select(t => t.Original.Oid).ToHashSet();
-            var (designs, missing) = await new DiagramService(connection).ReadTablesAsync(chosen.Where(c => !known.Contains(c.Oid)).Select(c => new DiagramTablePlacement(c.Schema, c.Name, 0, 0) { Oid = c.Oid }).ToArray(), cancellation.Token);
-            var added = designs.Where(d => !known.Contains(d.Oid)).Select(d => new DiagramTableModel(d, 0, 0)).ToList();
+            var (designs, missing, indexes) = await new DiagramService(connection).ReadTablesAndIndexesAsync(chosen.Where(c => !known.Contains(c.Oid)).Select(c => new DiagramTablePlacement(c.Schema, c.Name, 0, 0) { Oid = c.Oid }).ToArray(), [], cancellation.Token);
+            var added = designs.Where(d => !known.Contains(d.Oid)).Select(d => new DiagramTableModel(d, 0, 0) { Catalog = indexes.GetValueOrDefault(d.Oid) ?? DiagramTableIndexes.Empty }).ToList();
             tables.AddRange(added);
             Rebuild();
             if (added.Count == 1)
@@ -1052,7 +1078,9 @@ public partial class DatabaseDiagramView : UserControl
         Rebuild(); Touch();
     }
     public void ShowRelationships(DiagramTableModel table, DesignerForeignKeyRow? select = null) => ShowObjects(table, RelationshipsKind(table), select);
-    public void ShowIndexes(DiagramTableModel table) => ShowObjects(table, DesignerObjectKinds.Indexes(table.Indexes, () => table.UniqueName($"ix_{table.Name}"), () => table.Columns.FirstOrDefault()?.Name, Touch, () => { }));
+    /// <summary>Indexes/Keys of the table; select names the index to show first (an index row of the Indexes section), when the dialog still has it.</summary>
+    public void ShowIndexes(DiagramTableModel table, string? select = null) => ShowObjects(table, DesignerObjectKinds.Indexes(table.Indexes, () => table.UniqueName($"ix_{table.Name}"), () => table.Columns.FirstOrDefault()?.Name, Touch, () => { }),
+        select is null ? null : table.Indexes.FirstOrDefault(i => i.Name == select));
     public void ShowChecks(DiagramTableModel table) => ShowObjects(table, DesignerObjectKinds.Checks(table.Checks, () => table.UniqueName($"ck_{table.Name}"), Touch));
 
     /// <summary>Properties (Alt+Enter): Table Properties of the selected table, or the selected relationship in Foreign Key Relationships.</summary>
@@ -1273,9 +1301,12 @@ public partial class DatabaseDiagramView : UserControl
         {
             var routes = CurrentLayout().Relationships ?? [];
             bool wasDirty = IsDirty;
-            var (designs, _) = await new DiagramService(connection).ReadTablesAsync(clean.Select(t => new DiagramTablePlacement(t.Schema, t.Name, t.X, t.Y) { Oid = t.Original.Oid }).ToArray(), cancellation.Token);
+            // The indexes of every table are read again, also of tables with pending changes: they come from the catalog and are not edited here.
+            var (designs, _, indexes) = await new DiagramService(connection).ReadTablesAndIndexesAsync(clean.Select(t => new DiagramTablePlacement(t.Schema, t.Name, t.X, t.Y) { Oid = t.Original.Oid }).ToArray(),
+                tables.Except(clean).Where(t => !t.IsNew).Select(t => t.Original.Oid).ToArray(), cancellation.Token);
             var byOid = designs.ToDictionary(d => d.Oid);
             foreach (var table in clean) if (byOid.TryGetValue(table.Original.Oid, out var read)) table.Reset(read);
+            foreach (var table in tables) table.Catalog = indexes.GetValueOrDefault(table.Original.Oid) ?? DiagramTableIndexes.Empty;
             // Reset makes new key rows: the lines placed by hand are found again by name.
             ApplyRoutes(routes);
             if (!wasDirty) layoutBaseline = LayoutFingerprint();
@@ -1327,13 +1358,13 @@ public partial class DatabaseDiagramView : UserControl
             var saved = await service.SaveAsync(info, chosen, CurrentLayout(), changes.Edits, cancellation.Token);
             info = saved; name = saved.Name;
             var savedLayout = CurrentLayout();
-            var (designs, _) = await service.ReadTablesAsync(savedLayout.Tables, CancellationToken.None);
+            var (designs, _, indexes) = await service.ReadTablesAndIndexesAsync(savedLayout.Tables, [], CancellationToken.None);
             var byOid = designs.ToDictionary(d => d.Oid);
             var byName = designs.ToDictionary(d => d.Schema + "." + d.Name, StringComparer.Ordinal);
             // A table created by this save had no OID when the layout was read: it is found by name.
             var read = tables.ToDictionary(t => t, t => t.IsNew ? byName.GetValueOrDefault(t.Key) : byOid.GetValueOrDefault(t.Original.Oid));
             tables.RemoveAll(t => read[t] is null);
-            foreach (var table in tables) table.Reset(read[table]!);
+            foreach (var table in tables) { table.Reset(read[table]!); table.Catalog = indexes.GetValueOrDefault(table.Original.Oid) ?? DiagramTableIndexes.Empty; }
             // Reset makes new key rows: the lines placed by hand are found again by name.
             ApplyRoutes(savedLayout.Relationships);
             dropped.Clear();

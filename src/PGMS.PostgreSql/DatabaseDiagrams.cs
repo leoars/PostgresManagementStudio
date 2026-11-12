@@ -13,6 +13,13 @@ public sealed record DiagramTablePlacement(string Schema, string Name, double X,
     public string? View { get; init; }
     /// <summary>The fields of the Custom view, when they differ from the default.</summary>
     public IReadOnlyList<string>? CustomColumns { get; init; }
+    /// <summary>The Indexes section of the table is open (PGMS-044); it starts closed so diagrams laid out before keep their spacing.</summary>
+    public bool IndexesExpanded { get; init; }
+    /// <summary>The indexes of the table as the catalog had them when the diagram was saved, for tools and AI agents that read the diagram (PGMS-044).
+    /// Written by every save from the catalog, inside the save transaction; never read back as truth: opening a diagram reads the catalog again.</summary>
+    public IReadOnlyList<DiagramIndex>? Indexes { get; init; }
+    /// <summary>Foreign keys of the table that no index serves, when the diagram was saved.</summary>
+    public IReadOnlyList<DiagramUnindexedKey>? UnindexedForeignKeys { get; init; }
 }
 
 /// <summary>A text annotation placed on a diagram.</summary>
@@ -25,7 +32,14 @@ public sealed record DiagramRelationshipRoute(string Schema, string Table, strin
 /// <summary>What a diagram stores: which tables it shows and where, and the lines placed by hand. Never table data (decision of 07/11/2026, docs/MARCO-M1043.md).</summary>
 public sealed record DiagramLayout
 {
-    public int Format { get; init; } = 1;
+    /// <summary>1: layout only (M1043). 2: the indexes of each table, Show Indexes and IndexesExpanded (PGMS-044). A diagram of format 1 opens as it was
+    /// and is written as format 2 by the next save; older versions of PGMS ignore what they do not know.</summary>
+    public const int CurrentFormat = 2;
+    public int Format { get; init; } = CurrentFormat;
+    /// <summary>Show Indexes of the diagram menu (PGMS-044), on by default and kept by diagram.</summary>
+    public bool ShowIndexes { get; init; } = true;
+    /// <summary>When the save read the indexes written in Tables; null when they were not read (a layout not saved yet, or format 1).</summary>
+    public DateTimeOffset? CatalogRead { get; init; }
     public IReadOnlyList<DiagramTablePlacement> Tables { get; init; } = [];
     /// <summary>Only the lines moved by hand; the others are routed automatically. Older versions of PGMS ignore this list.</summary>
     public IReadOnlyList<DiagramRelationshipRoute> Relationships { get; init; } = [];
@@ -258,6 +272,16 @@ public sealed class DiagramService(string connectionString)
     /// <summary>Reads the tables of a diagram in one snapshot. A table that no longer exists is left out and named in Missing.</summary>
     public async Task<(IReadOnlyList<TableDesign> Tables, IReadOnlyList<string> Missing)> ReadTablesAsync(IReadOnlyList<DiagramTablePlacement> placements, CancellationToken token = default)
     {
+        var read = await ReadTablesAndIndexesAsync(placements, [], token).ConfigureAwait(false);
+        return (read.Tables, read.Missing);
+    }
+
+    public sealed record TablesRead(IReadOnlyList<TableDesign> Tables, IReadOnlyList<string> Missing, IReadOnlyDictionary<uint, DiagramTableIndexes> Indexes);
+
+    /// <summary>The tables as <see cref="ReadTablesAsync"/> reads them and, in the same snapshot, the indexes of those tables and of alsoIndexesOf
+    /// (tables of the diagram with pending changes, whose design is not read again but whose indexes are).</summary>
+    public async Task<TablesRead> ReadTablesAndIndexesAsync(IReadOnlyList<DiagramTablePlacement> placements, IReadOnlyCollection<uint> alsoIndexesOf, CancellationToken token = default)
+    {
         await using var connection = await OpenAsync(token).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, token).ConfigureAwait(false);
         await using (var readOnly = new NpgsqlCommand("SET TRANSACTION READ ONLY", connection, transaction)) await readOnly.ExecuteNonQueryAsync(token).ConfigureAwait(false);
@@ -275,8 +299,37 @@ public sealed class DiagramService(string connectionString)
             if (!await ExistsAsync(connection, transaction, schema, name, token).ConfigureAwait(false)) { missing.Add(placement.Schema + "." + placement.Name); continue; }
             tables.Add(await TableDesignService.ReadAsync(connection, transaction, schema, name, token).ConfigureAwait(false));
         }
+        var indexes = await DiagramIndexReader.ReadAsync(connection, transaction, tables.Select(t => t.Oid).Concat(alsoIndexesOf).ToArray(), token).ConfigureAwait(false);
         await transaction.CommitAsync(token).ConfigureAwait(false);
-        return (tables, missing);
+        return new(tables, missing, indexes);
+    }
+
+    /// <summary>The layout with the indexes each table has now, read inside the save transaction after the schema changes ran, so the saved diagram
+    /// tells the truth about the tables it was saved with. Tables are found by name: a table the save just created has no OID in the layout yet.</summary>
+    private static async Task<DiagramLayout> WithCatalogAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, DiagramLayout layout, CancellationToken token)
+    {
+        var found = new Dictionary<int, uint>();
+        await using (var command = new NpgsqlCommand("""
+            SELECT s.ord::int, c.oid FROM unnest(@schemas::text[], @names::text[]) WITH ORDINALITY s(schema_name, table_name, ord)
+            JOIN pg_catalog.pg_namespace n ON n.nspname = s.schema_name JOIN pg_catalog.pg_class c ON c.relnamespace = n.oid AND c.relname = s.table_name AND c.relkind IN ('r','p')
+            """, connection, transaction) { CommandTimeout = 15 })
+        {
+            command.Parameters.AddWithValue("schemas", layout.Tables.Select(t => t.Schema).ToArray());
+            command.Parameters.AddWithValue("names", layout.Tables.Select(t => t.Name).ToArray());
+            await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+            while (await reader.ReadAsync(token).ConfigureAwait(false)) found[reader.GetInt32(0) - 1] = reader.GetFieldValue<uint>(1);
+        }
+        var indexes = await DiagramIndexReader.ReadAsync(connection, transaction, found.Values.ToArray(), token).ConfigureAwait(false);
+        DateTimeOffset read;
+        await using (var now = new NpgsqlCommand("SELECT statement_timestamp()", connection, transaction) { CommandTimeout = 15 })
+            read = new DateTimeOffset(DateTime.SpecifyKind((DateTime)(await now.ExecuteScalarAsync(token).ConfigureAwait(false))!, DateTimeKind.Utc));
+        return layout with
+        {
+            Format = DiagramLayout.CurrentFormat, CatalogRead = read,
+            Tables = layout.Tables.Select((t, i) => found.TryGetValue(i, out var oid) && indexes.TryGetValue(oid, out var table)
+                ? t with { Oid = oid, Indexes = table.Indexes, UnindexedForeignKeys = table.UnindexedForeignKeys }
+                : t with { Indexes = null, UnindexedForeignKeys = null }).ToArray()
+        };
     }
     private static async Task<bool> ExistsAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string schema, string name, CancellationToken token)
     {
@@ -302,6 +355,7 @@ public sealed class DiagramService(string connectionString)
             await edit.VerifyAppliedAsync(connection, transaction, token).ConfigureAwait(false);
         }
         if (notice is not null) throw new InvalidOperationException("The save was rolled back after PostgreSQL notice: " + notice);
+        layout = await WithCatalogAsync(connection, transaction, layout, token).ConfigureAwait(false);
         string sql = existing is null
             ? $"INSERT INTO pgms.diagrams (name, definition) VALUES (@name, @definition::jsonb) RETURNING {InfoColumns}"
             : $"UPDATE pgms.diagrams SET name=@name, definition=@definition::jsonb, version=version+1, modified=now() WHERE diagram_id=@id AND version=@version RETURNING {InfoColumns}";

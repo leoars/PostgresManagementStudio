@@ -347,7 +347,7 @@ internal static class DatabaseDiagramChecks
             check(view.SelectAt(middle) is DiagramRelation && view.SelectedRelation is not null && view.Lines.Children.Contains(hitLine)
                 && view.Lines.Children.OfType<Polyline>().Any(p => p.Tag is null && p.Stroke is SolidColorBrush { Color: { R: 0x00, G: 0x78, B: 0xD7 } }), "Clicking a line selects it in blue and keeps the clicked line, so its context menu opens (found by mouse piloting)");
             check(Items(view.Relations.Single()).SequenceEqual(["DiagramDeleteRelationship", "DiagramRelationshipProperties"]), "Relationship menu: Delete Relationships from Database, Properties");
-            check(Items(null).SequenceEqual(["DiagramNewTable", "DiagramAddTable", "DiagramNewAnnotation", "DiagramSelectAll", "DiagramShowLabels", "DiagramArrange", "DiagramZoom", "DiagramViewPageBreaks", "DiagramRecalculatePageBreaks", "DiagramCopy"]), "Empty area menu follows SSMS (capture m4), without Paste");
+            check(Items(null).SequenceEqual(["DiagramNewTable", "DiagramAddTable", "DiagramNewAnnotation", "DiagramSelectAll", "DiagramShowLabels", "DiagramShowIndexes", "DiagramArrange", "DiagramZoom", "DiagramViewPageBreaks", "DiagramRecalculatePageBreaks", "DiagramCopy", "DiagramRefresh"]), "Empty area menu follows SSMS (capture m4), without Paste, plus Show Indexes and Refresh of PGMS-044");
 
             // Ctrl: the hand drags the visible area; Ctrl + wheel zooms (pedidos do usuário de 07/11/2026).
             var scroller = (ScrollViewer)view.FindName("Scroller");
@@ -800,6 +800,7 @@ internal static class DatabaseDiagramChecks
             window.DiagramNamePrompt = (_, _) => "Renamed";
             check(await window.RenameDiagramAsync(connection, id, "Quarterly"), "The diagram name goes back for the next checks");
             await DiagramEditingChecks.RunAsync(window, connection, check);
+            await DiagramIndexUiChecks.RunAsync(window, connection, check);
             await ViewDesignerChecks.RunAsync(window, connection, check);
             await QueryDesignerChecks.RunAsync(window, connection, check);
             check(await window.DeleteDiagramAsync(connection, id, "Renamed") && (await service.ListAsync()).Count == 0 && await Scalar("SELECT to_regclass('public.customers') IS NOT NULL") is true, "Delete removes the diagram and keeps its tables");

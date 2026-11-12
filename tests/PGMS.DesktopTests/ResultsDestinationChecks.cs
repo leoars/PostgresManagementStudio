@@ -18,6 +18,7 @@ internal static class ResultsDestinationChecks
         await QueryOptionsChecks.RunAsync(connection, check);
         await QueryMenuChecks.RunAsync(connection, check);
         await ForeignKeyScanUiChecks.RunAsync(connection, check);
+        await ForeignKeyIndexScanUiChecks.RunAsync(connection, check);
         await ResultPagingChecks.RunAsync(connection, check);
         await AboutChecks.RunAsync(check);
         static async Task Idle() => await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);

@@ -4,6 +4,12 @@
 
 Quinta pré-release pública do PGMS. É uma alpha para avaliação com dados sintéticos ou descartáveis. Rótulo de build: M1053. Os binários são gerados e atestados pelo mesmo [workflow de release](../../.github/workflows/release.yml) das versões anteriores. **Mudança de licença:** a partir desta versão, o trabalho próprio está sob Apache-2.0, com créditos no `NOTICE`; as versões até a alpha.4 continuam sob MIT.
 
+## Em desenvolvimento (ainda não publicado)
+
+Estas mudanças estão no `main` e farão parte da próxima pré-release; os downloads abaixo continuam sendo da v0.1.0-alpha.5.
+
+- **Índices nos diagramas de banco.** Cada tabela de um diagrama tem uma seção **Indexes**, recolhida por padrão, com uma linha por índice quando aberta: método (GIN, GiST, SP-GiST, BRIN, Hash), colunas ou expressões da chave, classe de operadores quando não é a padrão (como `gin_trgm_ops`), `INCLUDE`, UNIQUE, EXCLUDE, parcial e inválido, com o predicado e o `CREATE INDEX` completo na dica. Um aviso marca a tabela com chave estrangeira que nenhum índice atende e abre **Find Unindexed Foreign Keys…**, que também chega nesta mudança: num banco do Object Explorer, lista essas chaves pelo catálogo e cria os índices a partir de um script revisado, de forma concorrente ou em uma transação. **Show Indexes** e **Refresh** ficam no menu do diagrama. Cada gravação escreve os índices de cada tabela na definição do diagrama (formato 2) para ferramentas e agentes de IA que a leem; diagramas antigos abrem sem mudança. Só leitura: índices continuam sendo criados em **Indexes/Keys…**. O SSMS 22.11 não mostra índices no diagrama. Sugestão de um usuário do PGMS.
+
 ## O que mudou desde a v0.1.0-alpha.4
 
 - **Diagramas de banco.** Diagramas como os do SSMS, salvos no servidor: adicionar tabelas e tabelas relacionadas, arrastar uma coluna para criar chave estrangeira, Arrange Tables, zoom, modos de exibição, anotações, tabelas novas e edição de colunas dentro do diagrama. Alterações no banco aparecem antes como script SQL.

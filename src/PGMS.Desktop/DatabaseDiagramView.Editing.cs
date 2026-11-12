@@ -48,6 +48,7 @@ public partial class DatabaseDiagramView
     {
         if (Enum.TryParse<DiagramTableView>(placement.View, out var view)) table.View = view;
         if (placement.CustomColumns is { } custom) { table.CustomColumns.Clear(); table.CustomColumns.AddRange(custom.Where(DiagramColumnFields.All.Contains)); }
+        table.IndexesExpanded = placement.IndexesExpanded;
     }
 
     private Rect[] ContentRects() => tables.Where(boxes.ContainsKey).Select(Bounds).Concat(annotations.Where(noteBoxes.ContainsKey).Select(NoteBounds)).ToArray();
