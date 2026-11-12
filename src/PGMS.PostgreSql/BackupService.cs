@@ -6,6 +6,16 @@ namespace PGMS.PostgreSql;
 
 public sealed class BackupService(string connectionString, string toolsDirectory)
 {
+    /// <summary>A new, empty database to restore into, from template0 as pg_restore --create does; outside a transaction, on its own connection.</summary>
+    public static async Task CreateRestoreDatabaseAsync(string connectionString, string name, CancellationToken token = default)
+    {
+        string sql = $"CREATE DATABASE {SqlIdentifier.Quote(name)} TEMPLATE template0";
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(token).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand(sql, connection) { CommandTimeout = 60 };
+        await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+    }
+
     public Task BackupAsync(string destination, CancellationToken token = default)
         =>BackupWithOptionsAsync(destination,new BackupOptions(),token);
 

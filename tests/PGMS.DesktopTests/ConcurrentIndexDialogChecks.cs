@@ -55,6 +55,20 @@ internal static class ConcurrentIndexDialogChecks
                 finally{blocked.CancelCurrentOperation();await tx.RollbackAsync();await operation;}
             }
             finally{blocked.Close();}
+            // Pending Index Operation… of a table shows the pending operation only when it is on that table.
+            await Sql($"SET ROLE {qr};CREATE TABLE {qs}.other(id integer);RESET ROLE");
+            async Task<uint> Oid(string name){await using var cmd=new NpgsqlCommand($"SELECT '{qs}.{name}'::regclass::oid",admin);return (uint)(await cmd.ExecuteScalarAsync())!;}
+            var onOther=new ConcurrentIndexDialog(limited,new CatalogEntry(CatalogKind.Relation,"other",null,schema,await Oid("other"))){ShowInTaskbar=false};onOther.Show();
+            try
+            {
+                string feedback=Find<TextBlock>(onOther,"Feedback").Text;
+                check(feedback.StartsWith("No pending operation on ",StringComparison.Ordinal) && feedback.Contains(".\"target\" / canceled",StringComparison.Ordinal) && !Find<TextBox>(onOther,"Preview").Text.Contains("canceled",StringComparison.Ordinal) && !Find<Button>(onOther,"InspectButton").IsEnabled,
+                    "From another table, the pending operation is not shown: the window names the table it is on: "+feedback);
+            }
+            finally{onOther.Close();}
+            var onTarget=new ConcurrentIndexDialog(limited,new CatalogEntry(CatalogKind.Relation,"target",null,schema,await Oid("target"))){ShowInTaskbar=false};onTarget.Show();
+            try{check(Find<TextBox>(onTarget,"Preview").Text.Contains("canceled",StringComparison.Ordinal) && Find<Button>(onTarget,"InspectButton").IsEnabled,"From its own table, the pending operation is shown and can be inspected");}
+            finally{onTarget.Close();}
             var reopened=new ConcurrentIndexDialog(limited){ShowInTaskbar=false};reopened.Show();
             try
             {

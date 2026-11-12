@@ -26,7 +26,7 @@ public partial class PrivilegeDialog : Window
     public bool HasUnconfirmedCommit => pendingCommit is not null || unreadableCommit;
     private readonly DialogFocus focus=new();
     public string? ScriptSql { get; private set; }
-    public PrivilegeDialog(string connection, CatalogEntry? routineEntry = null)
+    public PrivilegeDialog(string connection, CatalogEntry? routineEntry = null, CatalogEntry? selected = null)
     {
         this.connection = connection;
         commitStore=new PrivilegeCommitStore(connection);
@@ -45,9 +45,26 @@ public partial class PrivilegeDialog : Window
             SchemaName.Text = routineEntry.Schema; ObjectName.Text = routineEntry.Name;
             Update();
         }
+        else if (selected is not null && Preselection(selected) is { } choice)
+        {
+            ObjectType.SelectedItem = choice.Target;
+            if (choice.Schema is not null) SchemaName.Text = choice.Schema;
+            ObjectName.Text = choice.Name;
+            Update();
+        }
         RestorePendingCommit();
         Loaded += (_,_) => {if(HasUnconfirmedCommit)InspectButton.Focus();else ObjectType.Focus();};
     }
+    /// <summary>The target of an Object Explorer selection: its database, a schema, a table, view or materialized view, or a sequence.</summary>
+    internal static (PrivilegeTarget Target, string? Schema, string Name)? Preselection(CatalogEntry entry) => entry switch
+    {
+        { Kind: CatalogKind.Database } => (PrivilegeTarget.Database, null, entry.Name),
+        { Kind: CatalogKind.Schema } => (PrivilegeTarget.Schema, null, entry.Name),
+        { Kind: CatalogKind.Relation, RelationType: "S" } => (PrivilegeTarget.Sequence, entry.Schema, entry.Name),
+        { Kind: CatalogKind.Relation } => (PrivilegeTarget.Table, entry.Schema, entry.Name),
+        _ => null
+    };
+
     private void RestorePendingCommit()
     {
         try

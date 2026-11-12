@@ -408,7 +408,18 @@ public partial class MainWindow : Window
     private async void TableOperationsFromExplorer(object sender, RoutedEventArgs e)
     {
         if (SelectedConnection is not { } connection || ExplorerTree.SelectedItem is not CatalogNode { Entry.CanEditTable: true } node) return;
-        var entry = node.Entry;
+        await InspectAndShowTableOperationsAsync(connection, node.Entry);
+    }
+
+    /// <summary>The nearest node from the selection up to the server that matches: Tools items then act on the table of a selected index, key or column too.</summary>
+    private CatalogEntry? SelectedAncestor(Func<CatalogEntry, bool> match)
+    {
+        for (var node = ExplorerTree.SelectedItem as CatalogNode; node is not null; node = node.Parent) if (match(node.Entry)) return node.Entry;
+        return null;
+    }
+
+    private async Task InspectAndShowTableOperationsAsync(string connection, CatalogEntry entry)
+    {
         try
         {
             var snapshot = await new TablePropertiesService(connection).InspectAsync(entry.Schema!, entry.Name);
@@ -452,7 +463,8 @@ public partial class MainWindow : Window
     private void PendingIndexFromExplorer(object sender,RoutedEventArgs e)
     {
         if(SelectedConnection is not { } connection){Status.Text="Connect to inspect a pending index operation.";return;}
-        new ConcurrentIndexDialog(connection){Owner=this}.ShowDialog();
+        var dialog=ExplorerTree.SelectedItem is CatalogNode { Entry.Kind: CatalogKind.Relation } node?new ConcurrentIndexDialog(connection,node.Entry):new ConcurrentIndexDialog(connection);
+        dialog.Owner=this;dialog.ShowDialog();
     }
     private async void ExpressionIndexFromExplorer(object sender, RoutedEventArgs e)
     {
@@ -471,8 +483,9 @@ public partial class MainWindow : Window
     private async void TableOperations(object sender, RoutedEventArgs e)
     {
         if (SelectedConnection is not { } connection) { Status.Text = "Connect before managing tables."; return; }
-        var entry = (ExplorerTree.SelectedItem as CatalogNode)?.Entry;
-        await ShowTableOperationsAsync(connection, entry?.Schema, entry?.Kind == CatalogKind.Relation ? entry.Name : null);
+        // A table, or anything under one, opens inspected, as from the table menu; otherwise the dialog asks for the table.
+        if (SelectedAncestor(e => e.CanEditTable) is { } table) { await InspectAndShowTableOperationsAsync(connection, table); return; }
+        await ShowTableOperationsAsync(connection, (ExplorerTree.SelectedItem as CatalogNode)?.Entry.Schema, null);
     }
     private async Task ShowTableOperationsAsync(string connection, string? schema, string? table, PGMS.PostgreSql.TableProperties? snapshot = null, string? column = null)
     {
@@ -493,8 +506,8 @@ public partial class MainWindow : Window
     private async void IndexOperations(object sender, RoutedEventArgs e)
     {
         if (SelectedConnection is not { } connection) { Status.Text = "Connect before managing indexes."; return; }
-        var entry = (ExplorerTree.SelectedItem as CatalogNode)?.Entry;
-        var dialog = new RelationEditDialog(connection, entry?.Schema, entry?.Kind == CatalogKind.Relation ? entry.Name : null) { Owner = this, InspectOnOpen = entry?.Kind == CatalogKind.Relation };
+        var table = SelectedAncestor(e => e.Kind == CatalogKind.Relation);
+        var dialog = new RelationEditDialog(connection, table?.Schema ?? (ExplorerTree.SelectedItem as CatalogNode)?.Entry.Schema, table?.Name) { Owner = this, InspectOnOpen = table is not null };
         if (dialog.ShowDialog() != true) return;
         if (dialog.ScriptSql is { } sql) await OpenAdministrativeScriptAsync(connection, sql);
         if (dialog.WasApplied) { await LoadExplorerAsync(); Status.Text = "Index operation completed. Object Explorer refreshed."; }
@@ -502,8 +515,8 @@ public partial class MainWindow : Window
     private async void TableConstraintOperations(object sender, RoutedEventArgs e)
     {
         if (SelectedConnection is not { } connection) { Status.Text = "Connect before managing table constraints."; return; }
-        var entry = (ExplorerTree.SelectedItem as CatalogNode)?.Entry;
-        var dialog = new TableConstraintDialog(connection, entry?.Schema, entry?.Kind == CatalogKind.Relation ? entry.Name : null) { Owner = this, InspectOnOpen = entry?.Kind == CatalogKind.Relation };
+        var table = SelectedAncestor(e => e.Kind == CatalogKind.Relation);
+        var dialog = new TableConstraintDialog(connection, table?.Schema ?? (ExplorerTree.SelectedItem as CatalogNode)?.Entry.Schema, table?.Name) { Owner = this, InspectOnOpen = table is not null };
         if (dialog.ShowDialog() != true) return;
         if (dialog.ScriptSql is { } sql) await OpenAdministrativeScriptAsync(connection, sql);
         if (dialog.WasApplied) { await LoadExplorerAsync(); Status.Text = "Constraint operation completed. Object Explorer refreshed."; }
@@ -511,8 +524,8 @@ public partial class MainWindow : Window
     private async void CheckConstraintOperations(object sender, RoutedEventArgs e)
     {
         if (SelectedConnection is not { } connection) { Status.Text = "Connect before managing CHECK constraints."; return; }
-        var entry = (ExplorerTree.SelectedItem as CatalogNode)?.Entry;
-        var dialog = new CheckConstraintDialog(connection, entry?.Schema, entry?.Kind == CatalogKind.Relation ? entry.Name : null) { Owner = this, InspectOnOpen = entry?.Kind == CatalogKind.Relation };
+        var table = SelectedAncestor(e => e.Kind == CatalogKind.Relation);
+        var dialog = new CheckConstraintDialog(connection, table?.Schema ?? (ExplorerTree.SelectedItem as CatalogNode)?.Entry.Schema, table?.Name) { Owner = this, InspectOnOpen = table is not null };
         if (dialog.ShowDialog() != true) return;
         if (dialog.ScriptSql is { } sql) await OpenAdministrativeScriptAsync(connection, sql);
         if (dialog.WasApplied) { await LoadExplorerAsync(); Status.Text = "CHECK constraint operation completed. Object Explorer refreshed."; }
@@ -520,8 +533,8 @@ public partial class MainWindow : Window
     private async void ForeignKeyOperations(object sender, RoutedEventArgs e)
     {
         if (SelectedConnection is not { } connection) { Status.Text = "Connect before managing foreign keys."; return; }
-        var entry = (ExplorerTree.SelectedItem as CatalogNode)?.Entry;
-        var dialog = new ForeignKeyDialog(connection, entry?.Schema, entry?.Kind == CatalogKind.Relation ? entry.Name : null) { Owner = this, InspectOnOpen = entry?.Kind == CatalogKind.Relation };
+        var table = SelectedAncestor(e => e.Kind == CatalogKind.Relation);
+        var dialog = new ForeignKeyDialog(connection, table?.Schema ?? (ExplorerTree.SelectedItem as CatalogNode)?.Entry.Schema, table?.Name) { Owner = this, InspectOnOpen = table is not null };
         if (dialog.ShowDialog() != true) return;
         if (dialog.ScriptSql is { } sql) await OpenAdministrativeScriptAsync(connection, sql);
         if (dialog.WasApplied) { await LoadExplorerAsync(); Status.Text = "Foreign key operation completed. Object Explorer refreshed."; }
@@ -787,13 +800,17 @@ public partial class MainWindow : Window
     private async void DefaultPermissions(object sender, RoutedEventArgs e)
     {
         if(SelectedConnection is not { } connection){Status.Text="Connect before managing default permissions.";return;}
-        var dialog=new DefaultPrivilegeDialog(connection){Owner=this};
+        // A selected schema, or anything in one, becomes the scope; the dialog still starts global without a schema.
+        string? schema=SelectedAncestor(e=>e.Kind is CatalogKind.Schema || e.Schema is not null) is { } scoped?(scoped.Kind==CatalogKind.Schema?scoped.Name:scoped.Schema):null;
+        var dialog=new DefaultPrivilegeDialog(connection,schema){Owner=this};
         if(dialog.ShowDialog()==true && dialog.ScriptSql is { } sql)await OpenAdministrativeScriptAsync(connection,sql);
     }
     private async void ObjectPermissions(object sender, RoutedEventArgs e)
     {
         if (SelectedConnection is not { } connection) { Status.Text = "Connect before managing object permissions."; return; }
-        var dialog = new PrivilegeDialog(connection) { Owner = this };
+        // The selected database, schema, table, view or sequence (or the object above a selected child) is preselected, as Routine Permissions does.
+        var selected = SelectedAncestor(e => e.Kind is CatalogKind.Database or CatalogKind.Schema || e.Kind == CatalogKind.Relation);
+        var dialog = new PrivilegeDialog(connection, selected: selected) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.ScriptSql is not { } sql) return;
         var query = NewQuery(sql); query.IsDirty = true; documents[query].Title += "*";
         try { await query.ConnectAsync(connection); }
@@ -838,6 +855,8 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Set by tests to look at the Back Up or Restore dialog before it is shown.</summary>
+    internal Action<BackupDialog>? BackupShown { get; set; }
     private void BackupDatabase(object sender, RoutedEventArgs e) => ShowBackup(false);
     private void RestoreDatabase(object sender, RoutedEventArgs e) => ShowBackup(true);
     private void BackupGlobals(object sender,RoutedEventArgs e)=>ShowBackup(false,true);
@@ -845,7 +864,10 @@ public partial class MainWindow : Window
     private async void ShowBackup(bool restore,bool globals=false)
     {
         if (SelectedConnection is not { } connection) return;
-        var dialog = new BackupDialog(restore, connection,globals) { Owner = this };
+        // Without a database in the selection (the Databases folder or the server), the database is chosen in the dialog, never the login database by default.
+        bool choose = !globals && (ExplorerTree.SelectedItem as CatalogNode)?.Entry.Database is null;
+        var dialog = new BackupDialog(restore, connection, globals, choose) { Owner = this };
+        BackupShown?.Invoke(dialog);
         dialog.ShowDialog();
         if (dialog.WasCompleted && restore) await LoadExplorerAsync();
     }

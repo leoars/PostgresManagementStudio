@@ -8,6 +8,7 @@
    <Border Background="White" BorderBrush="#B5C5D2" BorderThickness="1" Margin="0,0,12,0"><TextBlock Text="General" Background="#E4EFF6" Padding="10" VerticalAlignment="Top"/></Border>
    <ScrollViewer x:Name="FormScroller" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
     <TextBlock x:Name="Description" TextWrapping="Wrap" Margin="0,0,0,16"/>
+    <StackPanel x:Name="DatabaseFields" Visibility="Collapsed" Margin="0,0,0,12"><Label Target="{Binding ElementName=DatabasePicker}" Content="_Database:" Padding="0,0,0,4"/><ComboBox x:Name="DatabasePicker" Padding="4" AutomationProperties.Name="Database" SelectionChanged="DatabaseChanged" TextBoxBase.TextChanged="DatabaseTextChanged"/><TextBlock x:Name="DatabaseHelp" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="#4A4A4A"/></StackPanel>
     <Label Target="{Binding ElementName=FormatSelector}" Content="_Format:" Padding="0,0,0,4"/><ComboBox x:Name="FormatSelector" DisplayMemberPath="Label" SelectedValuePath="Value" SelectionChanged="OptionsChanged" Padding="4" AutomationProperties.Name="Backup or restore format"/>
     <StackPanel x:Name="BackupScopeFields" Margin="0,10,0,0"><Label Content="_Content:" Target="{Binding ElementName=ScopeSelector}" Padding="0,0,0,4"/><ComboBox x:Name="ScopeSelector" DisplayMemberPath="Label" SelectedValuePath="Value" SelectionChanged="OptionsChanged" Padding="4" AutomationProperties.Name="Backup schema and data scope"/></StackPanel>
     <StackPanel x:Name="SchemaFilterFields" Margin="0,10,0,0">

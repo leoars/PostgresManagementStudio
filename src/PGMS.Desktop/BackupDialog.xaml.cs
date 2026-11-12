@@ -19,18 +19,32 @@ public partial class BackupDialog : Window
     private readonly string connectionString;
     private CancellationTokenSource? cancellation;
     public bool WasCompleted { get; private set; }
+    /// <summary>Opened without a database (the Databases folder or the server): the database is chosen in the dialog, and nothing runs until it is.</summary>
+    private readonly bool chooseDatabase;
+    private IReadOnlyList<string> databases = [];
+    /// <summary>Replaces the confirmation before a new database is created for a restore; returns true to create it. Set by tests.</summary>
+    internal Func<string, bool>? ConfirmCreateDatabase { get; set; }
+    /// <summary>The database the operation ran against; with a chosen database, the one chosen.</summary>
+    public string? Database { get; private set; }
 
-    public BackupDialog(bool restore, string connectionString, bool globals=false)
+    public BackupDialog(bool restore, string connectionString, bool globals=false, bool chooseDatabase=false)
     {
         InitializeComponent();
         this.restore = restore;
         this.globals = globals;
         this.connectionString = connectionString;
+        this.chooseDatabase = chooseDatabase && !globals;
         var c = new NpgsqlConnectionStringBuilder(connectionString);
         Title = restore ? "Restore Database" : "Back Up Database";
         if(globals)Title=restore?"Restore Global Objects":"Back Up Global Objects";
         RunButton.Content = restore ? "Restore" : "Back Up";
-        Target.Text = $"{Title}\nServer: {c.Host}:{c.Port}    Database: {c.Database}    User: {c.Username}";
+        Target.Text = $"{Title}\nServer: {c.Host}:{c.Port}    Database: {(this.chooseDatabase ? "chosen below" : c.Database)}    User: {c.Username}";
+        if(this.chooseDatabase)
+        {
+            DatabaseFields.Visibility=Visibility.Visible;DatabasePicker.IsEditable=restore;
+            DatabaseHelp.Text=restore?"Choose the database to restore into, or type a new name: the database is created first (CREATE DATABASE … TEMPLATE template0), after you confirm.":"Choose the database to back up.";
+            Loaded+=async(_,_)=>await LoadDatabasesAsync();
+        }
         FormatSelector.ItemsSource=restore?new[]{new FormatChoice(BackupFormat.Custom,"Custom or tar archive"),new(BackupFormat.PlainSql,"Plain SQL script"),new(BackupFormat.Directory,"Directory archive")}
             :new[]{new FormatChoice(BackupFormat.Custom,"Custom archive"),new(BackupFormat.Tar,"Tar archive"),new(BackupFormat.PlainSql,"Plain SQL script"),new(BackupFormat.Directory,"Directory archive")};FormatSelector.SelectedIndex=0;
         ScopeSelector.ItemsSource=new[]{new ScopeChoice(BackupDataScope.All,"Schema and data"),new(BackupDataScope.SchemaOnly,"Schema only"),new(BackupDataScope.DataOnly,"Data only")};ScopeSelector.SelectedIndex=0;
@@ -45,6 +59,30 @@ public partial class BackupDialog : Window
         SelectionKindSelector.SelectedIndex=0;
         ready=true;
         UpdateOptions();
+    }
+    internal async Task LoadDatabasesAsync()
+    {
+        try
+        {
+            await using var connection=new NpgsqlConnection(connectionString);await connection.OpenAsync();
+            await using var command=new NpgsqlCommand("SELECT datname FROM pg_catalog.pg_database WHERE NOT datistemplate AND datallowconn ORDER BY datname",connection);
+            var names=new List<string>();await using(var reader=await command.ExecuteReaderAsync())while(await reader.ReadAsync())names.Add(reader.GetString(0));
+            databases=names;DatabasePicker.ItemsSource=names;
+        }
+        catch(Exception ex)when(ex is NpgsqlException or IOException or InvalidOperationException or TimeoutException){DatabaseHelp.Text="The list of databases could not be read: "+ex.Message+(restore?" Type the name of the database.":"");}
+        UpdateDatabase();
+    }
+    private string ChosenDatabase=>(DatabasePicker.IsEditable?DatabasePicker.Text:DatabasePicker.SelectedItem as string??"").Trim();
+    private bool ChosenIsNew=>ChosenDatabase.Length>0 && !databases.Contains(ChosenDatabase,StringComparer.Ordinal);
+    private void DatabaseChanged(object sender,System.Windows.Controls.SelectionChangedEventArgs e){if(ready)UpdateDatabase();}
+    private void DatabaseTextChanged(object sender,System.Windows.Controls.TextChangedEventArgs e){if(ready)UpdateDatabase();}
+    private void UpdateDatabase()
+    {
+        if(!chooseDatabase)return;
+        ClearPreviousFeedback();
+        if(ChosenDatabase.Length==0)DatabaseHelp.Text=restore?"Choose the database to restore into, or type a new name: the database is created first (CREATE DATABASE … TEMPLATE template0), after you confirm.":"Choose the database to back up.";
+        else if(ChosenIsNew)DatabaseHelp.Text=restore?$"{ChosenDatabase} does not exist: it is created first (CREATE DATABASE … TEMPLATE template0), after you confirm, and kept if the restore fails.":$"{ChosenDatabase} does not exist.";
+        else DatabaseHelp.Text=restore?$"The archive is restored into the existing database {ChosenDatabase}.":$"{ChosenDatabase} is backed up.";
     }
     private BackupFormat Format=>((FormatChoice)FormatSelector.SelectedItem).Value;
     private BackupCompression Compression=>Format is BackupFormat.Custom or BackupFormat.Directory?((CompressionChoice)CompressionSelector.SelectedItem).Value:BackupCompression.Default;
@@ -77,6 +115,7 @@ public partial class BackupDialog : Window
         Description.Text=restore
             ?sql?"Run a trusted SQL script with psql in this existing database. Ownership and privileges follow the script contents. Existing objects are not dropped automatically.":"Restore an archive into this existing database in one transaction. Choose content below. Definitions require absent target objects; data-only requires compatible existing tables. Existing objects are not dropped. Choose whether to restore archive ownership and object privileges below."
             :"Back up this database using the selected format and content. Choose a new destination; existing files and directories are not overwritten. Server roles and tablespaces are not included.";
+        if(chooseDatabase)Description.Text=Description.Text.Replace("this existing database","the database chosen above").Replace("this database","the database chosen above");
         FormatHelp.Text=restore
             ?sql?"psql requests one transaction and stops on errors. Explicit COMMIT, reconnect or transaction commands in a script can commit earlier changes. Review the script before running it.":"pg_restore reads custom, tar and directory archives. Restore errors before COMMIT roll back the transaction."
             :Scope==BackupDataScope.DataOnly?"Data-only restore requires compatible tables already present in the destination.":sql?"Plain SQL is restored with psql. Choose ownership and privilege commands now; they cannot be omitted later by archive restore options.":"Custom, tar and directory archives use pg_restore. Ownership and privilege choices are made when restoring.";
@@ -134,6 +173,23 @@ public partial class BackupDialog : Window
         if(cancellation is not null)return;
         if (string.IsNullOrWhiteSpace(ArchivePath.Text) || string.IsNullOrWhiteSpace(ToolsPath.Text)) { Feedback.Text = "Select a backup path and the PostgreSQL bin folder."; return; }
         WasCompleted = false;
+        string target=connectionString;
+        bool created=false;
+        if(chooseDatabase)
+        {
+            string name=ChosenDatabase;
+            if(name.Length==0){Feedback.Text=restore?"Choose the database to restore into, or type the name of a new one.":"Choose the database to back up.";return;}
+            if(ChosenIsNew)
+            {
+                if(!restore){Feedback.Text=$"{name} does not exist. Choose an existing database.";return;}
+                string question=$"Create the database {name} and restore into it?\n\nIt is created with CREATE DATABASE … TEMPLATE template0 and kept if the restore fails.";
+                if(!(ConfirmCreateDatabase?.Invoke(name) ?? MessageBox.Show(this,question,Title,MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes))return;
+                try{await BackupService.CreateRestoreDatabaseAsync(connectionString,name);created=true;databases=[..databases,name];}
+                catch(Exception ex)when(ex is NpgsqlException or ArgumentException or IOException or InvalidOperationException or TimeoutException){Feedback.Text="The database was not created: "+(ex is PostgresException pg?$"{pg.SqlState}: {pg.MessageText}":ex.Message);return;}
+            }
+            target=new NpgsqlConnectionStringBuilder(connectionString){Database=name}.ConnectionString;
+        }
+        Database=new NpgsqlConnectionStringBuilder(target).Database;
         if(globals && restore)
         {
             if(GlobalReviewed.IsChecked!=true){Feedback.Text="Review the global SQL script and destination, then confirm the review checkbox.";return;}
@@ -150,18 +206,19 @@ public partial class BackupDialog : Window
         Feedback.Text = restore ? "Restoring database…" : "Creating backup…";
         try
         {
-            var service = new BackupService(connectionString, ToolsPath.Text);
+            var service = new BackupService(target, ToolsPath.Text);
             if(globals){if(restore)await service.RestoreGlobalsAsync(ArchivePath.Text,cancellation.Token);else await service.BackupGlobalsAsync(ArchivePath.Text,cancellation.Token);}
             else if (restore){if(Format==BackupFormat.PlainSql)await service.RestoreSqlAsync(ArchivePath.Text,cancellation.Token);else if(Format==BackupFormat.Directory)await service.RestoreDirectoryAsync(ArchivePath.Text,Options,cancellation.Token);else await service.RestoreWithOptionsAsync(ArchivePath.Text,Options,cancellation.Token);}
             else await service.BackupWithOptionsAsync(ArchivePath.Text,DumpOptions,cancellation.Token);
             WasCompleted = true;
-            Feedback.Text = restore ? "Restore completed successfully." : "Backup completed successfully.\n" + Path.GetFullPath(ArchivePath.Text);
+            Feedback.Text = restore ? "Restore completed successfully." + (chooseDatabase ? $" Database: {Database}." : "") : "Backup completed successfully.\n" + Path.GetFullPath(ArchivePath.Text);
         }
         catch (OperationCanceledException) { Feedback.Text = globals && restore?"Global restore canceled. Earlier statements may already be committed. Inspect the destination before retrying.":restore ? "Restore canceled. Check the destination before retrying: cancellation can arrive after the server commits." : "Backup canceled. No destination was published."; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or Win32Exception or InvalidOperationException) { Feedback.Text = ex.Message; }
         finally
         {
             cancellation.Dispose(); cancellation = null;
+            if (created && !WasCompleted) Feedback.Text += $" The database {Database}, created for this restore, was kept; drop it if it is not needed.";
             RunButton.IsEnabled = ArchivePath.IsEnabled = ToolsPath.IsEnabled = BrowseButton.IsEnabled = ToolsButton.IsEnabled = true;
             RestoreScopeSelector.IsEnabled=RestoreOwner.IsEnabled=RestoreAcl.IsEnabled=true;
             LargeObjectsSelector.IsEnabled=CompressionSelector.IsEnabled=CompressionLevelSelector.IsEnabled=JobsSelector.IsEnabled=FormatSelector.IsEnabled=ScopeSelector.IsEnabled=SqlDumpOwner.IsEnabled=SqlDumpAcl.IsEnabled=true;

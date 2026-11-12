@@ -236,7 +236,7 @@ public partial class DatabaseDiagramView : UserControl
 
     // ---- Undo of the layout (pedido do usuário, 08/11/2026): Arrange Tables, moving tables and moving lines record where things were ----
     /// <summary>Positions by table key and hand-placed lines by (table key, foreign key name), so a refresh of the tables does not break it.</summary>
-    private sealed record LayoutSnapshot(Dictionary<string, Point> Positions, Dictionary<(string Table, string Key), DiagramManualRoute> Routes, Dictionary<DiagramAnnotation, Point> Notes);
+    private sealed record LayoutSnapshot(Dictionary<string, Point> Positions, Dictionary<(string Table, string Key), DiagramManualRoute> Routes, Dictionary<DiagramAnnotation, Point> Notes, Dictionary<string, DiagramTableView> Views);
     private readonly List<LayoutSnapshot> undoStack = [];
     private const int UndoLimit = 100;
     private LayoutSnapshot? pendingUndo;
@@ -246,7 +246,8 @@ public partial class DatabaseDiagramView : UserControl
     private LayoutSnapshot TakeSnapshot() => new(
         tables.ToDictionary(t => t.Key, t => new Point(t.X, t.Y)),
         Relations.Where(r => manualRoutes.ContainsKey(r.Key)).ToDictionary(r => (r.Foreign.Key, r.Key.Name), r => manualRoutes[r.Key]),
-        annotations.ToDictionary(a => a, a => new Point(a.X, a.Y)));
+        annotations.ToDictionary(a => a, a => new Point(a.X, a.Y)),
+        tables.ToDictionary(t => t.Key, t => t.View));
 
     private void PushUndo(LayoutSnapshot snapshot)
     {
@@ -264,6 +265,10 @@ public partial class DatabaseDiagramView : UserControl
         if (undoStack.Count == 0 || IsBusy || drag != DragMode.None) { if (undoStack.Count == 0) Say("Nothing to undo."); return; }
         var snapshot = undoStack[^1]; undoStack.RemoveAt(undoStack.Count - 1);
         foreach (var table in tables) if (snapshot.Positions.TryGetValue(table.Key, out var at)) { table.X = at.X; table.Y = at.Y; }
+        // Table View is a step too (12/11/2026): the boxes change size, so they are built again.
+        bool views = false;
+        foreach (var table in tables) if (snapshot.Views.TryGetValue(table.Key, out var was) && table.View != was) { table.View = was; views = true; }
+        if (views) Rebuild();
         foreach (var note in annotations) if (snapshot.Notes.TryGetValue(note, out var was)) { note.X = was.X; note.Y = was.Y; }
         manualRoutes.Clear();
         foreach (var relation in Relations)
@@ -1046,6 +1051,7 @@ public partial class DatabaseDiagramView : UserControl
         Position(); Touch();
     }
     public void SelectAll() { selected.Clear(); selected.UnionWith(tables); selectedRelation = null; RefreshTitles(); RefreshLineSelection(); }
+    internal void SelectNone() { selected.Clear(); selectedRelation = null; RefreshTitles(); RefreshLineSelection(); }
     public void ToggleLabels() { showLabels = !showLabels; DrawLines(); Touch(); }
 
     /// <summary>Add Related Tables: tables linked by a foreign key to the selected tables (to all when none is selected).</summary>

@@ -134,6 +134,12 @@ internal static class ExecutionPlanUiChecks
             queryDiagram.ContextMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanShowInNewTab").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
             check(shell.PlanDocuments.Count == 2 && shell.PlanDocuments[1].Diagram.Statements[0].Root.Children[0].Title == "Seq Scan", "Show Execution Plan In New Tab opens the plan in its own tab");
+            var tabMenu = shell.PlanDocuments[1].Diagram.ContextMenu;
+            tabMenu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent, tabMenu));
+            var queryMenu = queryDiagram.ContextMenu;
+            queryMenu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent, queryMenu));
+            check(tabMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanShowInNewTab").Visibility == Visibility.Collapsed && queryMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanShowInNewTab").Visibility == Visibility.Visible,
+                "Show Execution Plan In New Tab is offered in the query tab only, not in a plan tab, where it had nowhere to go");
             string resaved = System.IO.Path.Combine(planFolder, "again.json");
             shell.PlanDocuments[1].PickSaveFile = () => resaved;
             await shell.PlanDocuments[1].SaveSelectedAsync();
