@@ -4,6 +4,12 @@ English | [Português (Brasil)](../pt-BR/release-notes.md)
 
 Fifth public pre-release of PGMS. It is an alpha for evaluation with synthetic/disposable data. Build label: M1053. The binaries are built and attested by the same [release workflow](../../.github/workflows/release.yml) as the previous releases. **License change:** from this release on, original work is under Apache-2.0, with credits in `NOTICE`; releases through alpha.4 remain under MIT.
 
+## In development (not yet released)
+
+These changes are on `main` and will be part of the next pre-release; the downloads below are still v0.1.0-alpha.5.
+
+- **Indexes in database diagrams.** Each table of a diagram has an **Indexes** section, closed by default, with one row per index when opened: method (GIN, GiST, SP-GiST, BRIN, Hash), key columns or expressions, operator class when not the default (such as `gin_trgm_ops`), `INCLUDE`, UNIQUE, EXCLUDE, partial and invalid, with the predicate and the full `CREATE INDEX` in the tooltip. A warning marks a table with a foreign key that no index serves and opens **Find Unindexed Foreign Keys…**, which also arrives in this change: on a database in Object Explorer it lists such keys from the catalog and creates the indexes from a reviewed script, concurrently or in one transaction. **Show Indexes** and **Refresh** are in the diagram menu. Each save writes the indexes of each table into the diagram definition (format 2) for tools and AI agents that read it; older diagrams open unchanged. Read only: indexes are still created in **Indexes/Keys…**. SSMS 22.11 shows no indexes in a diagram. Suggested by a PGMS user.
+
 ## What changed since v0.1.0-alpha.4
 
 - **Database diagrams.** SSMS-style diagrams saved on the server: add tables and related tables, drag a column to create a foreign key, Arrange Tables, zoom, table views, annotations, new tables and column editing inside the diagram. Database changes are shown as a SQL script first.

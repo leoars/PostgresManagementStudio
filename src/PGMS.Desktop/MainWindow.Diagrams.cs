@@ -94,6 +94,7 @@ public partial class MainWindow
         view.TitleChanged += () => { document.Title = view.Title; RefreshCommands(); };
         view.Saved += changedTables => _ = AfterDiagramSavedAsync(view, changedTables);
         view.DesignRequested += table => OpenTableDesigner(connection, table.Schema, table.Name);
+        view.UnindexedForeignKeysRequested += table => _ = ShowUnindexedForeignKeysAsync(connection, table is null ? null : (table.Schema, table.Name));
         document.Closing += (_, e) => { if (acceptedDiagramCloses.Remove(view)) return; e.Cancel = true; _ = CloseDiagramAsync(view); };
         document.Closed += (_, _) => { diagrams.Remove(view); view.Shutdown(); RefreshCommands(); };
         AddDocument(document);

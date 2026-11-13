@@ -205,6 +205,7 @@ public partial class MainWindow
                 { var item = new MenuItem { Header = header, Name = name }; item.Click += click; tasks.Items.Add(item); }
                 menu.Items.Add(tasks);
                 Add("Find Missing _Foreign Keys…", FindMissingForeignKeys, "ExplorerMissingForeignKeys");
+                Add("Find _Unindexed Foreign Keys…", FindUnindexedForeignKeys, "ExplorerUnindexedForeignKeys");
                 Footer(true, ObjectProperties, "ExplorerObjectProperties", ServerReportService.DatabaseReports);
                 break;
             case CatalogKind.Schemas:

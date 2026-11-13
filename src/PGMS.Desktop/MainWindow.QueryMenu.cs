@@ -131,6 +131,34 @@ public partial class MainWindow
         if (window.Created) await RefreshSelectedExplorerAsync();
     }
 
+    private async void FindUnindexedForeignKeys(object sender, RoutedEventArgs e)
+    {
+        if (SelectedConnection is not { } connection) { Status.Text = "Connect before scanning for foreign keys."; return; }
+        if (await ShowUnindexedForeignKeysAsync(connection)) await RefreshSelectedExplorerAsync();
+    }
+
+    internal Action<ForeignKeyIndexScanWindow>? UnindexedForeignKeysShown { get; set; }
+
+    /// <summary>Find Unindexed Foreign Keys… on a database, from Object Explorer or from the warning of a diagram (PGMS-044). True when indexes were created;
+    /// the diagrams open on that database then read their indexes again.</summary>
+    internal async Task<bool> ShowUnindexedForeignKeysAsync(string connection, (string Schema, string Table)? focus = null)
+    {
+        var window = new ForeignKeyIndexScanWindow(connection, focus)
+        {
+            Owner = this,
+            OpenInQuery = async script =>
+            {
+                try { await OpenQueryTextAsync(connection, script); }
+                catch (Exception ex) when (ex is Npgsql.NpgsqlException or IOException or InvalidOperationException) { ShowError(ex); }
+            }
+        };
+        UnindexedForeignKeysShown?.Invoke(window);
+        window.ShowDialog();
+        if (!window.Created) return false;
+        foreach (var diagram in diagrams.Keys.Where(d => d.OnDatabase(connection)).ToList()) await diagram.RefreshTablesAsync();
+        return true;
+    }
+
     private readonly List<ExecutionPlanDocument> planDocuments = [];
     internal IReadOnlyList<ExecutionPlanDocument> PlanDocuments => planDocuments;
     private int planDocumentSequence;
