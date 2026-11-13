@@ -6,8 +6,9 @@ using Npgsql;
 
 namespace PGMS.Desktop;
 
-/// <summary>A saved connection. Group is the Registered Servers group path ("Production/Billing"); null or empty is the top level.</summary>
-public sealed record ConnectionProfile(Guid Id, string Name, string Host, int Port, string Database, string Username, string SslMode, string? ProtectedPassword = null, string? RootCertificate = null, string? Group = null)
+/// <summary>A saved connection. Group is the Registered Servers group path ("Production/Billing"); null or empty is the top level.
+/// DisableQueryHistory turns Query History off for every connection to this host and port (PGMS-043); older files without it record history.</summary>
+public sealed record ConnectionProfile(Guid Id, string Name, string Host, int Port, string Database, string Username, string SslMode, string? ProtectedPassword = null, string? RootCertificate = null, string? Group = null, bool DisableQueryHistory = false)
 {
     public override string ToString() => Name;
     public void Validate()

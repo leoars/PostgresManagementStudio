@@ -40,6 +40,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
     internal void InsertDesignedSql(string sql, (int Start, int Length)? range = null)
     {
         sql = sql.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", Environment.NewLine, StringComparison.Ordinal);
+        MarkOrigin(sql, QueryHistoryOrigin.QueryDesigner);
         int start = range?.Start ?? (Editor.SelectionLength > 0 ? Editor.SelectionStart : Editor.CaretOffset);
         Editor.Document.Replace(start, range?.Length ?? Editor.SelectionLength, sql);
         Editor.Select(start + sql.Length, 0);
@@ -50,6 +51,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
     internal void InsertGeneratedSql(string sql)
     {
         sql = sql.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", Environment.NewLine, StringComparison.Ordinal);
+        MarkOrigin(sql, QueryHistoryOrigin.Ai);
         if (Editor.SelectionLength > 0) { int start = Editor.SelectionStart; Editor.SelectedText = sql; Editor.Select(start, sql.Length); }
         else
         {
@@ -187,6 +189,8 @@ public partial class QueryView : UserControl, IAsyncDisposable
         resultsIncomplete = true;
         UpdateExport();
         long displayedRows = 0;
+        DateTime startedUtc = DateTime.UtcNow;
+        Exception? failure = null; bool canceled = false; long? affectedRows = null;
         var timer = Stopwatch.StartNew();
         var loader = new GridResultLoader(this, QueryOptions.GridPageRows);
         try
@@ -195,7 +199,8 @@ public partial class QueryView : UserControl, IAsyncDisposable
             var meter = StartClientTrial(sql);
             var result = await session.StreamAsync(sql, Measured(meter, (batch, _) => { loader.Accept(batch); return ValueTask.CompletedTask; }), options, cancellation.Token);
             loader.Drain(everything: true);
-            displayedRows = loader.Received;
+            displayedRows = result.DisplayedRows;
+            affectedRows = result.RecordsAffected >= 0 ? result.RecordsAffected : null;
             RecordClientTrial(meter);
             resultsIncomplete = false;
             displayLimited = result.Truncated;
@@ -212,6 +217,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
         {
             loader.Drain(everything: true);
             displayedRows = loader.Received;
+            failure = ex; canceled = ex is OperationCanceledException || cancellation?.IsCancellationRequested == true;
             if(ex is PostgresException positioned)SetErrorPosition(sql,positioned.Position,submittedStart,submittedRevision);
             Messages.Text = ex is PostgresException pg ? QueryErrorFormatter.Format(pg) :
                 ex is OperationCanceledException ? "Query canceled. An explicit transaction may require ROLLBACK before further commands." : ex.Message;
@@ -235,6 +241,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
             cancellation = null;
             UpdateExport();
             StateChanged?.Invoke(this, EventArgs.Empty);
+            RecordHistory(sql, startedUtc, timer.Elapsed, failure, canceled, displayedRows, affectedRows);
         }
     }
 

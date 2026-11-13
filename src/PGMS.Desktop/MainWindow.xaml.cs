@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         InitializeExplorerToolbar();
+        _ = QueryHistory; // startup cleanup of Query History
         WindowWorkArea.Attach(this);
         // Keep the caption and status reachable on scaled or small work areas.
         var workArea = SystemParameters.WorkArea;
@@ -105,12 +106,14 @@ public partial class MainWindow : Window
             // SSMS shortcut for Activity Monitor; with Alt held WPF reports the letter in SystemKey.
             if ((e.Key == Key.System ? e.SystemKey : e.Key) == Key.A && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt)) { ShowActivity(this, e); e.Handled = true; }
             if ((e.Key == Key.System ? e.SystemKey : e.Key) == Key.G && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt)) { ShowRegisteredServers(); e.Handled = true; }
+            if ((e.Key == Key.System ? e.SystemKey : e.Key) == Key.H && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt)) { ShowQueryHistory(); e.Handled = true; }
         };
     }
 
     internal Action<string, double>? UiPhaseMeasured { get; set; }
 
-    private QueryView NewQuery(string? text = null, string? path = null, Guid? recoveryId = null, bool activate = true, PreparedQueryDocument? prepared = null)
+    /// <param name="origin">Query History origin of text given here without a file (scripts, generated SQL); recovered drafts pass Typed.</param>
+    private QueryView NewQuery(string? text = null, string? path = null, Guid? recoveryId = null, bool activate = true, PreparedQueryDocument? prepared = null, QueryHistoryOrigin origin = QueryHistoryOrigin.Other)
     {
         QueryView view;
         using (UiPhaseScope.Start(UiPhaseMeasured, "view-total"))
@@ -125,6 +128,8 @@ public partial class MainWindow : Window
         }
         using var dockPhase = UiPhaseScope.Start(UiPhaseMeasured, "dock-and-commands");
         view.IsDirty = false;
+        AttachQueryHistory(view);
+        if (prepared is null && path is null && !string.IsNullOrWhiteSpace(text)) view.MarkOrigin(text, origin);
         // Tools ▸ Options ▸ Query Results ▸ General ▸ Default destination for results.
         var environment = EnvironmentSettings.Load();
         view.ResultsDestination = environment.DefaultResults;
@@ -984,7 +989,7 @@ public partial class MainWindow : Window
 
     private void ShowOptions(object sender, RoutedEventArgs e)
     {
-        var dialog = new OptionsDialog(EnvironmentSettings) { Owner = this };
+        var dialog = new OptionsDialog(EnvironmentSettings, () => QueryHistory.ClearAsync()) { Owner = this };
         dialog.ShowDialog();
     }
 

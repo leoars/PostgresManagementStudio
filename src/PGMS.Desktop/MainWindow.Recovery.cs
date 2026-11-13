@@ -51,7 +51,7 @@ public partial class MainWindow
             int available = Math.Max(0, QueryRecoveryStore.MaximumDocuments - occupied);
             var result = QueryRecoverySession.Recover(Path.Combine(Path.GetDirectoryName(layoutFile)!, "recovery"), recoverySession.Store.DirectoryPath, draft =>
             {
-                var query = NewQuery(draft.Text);
+                var query = NewQuery(draft.Text, origin: QueryHistoryOrigin.Typed);
                 query.FileFormat = draft.Format;query.WordWrap=draft.WordWrap;query.ShowWhiteSpace=draft.ShowWhiteSpace;query.CommandTimeoutSeconds=draft.CommandTimeoutSeconds;
                 query.IsDirty = true;
                 string title = draft.Title.StartsWith("Recovered - ", StringComparison.Ordinal) ? draft.Title : "Recovered - " + draft.Title;

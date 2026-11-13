@@ -29,6 +29,7 @@ public partial class MainWindow
             return;
         }
         var dialog = new QueryDesignerDialog(connection, selected) { Owner = this };
+        dialog.Designer.ExecutionObserved = query.RecordDesignerExecution;
         bool accepted = QueryDesignerHost is { } host ? await host(dialog) : dialog.ShowDialog() == true;
         if (!accepted || dialog.ResultSql.Length == 0) return;
         string sql = dialog.ResultSql;

@@ -12,8 +12,10 @@ public sealed class EnvironmentOptions(string path)
     /// <summary>RestoreWindowPlacement starts on, as the user chose; SSMS also reopens where it was closed. SelectTopRows and EditTopRows are the
     /// Object Explorer ▸ Commands values for Select Top n Rows and Edit Top n Rows (1000 and 200, as in SSMS); files without them get the defaults.</summary>
     public sealed record Document(int Version = 1, bool RestoreWindowPlacement = true, WindowPlacement? Window = null, int SelectTopRows = DefaultSelectTopRows, int EditTopRows = DefaultEditTopRows,
-        ResultsDestination DefaultResultsDestination = ResultsDestination.Grid, QueryOptions? QueryDefaults = null)
+        ResultsDestination DefaultResultsDestination = ResultsDestination.Grid, QueryOptions? QueryDefaults = null, QueryHistorySettings? QueryHistory = null)
     {
+        /// <summary>Query Execution ▸ Query History (PGMS-043); files without it record history with the default limits.</summary>
+        public QueryHistorySettings History => (QueryHistory ?? new QueryHistorySettings()).Normalized();
         /// <summary>Query Execution and Query Results pages: what new query tabs start with.</summary>
         public QueryOptions QueryOptionDefaults => (QueryDefaults ?? new QueryOptions()).Normalized();
         /// <summary>Query Results ▸ General ▸ Default destination for results of new query tabs; an unknown value falls back to Grid.</summary>
