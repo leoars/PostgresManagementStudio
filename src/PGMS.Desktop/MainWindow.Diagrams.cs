@@ -18,6 +18,8 @@ public partial class MainWindow
     internal Func<string, bool>? DiagramConfirmPrompt { get; set; }
     internal Func<string, string, string?>? DiagramNamePrompt { get; set; }
     internal Func<DatabaseDiagramView, MessageBoxResult>? DiagramClosePrompt { get; set; }
+    /// <summary>Replaces Install Diagram Support (question, script and the optional function of PGMS-045); without it, DiagramConfirmPrompt answers the question alone.</summary>
+    internal Func<InstallDiagramSupportDialog, bool>? DiagramInstallPrompt { get; set; }
     private bool ConfirmDiagram(string text) => DiagramConfirmPrompt?.Invoke(text) ?? MessageBox.Show(this, text, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
     private string? AskDiagramName(string title, string suggested) => DiagramNamePrompt is { } prompt ? prompt(title, suggested) : NamePrompt.Show(this, title, "Enter a name for the diagram:", suggested);
 
@@ -34,9 +36,16 @@ public partial class MainWindow
                 if (askEvenIfInstalled) Status.Text = "Diagram support is already installed in this database.";
                 return true;
             }
-            if (!ConfirmDiagram(InstallQuestion)) return false;
-            await service.InstallAsync();
-            Status.Text = "Diagram support installed (schema pgms, table pgms.diagrams).";
+            bool function = false;
+            if (DiagramInstallPrompt is null && DiagramConfirmPrompt is not null) { if (!ConfirmDiagram(InstallQuestion)) return false; }
+            else
+            {
+                var dialog = new InstallDiagramSupportDialog(InstallQuestion) { Owner = this };
+                if (!(DiagramInstallPrompt ?? (d => d.ShowDialog() == true))(dialog)) return false;
+                function = dialog.FunctionBox.IsChecked == true;
+            }
+            await service.InstallAsync(function);
+            Status.Text = function ? "Diagram support installed (schema pgms, table pgms.diagrams, function pgms.diagram_markdown)." : "Diagram support installed (schema pgms, table pgms.diagrams).";
             return true;
         }
         catch (Exception ex) when (ex is Npgsql.NpgsqlException or IOException or TimeoutException or InvalidOperationException)

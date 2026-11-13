@@ -20,6 +20,8 @@
 
 Veja o seu schema como no SSMS. Adicione tabelas e as tabelas relacionadas, arraste uma coluna sobre outra para criar uma chave estrangeira, altere colunas e chaves primárias dentro do diagrama e deixe o **Arrange Tables** organizar tudo. Toda alteração no banco aparece antes como script SQL para revisão. Os diagramas ficam salvos no servidor, num pequeno schema `pgms` que o PGMS pede permissão para criar.
 
+O diagrama também mostra os **índices** de cada tabela (GIN, GiST, BRIN e classes de operadores como `gin_trgm_ops`, numa seção recolhida por padrão) e avisa das chaves estrangeiras sem índice. Tabelas, colunas e relações podem ter **descrições**, gravadas como `COMMENT ON` do PostgreSQL. **Export for AI…** gera o diagrama em Markdown (colunas, chaves, relações, índices e descrições) para entregar a um agente de IA antes de ele escrever SQL; a função opcional `pgms.diagram_markdown(nome)` devolve o mesmo texto dentro do banco. Veja [Usando diagramas com agentes de IA](docs/pt-BR/user-guide.md#usando-diagramas-com-agentes-de-ia).
+
 ### Query Designer visual
 
 ![O Query Designer com os painéis Diagram, Criteria e SQL](docs/assets/pgms-query-designer.png)
