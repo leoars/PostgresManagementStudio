@@ -53,6 +53,34 @@ internal static class QueryOptionsChecks
             check(dialog.Result is { ExecutionTimeoutSeconds: 9, LockTimeoutMilliseconds: 2500, TextFormat: TextOutputFormat.ColumnAligned }, "OK returns the values on every page");
             dialog.Close();
 
+            // Plan warning thresholds (PGMS-040)
+            var planDialog = new QueryOptionsDialog(new QueryOptions(PlanWarningRatio: 25, PlanWarningMinimumRows: 400)) { ShowInTaskbar = false };
+            var planPages = Named<QueryOptionsPages>(planDialog, "OptionPages");
+            planDialog.Show(); await Idle();
+            var ratioBox = Named<TextBox>(planPages, "PlanRatioBox"); var minimumBox = Named<TextBox>(planPages, "PlanMinimumBox");
+            check(ratioBox.Text == "25" && minimumBox.Text == "400", "The plan warning thresholds open with the values of the tab");
+            ratioBox.Text = "1";
+            check(planPages.TryRead() is null && planPages.RejectedPage == QueryOptionsPages.ExecutionAdvanced, "A ratio below 2 is refused on Execution ▸ Advanced");
+            ratioBox.Text = "30"; minimumBox.Text = "x";
+            check(planPages.TryRead() is null && planPages.RejectedPage == QueryOptionsPages.ExecutionAdvanced, "A minimum that is not a number is refused");
+            minimumBox.Text = "0";
+            check(planPages.TryRead() is { PlanWarningRatio: 30, PlanWarningMinimumRows: 0 }, "The thresholds are read from the page");
+            planPages.ShowPage(QueryOptionsPages.ExecutionAdvanced); planPages.ResetCurrentPage(); await Idle(); planDialog.UpdateLayout();
+            check(ratioBox.Text == "10" && minimumBox.Text == "1000", "Reset to Default restores 10 times and 1000 rows");
+            var advancedPanel = Named<StackPanel>(planPages, "ExecutionAdvancedPanel"); var lastHelp = (FrameworkElement)advancedPanel.Children[^1]; var resetButton = Named<Button>(planPages, "ResetButton");
+            double helpBottom = lastHelp.TranslatePoint(new Point(0, lastHelp.ActualHeight), planPages).Y, resetTop = resetButton.TranslatePoint(new Point(), planPages).Y;
+            check(helpBottom <= resetTop + 0.1, $"Execution ▸ Advanced fits the dialog: text ends at {helpBottom:0}, Reset starts at {resetTop:0}");
+            var planRoot = (FrameworkElement)planDialog.Content;
+            var planBitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(planRoot.ActualWidth), (int)Math.Ceiling(planRoot.ActualHeight), 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            var planDrawing = new System.Windows.Media.DrawingVisual();
+            using (var dc = planDrawing.RenderOpen()) { var bounds = new Rect(0, 0, planRoot.ActualWidth, planRoot.ActualHeight); dc.DrawRectangle(planDialog.Background, null, bounds); dc.DrawRectangle(new System.Windows.Media.VisualBrush(planRoot), null, bounds); }
+            planBitmap.Render(planDrawing);
+            var planEncoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); planEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(planBitmap));
+            System.IO.Directory.CreateDirectory("artifacts/review");
+            using (var planImage = System.IO.File.Create("artifacts/review/m1057-query-options-advanced.png")) planEncoder.Save(planImage);
+            planDialog.Close();
+            check(new QueryOptions(PlanWarningRatio: 1, PlanWarningMinimumRows: -4).Normalized() == new QueryOptions(), "Hand-edited plan thresholds go back to the defaults");
+
             // Menu and per-tab scope
             var otherTab = await window.OpenQueryTextAsync(connection, "SELECT 1");
             var query = await window.OpenQueryTextAsync(connection, $"SELECT id, nome FROM {schema}.t ORDER BY id; UPDATE {schema}.t SET id = id WHERE false;"); // last opened: the visible tab, so its grid has cells

@@ -36,7 +36,7 @@ public partial class MainWindow
         {
             var databases = await new CatalogService(connection).ChildrenAsync(new(CatalogKind.Databases, "Databases"));
             if (ActiveQuery != query || !DatabaseName.IsDropDownOpen) return;
-            FillDatabaseBox(databases.Select(d => d.Name).Append(query.Database).Distinct().Order(StringComparer.CurrentCultureIgnoreCase), query.Database);
+            FillDatabaseBox(databases.Where(d => !d.IsOffline).Select(d => d.Name).Append(query.Database).Distinct().Order(StringComparer.CurrentCultureIgnoreCase), query.Database);
         }
         catch (Exception ex) when (ex is Npgsql.NpgsqlException or IOException or InvalidOperationException or OperationCanceledException)
         {

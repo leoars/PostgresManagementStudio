@@ -136,6 +136,7 @@ internal static class ResultsDestinationChecks
 
             // Object Explorer: Select Top n Rows / Edit Top n Rows
             await window.ConnectExplorerAsync(connection);
+            await ObjectScriptUiChecks.RunAsync(window, connection, check);
             bool askedAgain = false;
             await window.ConnectAtStartupAsync(_ => { askedAgain = true; return false; });
             check(!askedAgain, "With Object Explorer already connected the startup dialog is not shown");

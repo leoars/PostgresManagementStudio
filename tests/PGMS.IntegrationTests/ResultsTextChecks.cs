@@ -12,6 +12,7 @@ internal static class ResultsTextChecks
         await SqlCompletionChecks.RunAsync(connection, check);
         await ForeignKeyScanChecks.RunAsync(connection, check);
         await ForeignKeyIndexScanChecks.RunAsync(connection, check);
+        await ObjectScriptChecks.RunAsync(connection, check);
         await ResultPagesChecks.RunAsync(connection, check);
         // ---- Layout, without a server ----
         var sw = new StringWriter { NewLine = "\n" };

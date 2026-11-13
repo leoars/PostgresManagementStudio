@@ -135,7 +135,8 @@ public partial class MainWindow : Window
         view.ResultsDestination = environment.DefaultResults;
         view.ApplyQueryOptions(environment.QueryOptionDefaults);
         view.JsonLinkRequested += OpenJsonDocument;
-        view.PlanTabRequested += statements => OpenPlanDocument(statements, "Execution plan");
+        view.PlanTabRequested += statements => OpenPlanDocument(statements, "Execution plan", PlanOrigin(view));
+        view.MissingIndexDetailsRequested += OpenMissingIndexDetails;
         var document = new LayoutDocument { Title = path is null ? $"SQLQuery{++sequence}.sql" : Path.GetFileName(path), ContentId = Guid.NewGuid().ToString(), Content = view };
         documents.Add(view, document);
         view.StateChanged += (_, _) =>

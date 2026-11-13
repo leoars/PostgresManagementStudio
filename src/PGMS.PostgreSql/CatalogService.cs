@@ -2,13 +2,16 @@ using Npgsql;
 
 namespace PGMS.PostgreSql;
 
-public enum CatalogKind { Server, Databases, Database, Schemas, Schema, Tables, Views, MaterializedViews, Sequences, Functions, Procedures, Relation, Routine, Columns, Column, Indexes, Index, Roles, Role, Enums, Domains, DataType, DatabaseDiagrams, DatabaseDiagram }
+public enum CatalogKind { Server, Databases, Database, Schemas, Schema, Tables, Views, MaterializedViews, Sequences, Functions, Procedures, Relation, Routine, Columns, Column, Indexes, Index, Roles, Role, Enums, Domains, DataType, DatabaseDiagrams, DatabaseDiagram, Keys, Key, Constraints, Constraint, Triggers, Trigger }
 public sealed record CatalogEntry(CatalogKind Kind, string Name, string? Database = null, string? Schema = null, uint Oid = 0)
 {
     public string? RelationType { get; init; }
     public string? DataTypeKind { get; init; }
+    public string? RoutineKind { get; init; }
     public string? RoleName { get; init; }
     public string? Owner { get; init; }
+    /// <summary>A database with ALLOW_CONNECTIONS off, shown as "name (Offline)" like SSMS; <see cref="Database"/> keeps the real name.</summary>
+    public bool IsOffline { get; init; }
     public bool CanManageRole => Kind == CatalogKind.Role && RoleName is not null;
     public bool CanConfigureTls => Kind == CatalogKind.Server;
     public bool IsServer => Kind == CatalogKind.Server;
@@ -20,7 +23,7 @@ public sealed record CatalogEntry(CatalogKind Kind, string Name, string? Databas
     public bool CanInspectTable => Kind == CatalogKind.Relation && RelationType is "r" or "p";
     public bool CanEditTable => Kind == CatalogKind.Relation && RelationType == "r";
     public bool CanManagePartitions => Kind == CatalogKind.Relation && RelationType == "p";
-    public bool CanExpand => Kind is not (CatalogKind.Routine or CatalogKind.Column or CatalogKind.Index or CatalogKind.Role or CatalogKind.DataType or CatalogKind.DatabaseDiagram);
+    public bool CanExpand => !IsOffline && Kind is not (CatalogKind.Routine or CatalogKind.Column or CatalogKind.Index or CatalogKind.Role or CatalogKind.DataType or CatalogKind.DatabaseDiagram or CatalogKind.Key or CatalogKind.Constraint or CatalogKind.Trigger);
     public bool IsDiagram => Kind == CatalogKind.DatabaseDiagram && Oid != 0;
 }
 
@@ -43,12 +46,18 @@ public sealed class CatalogService(string connectionString)
             case CatalogKind.Database: return [Folder(CatalogKind.DatabaseDiagrams, "Database Diagrams"), Folder(CatalogKind.Schemas, "Schemas")];
             case CatalogKind.DatabaseDiagrams: return await DiagramsAsync(parent, token).ConfigureAwait(false);
             case CatalogKind.Schema: return [Folder(CatalogKind.Tables, "Tables"), Folder(CatalogKind.Views, "Views"), Folder(CatalogKind.MaterializedViews, "Materialized Views"), Folder(CatalogKind.Sequences, "Sequences"), Folder(CatalogKind.Functions, "Functions"), Folder(CatalogKind.Procedures, "Procedures"), Folder(CatalogKind.Enums, "Enums"), Folder(CatalogKind.Domains, "Domains")];
+            // SSMS 22.11 order under a table: Columns, Keys, Constraints, Triggers, Indexes (Statistics has no node here).
+            case CatalogKind.Relation when parent.RelationType is "r" or "p": return [Folder(CatalogKind.Columns, "Columns"), Folder(CatalogKind.Keys, "Keys"), Folder(CatalogKind.Constraints, "Constraints"), Folder(CatalogKind.Triggers, "Triggers"), Folder(CatalogKind.Indexes, "Indexes")];
+            case CatalogKind.Relation when parent.RelationType == "v": return [Folder(CatalogKind.Columns, "Columns"), Folder(CatalogKind.Triggers, "Triggers"), Folder(CatalogKind.Indexes, "Indexes")];
             case CatalogKind.Relation: return [Folder(CatalogKind.Columns, "Columns"), Folder(CatalogKind.Indexes, "Indexes")];
         }
         if (!parent.CanExpand) return [];
         string sql = parent.Kind switch
         {
-            CatalogKind.Databases => "SELECT oid, datname FROM pg_catalog.pg_database WHERE NOT datistemplate AND datallowconn ORDER BY datname",
+            CatalogKind.Databases => "SELECT oid, datname || CASE WHEN datallowconn THEN '' ELSE ' (Offline)' END, datname, NOT datallowconn FROM pg_catalog.pg_database WHERE NOT datistemplate ORDER BY datname",
+            CatalogKind.Keys => "SELECT oid, conname FROM pg_catalog.pg_constraint WHERE conrelid=@oid AND contype IN ('p','u','f') ORDER BY CASE contype WHEN 'p' THEN 0 WHEN 'u' THEN 1 ELSE 2 END, conname",
+            CatalogKind.Constraints => "SELECT oid, conname FROM pg_catalog.pg_constraint WHERE conrelid=@oid AND contype IN ('c','x') ORDER BY conname",
+            CatalogKind.Triggers => "SELECT oid, tgname FROM pg_catalog.pg_trigger WHERE tgrelid=@oid AND NOT tgisinternal ORDER BY tgname",
             CatalogKind.Schemas => "SELECT oid, nspname FROM pg_catalog.pg_namespace WHERE nspname <> 'information_schema' AND nspname !~ '^pg_' ORDER BY nspname",
             CatalogKind.Roles => "SELECT oid, rolname || CASE WHEN rolcanlogin THEN ' (login)' ELSE '' END, rolname FROM pg_catalog.pg_roles ORDER BY rolname",
             CatalogKind.Enums or CatalogKind.Domains => "SELECT t.oid, t.typname, t.typtype::text FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname=@schema AND t.typtype::text=@kind ORDER BY t.typname, t.oid",
@@ -81,10 +90,11 @@ public sealed class CatalogService(string connectionString)
                 CatalogKind.Roles => CatalogKind.Role, CatalogKind.Columns => CatalogKind.Column,
                 CatalogKind.Indexes => CatalogKind.Index, CatalogKind.Functions or CatalogKind.Procedures => CatalogKind.Routine,
                 CatalogKind.Enums or CatalogKind.Domains => CatalogKind.DataType,
+                CatalogKind.Keys => CatalogKind.Key, CatalogKind.Constraints => CatalogKind.Constraint, CatalogKind.Triggers => CatalogKind.Trigger,
                 _ => CatalogKind.Relation
             };
-            entries.Add(new(kind, name, kind == CatalogKind.Database ? name : parent.Database,
-                kind == CatalogKind.Schema ? name : parent.Schema, oid) { RelationType = kind == CatalogKind.Relation && reader.FieldCount > 2 ? reader.GetString(2) : null, DataTypeKind = kind == CatalogKind.DataType ? reader.GetString(2) : null, RoleName = kind == CatalogKind.Role ? reader.GetString(2) : null, Owner = kind == CatalogKind.Relation ? reader.GetString(3) : kind == CatalogKind.Routine ? reader.GetString(2) : null });
+            entries.Add(new(kind, name, kind == CatalogKind.Database ? reader.GetString(2) : parent.Database,
+                kind == CatalogKind.Schema ? name : parent.Schema, oid) { IsOffline = kind == CatalogKind.Database && reader.GetBoolean(3), RelationType = kind == CatalogKind.Relation && reader.FieldCount > 2 ? reader.GetString(2) : null, DataTypeKind = kind == CatalogKind.DataType ? reader.GetString(2) : null, RoutineKind = kind == CatalogKind.Routine ? (parent.Kind == CatalogKind.Procedures ? "p" : "f") : null, RoleName = kind == CatalogKind.Role ? reader.GetString(2) : null, Owner = kind == CatalogKind.Relation ? reader.GetString(3) : kind == CatalogKind.Routine ? reader.GetString(2) : null });
         }
         return entries;
     }

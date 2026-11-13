@@ -34,6 +34,20 @@ public sealed class DatabaseEditService(string connectionString)
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         var names = new List<string>(); while (await reader.ReadAsync(token).ConfigureAwait(false)) names.Add(reader.GetString(0)); return names;
     }
+    public static bool CanTakeOffline(string database, string connectedDatabase) => !Protected(database) && !string.Equals(database, connectedDatabase, StringComparison.Ordinal);
+    private static bool Protected(string database) => database is "postgres" or "template0" or "template1";
+
+    /// <summary>Take Offline / Bring Online (SSMS Tasks ▸): ALLOW_CONNECTIONS. PostgreSQL refuses new sessions and leaves existing ones running.
+    /// Runs from the maintenance database, the only way back in once a database is offline.</summary>
+    public async Task SetOnlineAsync(string database, bool online, CancellationToken token = default)
+    {
+        if (Protected(database)) throw new ArgumentException("System and maintenance databases cannot be changed here.");
+        await using var connection = new NpgsqlConnection(MaintenanceConnection().ConnectionString);
+        await connection.OpenAsync(token).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand($"ALTER DATABASE {SqlIdentifier.Quote(database)} WITH ALLOW_CONNECTIONS {(online ? "true" : "false")}", connection) { CommandTimeout = 60 };
+        await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+    }
+
     public async Task ApplyAsync(DatabaseEdit edit, CancellationToken token = default)
     {
         string sql = edit.ToSql();

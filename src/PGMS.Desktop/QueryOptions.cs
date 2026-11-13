@@ -9,7 +9,8 @@ public sealed record QueryOptions(
     bool NoCount = false, QueryIsolationLevel Isolation = QueryIsolationLevel.ServerDefault, int LockTimeoutMilliseconds = -1, bool ShowCompletionTime = true,
     bool RetainLineBreaks = true, bool GridDiscardResults = false, bool DisplayJsonAsLink = true,
     TextOutputFormat TextFormat = TextOutputFormat.ColumnAligned, string CustomDelimiter = ";", bool TextIncludeHeaders = true, bool TextIncludeQuery = false, bool TextRightAlignNumeric = false, bool TextDiscardResults = false, int TextMaxCharacters = TextResultsWriter.DefaultMaxCharacters,
-    int GridPageRows = QueryOptions.DefaultGridPageRows)
+    int GridPageRows = QueryOptions.DefaultGridPageRows,
+    int PlanWarningRatio = ExecutionPlanWarningOptions.DefaultRatio, int PlanWarningMinimumRows = ExecutionPlanWarningOptions.DefaultMinimum)
 {
     public const int MaxTimeoutSeconds = 86400, MaxLockTimeoutMilliseconds = 86400000, MaxTextCharacters = 8192, DefaultGridPageRows = 100000, MinGridPageRows = 100, MaxGridPageRows = 1000000;
 
@@ -22,8 +23,13 @@ public sealed record QueryOptions(
         TextFormat = Enum.IsDefined(TextFormat) ? TextFormat : TextOutputFormat.ColumnAligned,
         CustomDelimiter = CustomDelimiter is { Length: 1 } ? CustomDelimiter : ";",
         TextMaxCharacters = TextMaxCharacters is >= 1 and <= MaxTextCharacters ? TextMaxCharacters : TextResultsWriter.DefaultMaxCharacters,
-        GridPageRows = GridPageRows is >= MinGridPageRows and <= MaxGridPageRows ? GridPageRows : DefaultGridPageRows
+        GridPageRows = GridPageRows is >= MinGridPageRows and <= MaxGridPageRows ? GridPageRows : DefaultGridPageRows,
+        PlanWarningRatio = PlanWarningRatio is >= ExecutionPlanWarningOptions.MinRatio and <= ExecutionPlanWarningOptions.MaxRatio ? PlanWarningRatio : ExecutionPlanWarningOptions.DefaultRatio,
+        PlanWarningMinimumRows = PlanWarningMinimumRows is >= 0 and <= ExecutionPlanWarningOptions.MaxMinimum ? PlanWarningMinimumRows : ExecutionPlanWarningOptions.DefaultMinimum
     };
+
+    /// <summary>Discarded-rows warning of the graphical plan (PGMS-040); applies to the next plan shown.</summary>
+    internal ExecutionPlanWarningOptions PlanWarnings => new(PlanWarningRatio, PlanWarningMinimumRows);
 
     internal TextResultsFormat TextLayout => new(TextFormat, CustomDelimiter[0], TextIncludeHeaders, TextRightAlignNumeric);
 }

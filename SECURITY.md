@@ -2,7 +2,7 @@
 
 English | [Português (Brasil)](SECURITY.pt-BR.md)
 
-PGMS is in development. There is no published supported release series or guaranteed response time. Current development and the v0.1.0-alpha.5 pre-release are the starting points for investigation; historical packages do not automatically receive fixes.
+PGMS is in development. There is no published supported release series or guaranteed response time. Current development and the v0.1.0-alpha.6 pre-release are the starting points for investigation; historical packages do not automatically receive fixes.
 
 Do not disclose an unpatched vulnerability or real credentials in a public issue. Use GitHub's **Report a vulnerability** on this repository if private reporting is enabled. If it is unavailable, open an issue asking the maintainer for a private contact channel without including vulnerability details. Never post database dumps, saved profiles, DPAPI payloads, access tokens or private keys.
 

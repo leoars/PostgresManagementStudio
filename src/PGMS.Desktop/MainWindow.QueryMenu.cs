@@ -159,14 +159,35 @@ public partial class MainWindow
         return true;
     }
 
+    /// <summary>Missing Index Details… of a plan: the suggestions as a commented script in a new tab on the same connection, as SSMS 22.11 does. Nothing runs.</summary>
+    private async void OpenMissingIndexDetails(QueryView source, IReadOnlyList<PGMS.PostgreSql.PlanIndexSuggestion> suggestions) =>
+        await OpenMissingIndexScriptAsync(PlanOrigin(source), suggestions);
+
+    /// <summary>The connection and the script header of a plan shown in a query tab, kept by a plan tab opened from it.</summary>
+    private (string? Connection, string Header) PlanOrigin(QueryView source)
+    {
+        string title = documents.TryGetValue(source, out var document) ? document.Title.TrimEnd('*') : "query";
+        return (source.ConnectionString, $"{title} - database {source.Database}");
+    }
+
+    private async Task OpenMissingIndexScriptAsync((string? Connection, string Header) origin, IReadOnlyList<PGMS.PostgreSql.PlanIndexSuggestion> suggestions)
+    {
+        string script = PGMS.PostgreSql.PlanIndexAdvisor.Script(origin.Header, suggestions);
+        if (origin.Connection is { } connection) await OpenQueryTextAsync(connection, script);
+        else NewQuery(script);
+    }
+
     private readonly List<ExecutionPlanDocument> planDocuments = [];
     internal IReadOnlyList<ExecutionPlanDocument> PlanDocuments => planDocuments;
     private int planDocumentSequence;
 
-    /// <summary>A plan in its own document tab, independent of any query session.</summary>
-    internal ExecutionPlanDocument OpenPlanDocument(IReadOnlyList<PGMS.PostgreSql.ExecutionPlanStatement> statements, string title)
+    /// <summary>A plan in its own document tab, independent of any query session. Opened from a query tab, it keeps that tab's connection string and header,
+    /// so Missing Index Details… opens the script connected, as from the query tab; a plan file has neither and opens it in a tab that is not connected.</summary>
+    internal ExecutionPlanDocument OpenPlanDocument(IReadOnlyList<PGMS.PostgreSql.ExecutionPlanStatement> statements, string title, (string? Connection, string Header)? origin = null)
     {
         var view = new ExecutionPlanDocument(statements) { Report = text => Status.Text = text };
+        var from = origin ?? (null, title);
+        view.Diagram.MissingIndexDetailsRequested += async suggestions => await OpenMissingIndexScriptAsync(from, suggestions);
         var document = new AvalonDock.Layout.LayoutDocument { Title = planDocumentSequence++ == 0 ? title : $"{title} {planDocumentSequence}", ContentId = Guid.NewGuid().ToString(), Content = view };
         planDocuments.Add(view);
         document.Closed += (_, _) => { planDocuments.Remove(view); RefreshCommands(); };
@@ -187,7 +208,8 @@ public partial class MainWindow
         try
         {
             var plan = await PGMS.PostgreSql.QueryPlanFiles.LoadAsync(path);
-            var statements = await Task.Run(() => PGMS.PostgreSql.ExecutionPlanBuilder.Build([plan]));
+            var planWarnings = EnvironmentSettings.Load().QueryOptionDefaults.PlanWarnings;
+            var statements = await Task.Run(() => PGMS.PostgreSql.ExecutionPlanBuilder.Build([plan], warnings: planWarnings));
             var view = OpenPlanDocument(statements, Path.GetFileName(path));
             Status.Text = "Saved plan opened. It was not run against any server.";
             return view;

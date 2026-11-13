@@ -36,6 +36,15 @@ public partial class QueryView
     /// <summary>Show Execution Plan In New Tab: the host opens the plan on screen in a document of its own.</summary>
     internal event Action<IReadOnlyList<ExecutionPlanStatement>>? PlanTabRequested;
     private void ShowPlanInNewTab(object? sender,EventArgs e){if(PlanDiagram.Statements.Count>0)PlanTabRequested?.Invoke(PlanDiagram.Statements);}
+    /// <summary>Missing Index Details…: the host opens the commented script in a new query tab of this connection. Nothing is executed.</summary>
+    internal event Action<QueryView,IReadOnlyList<PlanIndexSuggestion>>? MissingIndexDetailsRequested;
+    private void ShowMissingIndexDetails(IReadOnlyList<PlanIndexSuggestion> suggestions)=>MissingIndexDetailsRequested?.Invoke(this,suggestions);
+    /// <summary>Adds the index suggestions that pass the catalog check (PGMS-041). A failure here, such as a transaction left aborted, only means no suggestion.</summary>
+    private static async Task<IReadOnlyList<ExecutionPlanStatement>> WithIndexAdviceAsync(QuerySession session,IReadOnlyList<ExecutionPlanStatement> statements,CancellationToken token)
+    {
+        try{return await session.AdviseIndexesAsync(statements,token).ConfigureAwait(false);}
+        catch(Exception ex)when(ex is NpgsqlException or InvalidOperationException or IOException or TimeoutException or ObjectDisposedException){return statements;}
+    }
     // Export follows the statement of the selected operator; with no plan on screen there is nothing to export.
     private void SelectedPlanOperator(object? sender,EventArgs e)
     {
@@ -63,7 +72,13 @@ public partial class QueryView
         if(capture.Plans.Count==0){PlanStatus.Text="This execution produced no plan: statements such as SET or CREATE have none.";return;}
         try
         {
-            var statements=await Task.Run(()=>ExecutionPlanBuilder.Build(capture.Plans));
+            var planWarnings=QueryOptions.PlanWarnings;
+            var capturedSession=session;
+            var statements=await Task.Run(async()=>
+            {
+                var built=ExecutionPlanBuilder.Build(capture.Plans,warnings:planWarnings);
+                return capturedSession is { IsConnected: true }?await WithIndexAdviceAsync(capturedSession,built,CancellationToken.None).ConfigureAwait(false):built;
+            });
             planRevision=revision;PlanDiagram.Show(statements);
             PlanStatus.Text=$"Actual plan · captured during this execution, which ran once. {statements.Count} statement(s)."+(capture.Omitted>0?$" {capture.Omitted} plan(s) omitted: limit {ActualPlanCapture.MaximumPlans} plans, 1 Mi characters each.":"");
         }
@@ -104,11 +119,12 @@ public partial class QueryView
         UpdateExport();StateChanged?.Invoke(this,EventArgs.Empty);
         try
         {
-            var capturedSession=session;var token=cancellation.Token;
+            var capturedSession=session;var token=cancellation.Token;var planWarnings=QueryOptions.PlanWarnings;
             var loaded=await Task.Run(async()=>
             {
                 var plan=await (analyze?capturedSession.AnalyzeAsync(sql,options,token):generic?capturedSession.ExplainGenericAsync(sql,options,token):capturedSession.ExplainAsync(sql,options,token)).ConfigureAwait(false);
-                return (Statements:ExecutionPlanBuilder.Build([plan],sql,token),Timings:QueryPlanTimings.Read(plan));
+                var built=ExecutionPlanBuilder.Build([plan],sql,token,planWarnings);
+                return (Statements:await WithIndexAdviceAsync(capturedSession,built,token).ConfigureAwait(false),Timings:QueryPlanTimings.Read(plan));
             },token);
             planRevision=revision;PlanDiagram.Show(loaded.Statements);
             PlanStatus.Text=analyze?"Analyzed plan · SQL executed. Effects follow the current transaction; no automatic rollback.":generic?"Generic plan · $n parameters are not bound, so the planner cannot use their values; costs are planner units. Query rows were not executed.":"Estimated plan · costs are planner units, not milliseconds. Query rows were not executed.";

@@ -43,7 +43,7 @@ internal static class ExecutionPlanUiChecks
             diagram.Zoom = 1;
             var menu = diagram.ContextMenu;
             string[] names = menu.Items.OfType<MenuItem>().Select(m => m.Name).ToArray();
-            check(names.SequenceEqual(["PlanSaveAs", "PlanShowInNewTab", "PlanFindNode", "PlanZoomIn", "PlanZoomOut", "PlanCustomZoom", "PlanZoomFit"]), "Context menu offers save, new tab, find and zoom");
+            check(names.SequenceEqual(["PlanSaveAs", "PlanShowInNewTab", "PlanFindNode", "PlanMissingIndex", "PlanZoomIn", "PlanZoomOut", "PlanCustomZoom", "PlanZoomFit"]), "Context menu offers save, new tab, find, missing index and zoom");
             menu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanZoomIn").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             check(Math.Abs(diagram.Zoom - 1.25) < 0.001, "Zoom In enlarges by one step");
             menu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanZoomOut").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
@@ -102,6 +102,63 @@ internal static class ExecutionPlanUiChecks
             await query.ExplainPlanAsync();
             check(diagram.Statements.Count == 1 && diagram.Statements[0].Root.Children[0].ActualRows is null && !diagram.Statements[0].Root.Children[0].Lines.Any(l => l.EndsWith(" of", StringComparison.Ordinal)), "Estimated plan has no invented actual rows");
             check(diagram.Statements[0].QueryText == editor.Text, "Estimated plan shows the SQL it explained");
+
+            // Discarded rows warning (PGMS-040)
+            ExecutionPlanOperator ItemsScan() => TryFind(diagram.Statements[0].Root, o => !o.IsStatement && o.Properties.GetValueOrDefault("Relation Name") == "items_ui") ?? throw new Exception("no scan of items_ui");
+            int Signs() => FindAll<Grid>(diagram).Count(g => g.Tag as string == ExecutionPlanView.WarningSignTag);
+            async Task AnalyzeAsync() { query.ReviewAnalyzedPlan(); await query.ConfirmAnalyzedPlanAsync(); await query.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle); }
+            editor.Text = "SELECT * FROM items_ui WHERE id = 7";
+            await query.ExplainPlanAsync();
+            check(ItemsScan().Warnings.Count == 0 && Signs() == 0, "An estimated plan has no discarded-rows warning");
+            var missingItem = menu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanMissingIndex");
+            TextBox? MissingLine() => FindAll<TextBox>(diagram).SingleOrDefault(t => t.Tag as string == ExecutionPlanView.MissingIndexTag);
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+            check(!missingItem.IsEnabled && menu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanFindNode").IsEnabled && MissingLine() is null && diagram.Statements[0].MissingIndexes.Count == 0, "Without a suggestion Missing Index Details is listed but gray, and the header has no extra line");
+            await AnalyzeAsync();
+            var scan = ItemsScan();
+            check(scan.Warnings.SequenceEqual(["Rows Removed by Filter: 2999, against 1 row returned (2999 times)."]), "A scan that discards 2999 rows to return 1 gets a warning: " + string.Join("|", scan.Warnings));
+            check(Signs() == 1, "Only the operator with the warning shows the sign, found " + Signs());
+            check(scan.Properties.GetValueOrDefault("Warnings") == scan.Warnings[0] && ExecutionPlanSearch.PropertyNames(ExecutionPlanSearch.Operators(diagram.Statements)).Contains("Warnings"), "The warning is a property, so Find Node reaches it");
+            var warned = FindAll<StackPanel>(diagram).Single(p => System.Windows.Automation.AutomationProperties.GetHelpText(p).StartsWith("Warning: ", StringComparison.Ordinal));
+            check(System.Windows.Automation.AutomationProperties.GetName(warned).StartsWith("Seq Scan", StringComparison.Ordinal), "The warning is exposed to assistive technology on its operator");
+            var warningCard = ((StackPanel)ExecutionPlanView.Card(scan)).Children.OfType<TextBlock>().Select(t => t.Text).ToList();
+            check(warningCard[^2] == "Warnings" && warningCard[^1] == scan.Warnings[0], "The tooltip ends with the Warnings section");
+            check(!((StackPanel)ExecutionPlanView.Card(diagram.Statements[0].Root)).Children.OfType<TextBlock>().Any(t => t.Text == "Warnings"), "An operator without warnings has no Warnings section");
+
+            // Index suggestion (PGMS-041)
+            check(diagram.Statements[0].MissingIndexes is [{ QualifiedTable: "pg_temp.items_ui", KeyList: "id", IndexName: "ix_items_ui_id" }], "The warned scan gives an index suggestion checked on the session of the tab: " + string.Join("|", diagram.Statements[0].MissingIndexes.Select(m => m.HeaderLine)));
+            check(MissingLine() is { Text: "Missing Index (heuristic, not verified): CREATE INDEX ON pg_temp.items_ui (id)", IsReadOnly: true, Foreground: System.Windows.Media.SolidColorBrush { Color: { R: 0, G: 0x80, B: 0 } } }, "The suggestion is the green line under the statement text");
+            IReadOnlyList<PlanIndexSuggestion>? asked = null;
+            query.MissingIndexDetailsRequested += (_, suggestions) => asked = suggestions;
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+            check(missingItem.IsEnabled, "With a suggestion Missing Index Details is available");
+            missingItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            check(asked is [{ IndexName: "ix_items_ui_id" }], "Missing Index Details hands the suggestions of the statement to the host");
+            tabs.SelectedItem = query.FindName("PlanTab");
+            await ResultExportUiChecks.Capture(window, query, "m1057-plan-warning", 1000, 700, check);
+            query.ApplyQueryOptions(new QueryOptions(PlanWarningMinimumRows: 5000)); await AnalyzeAsync();
+            check(ItemsScan().Warnings.Count == 0 && Signs() == 0 && diagram.Statements[0].MissingIndexes.Count == 0 && MissingLine() is null, "Below the minimum of discarded rows there is no warning and no suggestion");
+            query.ApplyQueryOptions(new QueryOptions(PlanWarningRatio: 5000, PlanWarningMinimumRows: 0)); await AnalyzeAsync();
+            check(ItemsScan().Warnings.Count == 0, "Below the configured ratio there is no warning");
+            query.ApplyQueryOptions(new QueryOptions(PlanWarningRatio: 2999, PlanWarningMinimumRows: 2999)); await AnalyzeAsync();
+            check(ItemsScan().Warnings.Count == 1 && Signs() == 1, "Reaching both configured values warns");
+            query.ApplyQueryOptions(new QueryOptions());
+            query.IncludeActualPlan = true; tabs.SelectedIndex = 0;
+            await query.ExecuteAsync(); await query.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            check(ItemsScan().Warnings.Count == 1 && Signs() == 1 && diagram.Statements[0].MissingIndexes is [{ KeyList: "id" }], "Include Actual Execution Plan warns and suggests too");
+            query.IncludeActualPlan = false;
+
+            string loopsFile = System.IO.Path.Combine(directory, "loops.json");
+            await System.IO.File.WriteAllTextAsync(loopsFile, "[{\"Plan\":{\"Node Type\":\"Nested Loop\",\"Join Type\":\"Inner\",\"Startup Cost\":0.0,\"Total Cost\":100.0,\"Plan Rows\":10,\"Plan Width\":4,\"Actual Startup Time\":0.1,\"Actual Total Time\":5.0,\"Actual Rows\":2,\"Actual Loops\":1,\"Rows Removed by Join Filter\":4000,\"Plans\":["
+                + "{\"Node Type\":\"Bitmap Heap Scan\",\"Parent Relationship\":\"Outer\",\"Relation Name\":\"t\",\"Startup Cost\":0.0,\"Total Cost\":40.0,\"Plan Rows\":10,\"Plan Width\":4,\"Actual Startup Time\":0.1,\"Actual Total Time\":1.0,\"Actual Rows\":10,\"Actual Loops\":1,\"Rows Removed by Index Recheck\":999,\"Rows Removed by Filter\":50},"
+                + "{\"Node Type\":\"Seq Scan\",\"Parent Relationship\":\"Inner\",\"Relation Name\":\"u\",\"Startup Cost\":0.0,\"Total Cost\":5.0,\"Plan Rows\":1,\"Plan Width\":4,\"Actual Startup Time\":0.01,\"Actual Total Time\":0.02,\"Actual Rows\":0,\"Actual Loops\":50,\"Rows Removed by Filter\":30}]}}]");
+            var loopsPlan = await QueryPlanFiles.LoadAsync(loopsFile);
+            var loop = ExecutionPlanBuilder.Build([loopsPlan])[0].Root.Children[0];
+            check(loop.Warnings.SequenceEqual(["Rows Removed by Join Filter: 4000, against 2 rows returned (2000 times)."]), "Join Filter counts: " + string.Join("|", loop.Warnings));
+            check(loop.Children[0].Warnings.Count == 0, "999 rechecked rows stay under the default minimum of 1000");
+            check(loop.Children[1].Warnings.SequenceEqual(["Rows Removed by Filter: 1500, against 0 rows returned."]), "Counters are per loop and are multiplied by the loops: " + string.Join("|", loop.Children[1].Warnings));
+            var recheck = ExecutionPlanBuilder.Build([loopsPlan], warnings: new ExecutionPlanWarningOptions(10, 500))[0].Root.Children[0].Children[0];
+            check(recheck.Warnings.SequenceEqual(["Rows Removed by Index Recheck: 999, against 10 rows returned (100 times)."]), "Index Recheck counts, and each counter is judged on its own: " + string.Join("|", recheck.Warnings));
         }
         finally { query.Cancel(); await query.DisposeAsync(); window.Close(); }
 
@@ -134,16 +191,51 @@ internal static class ExecutionPlanUiChecks
             queryDiagram.ContextMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanShowInNewTab").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
             check(shell.PlanDocuments.Count == 2 && shell.PlanDocuments[1].Diagram.Statements[0].Root.Children[0].Title == "Seq Scan", "Show Execution Plan In New Tab opens the plan in its own tab");
-            var tabMenu = shell.PlanDocuments[1].Diagram.ContextMenu;
-            tabMenu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent, tabMenu));
-            var queryMenu = queryDiagram.ContextMenu;
-            queryMenu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent, queryMenu));
-            check(tabMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanShowInNewTab").Visibility == Visibility.Collapsed && queryMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanShowInNewTab").Visibility == Visibility.Visible,
-                "Show Execution Plan In New Tab is offered in the query tab only, not in a plan tab, where it had nowhere to go");
             string resaved = System.IO.Path.Combine(planFolder, "again.json");
             shell.PlanDocuments[1].PickSaveFile = () => resaved;
             await shell.PlanDocuments[1].SaveSelectedAsync();
             check(System.IO.File.Exists(resaved) && (await QueryPlanFiles.LoadAsync(resaved)).Json.Contains("Seq Scan", StringComparison.Ordinal), "A plan tab can be saved");
+
+            // Missing Index Details opens a tab (PGMS-041)
+            var adviceTab = await shell.OpenQueryTextAsync(connection, "CREATE TEMP TABLE advice_ui AS SELECT g AS id, g % 50 AS k FROM generate_series(1, 4000) g");
+            await adviceTab.ExecuteAsync();
+            adviceTab.Editor.Text = "SELECT id FROM advice_ui WHERE k = 3";
+            adviceTab.ReviewAnalyzedPlan(); await adviceTab.ConfirmAnalyzedPlanAsync();
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            adviceTab.IsDirty = false;
+            var adviceDiagram = (ExecutionPlanView)adviceTab.FindName("PlanDiagram");
+            var openBefore = shell.QueryDocuments.ToList();
+            adviceDiagram.ContextMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanMissingIndex").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            QueryView? details = null;
+            for (int i = 0; i < 200 && (details = shell.QueryDocuments.Except(openBefore).FirstOrDefault()) is not { IsConnected: true }; i++) await Task.Delay(50);
+            string detailsText = details?.Editor.Text ?? "";
+            check(details is { IsConnected: true, IsDirty: false } && detailsText.StartsWith("/*\nMissing Index Details from SQLQuery", StringComparison.Ordinal) && detailsText.Contains(" - database ", StringComparison.Ordinal), "Missing Index Details opens a connected tab that names the query it came from: " + detailsText.Split('\n').ElementAtOrDefault(1));
+            check(detailsText.Contains("\nCREATE INDEX CONCURRENTLY ix_advice_ui_k\nON pg_temp.advice_ui (k);\n*/", StringComparison.Ordinal) && detailsText.Contains("Seq Scan on pg_temp.advice_ui discarded 3920 rows to return 80", StringComparison.Ordinal), "The tab holds the commented CREATE INDEX and what it was read from");
+            adviceDiagram.ContextMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanShowInNewTab").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            var copied = shell.PlanDocuments[^1].Diagram;
+            check(copied.Statements[0].MissingIndexes.Count == 1 && FindAll<TextBox>(copied).Any(t => t.Tag as string == ExecutionPlanView.MissingIndexTag), "A plan shown in a new tab keeps its suggestion");
+            openBefore = shell.QueryDocuments.ToList();
+            copied.ContextMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanMissingIndex").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            QueryView? fromTab = null;
+            for (int i = 0; i < 200 && (fromTab = shell.QueryDocuments.Except(openBefore).FirstOrDefault()) is not { IsConnected: true }; i++) await Task.Delay(50);
+            check(fromTab is { IsConnected: true, IsDirty: false } && fromTab.Editor.Text.Contains("CREATE INDEX CONCURRENTLY ix_advice_ui_k", StringComparison.Ordinal) && fromTab.Editor.Text.Split('\n').ElementAtOrDefault(1) == detailsText.Split('\n').ElementAtOrDefault(1),
+                "From a plan tab opened from a query, the script opens connected and names the same query, as from the query tab");
+            var copiedMenu = copied.ContextMenu;
+            copiedMenu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent, copiedMenu));
+            var queryMenu = adviceDiagram.ContextMenu;
+            queryMenu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent, queryMenu));
+            check(copiedMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanShowInNewTab").Visibility == Visibility.Collapsed && queryMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanShowInNewTab").Visibility == Visibility.Visible,
+                "Show Execution Plan In New Tab is offered in the query tab only, not in a plan tab, where it had nowhere to go");
+            openBefore = shell.QueryDocuments.ToList();
+            var fileStatements = saved.Diagram.Statements;
+            saved.Diagram.Show(copied.Statements);
+            saved.Diagram.ContextMenu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanMissingIndex").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            var loose = shell.QueryDocuments.Except(openBefore).FirstOrDefault();
+            check(loose is { IsConnected: false, IsDirty: false } && loose.Editor.Text.Contains("CREATE INDEX CONCURRENTLY ix_advice_ui_k", StringComparison.Ordinal), "From the tab of a plan file the script opens in a tab that is not connected");
+            saved.Diagram.Show(fileStatements);
+            check(saved.Diagram.Statements[0].MissingIndexes.Count == 0, "A plan opened from a file has no suggestion: nothing was checked");
         }
         finally { shell.Close(); }
     }

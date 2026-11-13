@@ -162,6 +162,7 @@ public partial class MainWindow
         }
 
         var entry = node?.Entry;
+        void Script() { if (entry is not null && BuildScriptMenu(entry) is { } script) menu.Items.Add(script); }
         switch (entry?.Kind)
         {
             case null:
@@ -196,11 +197,27 @@ public partial class MainWindow
                 Separator(); Add("Restore Database…", RestoreDatabase, "ExplorerRestoreDatabase");
                 Footer();
                 break;
+            case CatalogKind.Database when entry.IsOffline:
+                // Nothing can connect to it: the only thing left to do is bring it back.
+                Add("New _Database…", NewDatabase, "ExplorerNewDatabase");
+                Separator();
+                var offlineTasks = new MenuItem { Header = "Tas_ks", Name = "ExplorerDatabaseTasks" };
+                var bringOnline = new MenuItem { Header = "Bring Online", Name = "ExplorerBringOnline" };
+                bringOnline.Click += async (_, _) => await SetDatabaseOnlineAsync(entry, true);
+                offlineTasks.Items.Add(bringOnline); menu.Items.Add(offlineTasks);
+                Separator(); Add("_Refresh", RefreshExplorer, "ExplorerRefresh");
+                break;
             case CatalogKind.Database:
                 Add("New _Database…", NewDatabase, "ExplorerNewDatabase");
                 Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Script();
                 Separator();
                 var tasks = new MenuItem { Header = "Tas_ks", Name = "ExplorerDatabaseTasks" };
+                bool canTakeOffline = catalogService is { } connected && DatabaseEditService.CanTakeOffline(entry.Database ?? entry.Name, connected.DefaultDatabase);
+                var takeOffline = new MenuItem { Header = "Take Offline", Name = "ExplorerTakeOffline", IsEnabled = canTakeOffline };
+                if (!canTakeOffline) { takeOffline.ToolTip = "Not available for the maintenance database or the database Object Explorer is connected to."; ToolTipService.SetShowOnDisabled(takeOffline, true); }
+                takeOffline.Click += async (_, _) => await SetDatabaseOnlineAsync(entry, false);
+                tasks.Items.Add(takeOffline); tasks.Items.Add(new MenuItem { Header = "Bring Online", Name = "ExplorerBringOnline", IsEnabled = false }); tasks.Items.Add(new System.Windows.Controls.Separator());
                 foreach (var (header, click, name) in new (string, RoutedEventHandler, string)[] { ("Back Up…", BackupDatabase, "ExplorerBackupDatabase"), ("Restore…", RestoreDatabase, "ExplorerRestoreDatabase"), ("Database Operations…", DatabaseOperations, "ExplorerDatabaseOperations") })
                 { var item = new MenuItem { Header = header, Name = name }; item.Click += click; tasks.Items.Add(item); }
                 menu.Items.Add(tasks);
@@ -215,6 +232,7 @@ public partial class MainWindow
             case CatalogKind.Schema:
                 Add("New _Schema…", NewSchema, "ExplorerNewSchema");
                 Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Script();
                 Separator(); Add("Schema Operations…", SchemaOperations, "ExplorerSchemaOperations");
                 Footer(true, ObjectProperties, "ExplorerObjectProperties");
                 break;
@@ -253,6 +271,7 @@ public partial class MainWindow
                 break;
             case CatalogKind.Role:
                 Add("New Login/Group _Role…", NewRole, "ExplorerNewRole");
+                Script();
                 Add("Role Memberships…", RoleMemberships, "ExplorerRoleMemberships");
                 Add("Set Role Password…", SetRolePassword, "ExplorerSetRolePassword");
                 Separator(); Add("Start psql", StartPsql, "ExplorerStartPsql");
@@ -264,6 +283,7 @@ public partial class MainWindow
                 Add("New _Table…", NewTableInDesigner, "ExplorerNewTable");
                 Add("De_sign", DesignFromExplorer, "ExplorerDesign");
                 RowCommands();
+                Script();
                 Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
                 Separator();
                 if (entry.CanEditTable)
@@ -278,21 +298,42 @@ public partial class MainWindow
                 break;
             case CatalogKind.Relation when entry.RelationType == "S":
                 Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Script();
                 Separator(); Add("Sequence Operations…", SequenceOperations, "ExplorerSequenceOperations");
                 Footer();
                 break;
             case CatalogKind.Relation when entry.CanInspectObjectProperties: // Views and materialized views.
                 if (entry.RelationType == "v") { Add("New _View…", NewViewFromExplorer, "ExplorerNewView"); Add("De_sign", DesignViewFromExplorer, "ExplorerDesignView"); }
                 RowCommands(edit: entry.RelationType == "v");
+                Script();
                 Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
                 Footer(true, ObjectProperties, "ExplorerObjectProperties");
                 break;
             case CatalogKind.Routine:
                 Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Script();
                 Separator(); Add("Routine Permissions…", RoutinePermissionsFromExplorer, "ExplorerRoutinePermissions");
                 Footer(true, ObjectProperties, "ExplorerObjectProperties");
                 break;
+            case CatalogKind.Index:
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Script();
+                // SSMS: Rebuild · Reorganize · Disable; only Rebuild has a PostgreSQL counterpart (REINDEX).
+                Separator(); Add("Re_build", RebuildIndexFromExplorer, "ExplorerRebuildIndex");
+                Footer();
+                break;
+            case CatalogKind.Indexes:
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Separator(); Add("Re_build All", RebuildAllFromExplorer, "ExplorerRebuildAll");
+                Footer();
+                break;
+            case CatalogKind.Key or CatalogKind.Constraint or CatalogKind.Trigger:
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Script();
+                Footer();
+                break;
             case CatalogKind.DataType:
+                Script();
                 if (entry.CanManageEnum) Add("Enum Values…", EnumFromExplorer, "ExplorerEnumValues");
                 if (entry.CanManageDomain) Add("Domain Constraints…", DomainFromExplorer, "ExplorerDomainConstraints");
                 Footer();
