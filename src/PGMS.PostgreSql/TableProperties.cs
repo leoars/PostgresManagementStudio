@@ -158,3 +158,4 @@ public sealed class TablePropertiesService(string connectionString)
         return info with { Triggers = triggers, IncomingForeignKeys = incoming, Constraints = constraints, Indexes = indexes, Columns = columns, Dependents = dependencies.Take(1000).ToArray(), DependentsTruncated = dependencies.Count > 1000 };
     }
 }
+

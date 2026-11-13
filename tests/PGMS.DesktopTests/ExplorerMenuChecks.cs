@@ -35,7 +35,7 @@ internal static class ExplorerMenuChecks
 
             var database = await MenuFor(new CatalogEntry(CatalogKind.Database, "postgres", "postgres", Oid: 5));
             var tasks = database.OfType<MenuItem>().Single(m => m.Name == "ExplorerDatabaseTasks");
-            check(tasks.Items.OfType<MenuItem>().Select(m => m.Name).SequenceEqual(["ExplorerBackupDatabase", "ExplorerRestoreDatabase", "ExplorerDatabaseOperations"]) && Names(database).Contains("ExplorerObjectProperties"), "Database menu groups Back Up and Restore under Tasks, as in SSMS");
+            check(tasks.Items.OfType<MenuItem>().Select(m => m.Name).SequenceEqual(["ExplorerTakeOffline", "ExplorerBringOnline", "ExplorerBackupDatabase", "ExplorerRestoreDatabase", "ExplorerDatabaseOperations"]) && Names(database).Contains("ExplorerObjectProperties"), "Database menu groups Take Offline, Bring Online, Back Up and Restore under Tasks, as in SSMS");
             check(Names(await MenuFor(new CatalogEntry(CatalogKind.Databases, "Databases"))).SequenceEqual(["ExplorerNewDatabase", "-", "ExplorerRestoreDatabase", "-", "ExplorerStartPsql", "-", "ExplorerRefresh"]), "Databases folder menu matches SSMS minus SQL Server-only items");
             var predefined = Names(await MenuFor(new CatalogEntry(CatalogKind.Role, "pg_monitor") { RoleName = "pg_monitor" }));
             check(predefined.SequenceEqual(["ExplorerStartPsql", "-", "ExplorerRefresh"]), "Predefined pg_ roles, like SSMS fixed server roles, offer no editing");

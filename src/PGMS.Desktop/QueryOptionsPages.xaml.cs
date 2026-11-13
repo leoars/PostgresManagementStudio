@@ -41,6 +41,8 @@ public partial class QueryOptionsPages : UserControl
                 CompletionBox.IsChecked = o.ShowCompletionTime;
                 IsolationBox.SelectedIndex = (int)o.Isolation;
                 LockBox.Text = o.LockTimeoutMilliseconds.ToString(CultureInfo.InvariantCulture);
+                PlanRatioBox.Text = o.PlanWarningRatio.ToString(CultureInfo.InvariantCulture);
+                PlanMinimumBox.Text = o.PlanWarningMinimumRows.ToString(CultureInfo.InvariantCulture);
                 break;
             case ResultsGrid:
                 RetainBox.IsChecked = o.RetainLineBreaks;
@@ -78,6 +80,10 @@ public partial class QueryOptionsPages : UserControl
             return Reject(ExecutionGeneral, TimeoutBox, $"Enter an execution time-out from 0 to {QueryOptions.MaxTimeoutSeconds} seconds.");
         if (!int.TryParse(LockBox.Text.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int lockTimeout) || lockTimeout is < -1 or > QueryOptions.MaxLockTimeoutMilliseconds)
             return Reject(ExecutionAdvanced, LockBox, $"Enter a lock timeout from -1 to {QueryOptions.MaxLockTimeoutMilliseconds} milliseconds.");
+        if (!int.TryParse(PlanRatioBox.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int planRatio) || planRatio is < ExecutionPlanWarningOptions.MinRatio or > ExecutionPlanWarningOptions.MaxRatio)
+            return Reject(ExecutionAdvanced, PlanRatioBox, $"Enter from {ExecutionPlanWarningOptions.MinRatio} to {ExecutionPlanWarningOptions.MaxRatio} times the rows returned.");
+        if (!int.TryParse(PlanMinimumBox.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int planMinimum) || planMinimum > ExecutionPlanWarningOptions.MaxMinimum)
+            return Reject(ExecutionAdvanced, PlanMinimumBox, $"Enter a minimum from 0 to {ExecutionPlanWarningOptions.MaxMinimum} discarded rows.");
         if (!int.TryParse(PageRowsBox.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int pageRows) || pageRows is < QueryOptions.MinGridPageRows or > QueryOptions.MaxGridPageRows)
             return Reject(ResultsGrid, PageRowsBox, $"Enter rows per page from {QueryOptions.MinGridPageRows} to {QueryOptions.MaxGridPageRows}.");
         var format = (TextOutputFormat)Math.Max(0, FormatBox.SelectedIndex);
@@ -88,7 +94,7 @@ public partial class QueryOptionsPages : UserControl
         return new QueryOptions(timeout, CheckTransactionsBox.IsChecked == true,
             NoCountBox.IsChecked == true, (QueryIsolationLevel)Math.Max(0, IsolationBox.SelectedIndex), lockTimeout, CompletionBox.IsChecked == true,
             RetainBox.IsChecked == true, GridDiscardBox.IsChecked == true, JsonLinkBox.IsChecked == true,
-            format, DelimiterBox.Text.Length == 1 ? DelimiterBox.Text : ";", TextHeadersBox.IsChecked == true, TextQueryBox.IsChecked == true, RightAlignBox.IsChecked == true, TextDiscardBox.IsChecked == true, maxCharacters, pageRows);
+            format, DelimiterBox.Text.Length == 1 ? DelimiterBox.Text : ";", TextHeadersBox.IsChecked == true, TextQueryBox.IsChecked == true, RightAlignBox.IsChecked == true, TextDiscardBox.IsChecked == true, maxCharacters, pageRows, planRatio, planMinimum);
     }
 
     /// <summary>Page holding the last rejected value, for the host to select it in its tree.</summary>

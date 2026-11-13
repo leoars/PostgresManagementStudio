@@ -38,3 +38,4 @@ public static class JsonResults
         finally{if(File.Exists(temporary))File.Delete(temporary);}
     }
 }
+

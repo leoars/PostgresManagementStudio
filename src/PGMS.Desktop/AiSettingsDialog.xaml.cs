@@ -32,6 +32,7 @@ public partial class AiSettingsDialog : Window
     {
         shown = provider; var p = settings.For(provider);
         Provider.SelectedItem = provider; Endpoint.Text = p.Endpoint; Model.Text = p.Model; Model.ItemsSource = null;
+        ContextLimit.Text = (p.ContextCharacters == 0 ? PGMS.PostgreSql.SchemaContext.DefaultMaximumCharacters : p.ContextCharacters).ToString(System.Globalization.CultureInfo.InvariantCulture);
         Key.Password = pendingKeys.GetValueOrDefault(provider, "");
     }
 
@@ -45,7 +46,7 @@ public partial class AiSettingsDialog : Window
     private void Remember()
     {
         if (Key.Password.Length > 0) pendingKeys[shown] = Key.Password; else pendingKeys.Remove(shown);
-        try { settings = settings.With(settings.For(shown) with { Endpoint = Endpoint.Text.Trim(), Model = Model.Text.Trim() }); }
+        try { settings = settings.With(settings.For(shown) with { Endpoint = Endpoint.Text.Trim(), Model = Model.Text.Trim(), ContextCharacters = TypedContextLimit() }); }
         catch (ArgumentException) { } // Invalid edits are reported again on Save or Test.
     }
 
@@ -66,9 +67,18 @@ public partial class AiSettingsDialog : Window
     /// <summary>The visible provider as it would be saved, with a typed key encrypted in memory.</summary>
     private AiProviderSettings Edited()
     {
-        var p = settings.For(shown) with { Endpoint = Endpoint.Text.Trim(), Model = Model.Text.Trim() };
+        var p = settings.For(shown) with { Endpoint = Endpoint.Text.Trim(), Model = Model.Text.Trim(), ContextCharacters = TypedContextLimit() };
         if (p.NeedsKey && Key.Password.Length > 0) p = p.WithKey(Key.Password);
         return p.Validate();
+    }
+
+    // Digits with optional thousands separators; anything else is refused with the allowed range.
+    private int TypedContextLimit()
+    {
+        string text = ContextLimit.Text.Trim().Replace(".", "").Replace(",", "").Replace(" ", "");
+        if (text.Length == 0 || text.Length > 9 || !text.All(char.IsAsciiDigit) || int.Parse(text, System.Globalization.CultureInfo.InvariantCulture) == 0)
+            throw new ArgumentException($"Enter a context limit between {PGMS.PostgreSql.SchemaContext.MinimumCharacters:N0} and {PGMS.PostgreSql.SchemaContext.MaximumCharacters:N0} characters.");
+        return int.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private async void Test(object sender, RoutedEventArgs e) => await TestAsync();

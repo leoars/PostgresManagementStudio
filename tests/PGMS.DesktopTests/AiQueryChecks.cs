@@ -74,6 +74,63 @@ internal static class AiQueryChecks
                 finally { if (dialog.IsVisible) dialog.Close(); }
             }
             finally { await Sql($"DROP SCHEMA {schema} CASCADE"); }
+            check(fake.SelectionPrompts.Count == 0, "A database that fits is sent whole, without a request to choose relations");
+
+            // A database over the context limit: the provider picks from the names first, then gets those relations in detail.
+            check(AiQueryGenerator.ParseSelection("```\n- `public.a`\n2. public.b -- why\n* \"S\".\"T\",\n\n</relations>\n```").SequenceEqual(["public.a", "public.b", "\"S\".\"T\""]), "Chosen names are read without list markers, backticks, comments or fences");
+            string large = "ai_large_" + Guid.NewGuid().ToString("N")[..8];
+            await Sql($"""
+                CREATE SCHEMA {large};
+                DO $$ BEGIN FOR i IN 0..59 LOOP EXECUTE format('CREATE TABLE {large}.t_%s (a int, b text)', lpad(i::text, 2, '0')); END LOOP; END $$;
+                CREATE TABLE {large}.zz_wanted_customers (wanted_col int PRIMARY KEY, note text);
+                COMMENT ON TABLE {large}.zz_wanted_customers IS 'People who buy';
+                INSERT INTO {large}.zz_wanted_customers VALUES (1, '{Secret}');
+                """);
+            try
+            {
+                var dialog = new AiQueryDialog(ollama with { ContextCharacters = 2000 }, connection, null, _ => { }) { ShowInTaskbar = false, Opacity = 0 };
+                dialog.Show();
+                try
+                {
+                    ((TextBox)dialog.FindName("Request")).Text = "contar clientes";
+                    await dialog.GenerateAsync();
+                    string sent = fake.LastBody!.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!;
+                    string asked = fake.SelectionPrompts.Count == 1 ? fake.SelectionPrompts[0] : "";
+                    check(asked.Contains($"{large}.zz_wanted_customers -- People who buy\n", StringComparison.Ordinal) && asked.Contains($"{large}.t_59\n", StringComparison.Ordinal) && asked.Contains("<request>\ncontar clientes", StringComparison.Ordinal)
+                        && !asked.Contains("wanted_col", StringComparison.Ordinal) && !asked.Contains(Secret, StringComparison.Ordinal), "The first request carries only names, table comments and the request");
+                    check(sent.Contains($"TABLE {large}.zz_wanted_customers -- People who buy\n  wanted_col integer NOT NULL", StringComparison.Ordinal) && sent.Contains("more relations omitted for size", StringComparison.Ordinal) && !sent.Contains("made.up", StringComparison.Ordinal)
+                        && !sent.Contains(Secret, StringComparison.Ordinal) && sent.Length < 2600 && ((TextBox)dialog.FindName("Result")).Text == "SELECT 7;", "The relation the provider chose is sent in detail although no word of the request matches it; invented names are dropped");
+                    check(dialog.SentContext!.Contains("-- First request: choosing the relations", StringComparison.Ordinal) && dialog.SentContext.Contains(asked, StringComparison.Ordinal) && dialog.SentContext.Contains(sent, StringComparison.Ordinal)
+                        && ((TextBlock)dialog.FindName("ContextInfo")).Text.Contains("Ollama chose 1 of them", StringComparison.Ordinal), "View Sent Context shows both requests and the dialog says the provider chose");
+                }
+                finally { if (dialog.IsVisible) dialog.Close(); }
+            }
+            finally { await Sql($"DROP SCHEMA {large} CASCADE"); }
+
+            // The context limit is a setting of each provider.
+            string settingsDirectory = Path.Combine(Path.GetTempPath(), "pgms-ai-limit-" + Guid.NewGuid().ToString("N")), settingsFile = Path.Combine(settingsDirectory, "ai-settings.json");
+            try
+            {
+                Directory.CreateDirectory(settingsDirectory);
+                File.WriteAllText(settingsFile, """{"Version":1,"ActiveProvider":"Ollama","Providers":[{"Provider":"Ollama","Model":"m","Endpoint":"http://localhost:11434"}]}""");
+                var store = new AiSettingsStore(settingsFile);
+                bool refused = false;
+                try { (AiSettings.Default.For(AiProvider.Ollama) with { ContextCharacters = 100 }).Validate(); } catch (ArgumentException) { refused = true; }
+                check(AiSettings.Default.For(AiProvider.Anthropic).ContextCharacters == 200_000 && store.Load().For(AiProvider.Ollama).ContextCharacters == 200_000 && refused, "The context limit defaults to 200,000, also for a settings file written before it existed, and has a minimum");
+                var limits = new AiSettingsDialog(settingsFile) { ShowInTaskbar = false, Opacity = 0 };
+                limits.Show();
+                try
+                {
+                    var box = (TextBox)limits.FindName("ContextLimit");
+                    bool shown = box.Text == "200000";
+                    box.Text = "abc";
+                    bool invalid = !limits.SaveSettings() && ((TextBlock)limits.FindName("Feedback")).Text.Contains("context limit between", StringComparison.Ordinal);
+                    box.Text = "80.000";
+                    check(shown && invalid && limits.SaveSettings() && store.Load().For(AiProvider.Ollama).ContextCharacters == 80_000 && store.Load().For(AiProvider.OpenAI).ContextCharacters == 200_000, "AI Assistant Settings shows, validates and saves the context limit of the provider");
+                }
+                finally { limits.Close(); }
+            }
+            finally { try { Directory.Delete(settingsDirectory, true); } catch (IOException) { } }
 
             var view = new QueryView { };
             var window = new Window { Content = view, ShowInTaskbar = false, Opacity = 0, Width = 600, Height = 400 }; window.Show();
@@ -100,6 +157,7 @@ internal static class AiQueryChecks
         public JsonDocument? LastBody { get; private set; }
         public string LastBeta { get; private set; } = "";
         public string LastAuthorization { get; private set; } = "";
+        public List<string> SelectionPrompts { get; } = [];
         public FakeChat()
         {
             var probe = new TcpListener(IPAddress.Loopback, 0); probe.Start(); int port = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
@@ -124,8 +182,13 @@ internal static class AiQueryChecks
                 LastBeta = context.Request.Headers["anthropic-beta"] ?? ""; LastAuthorization = context.Request.Headers["Authorization"] ?? "";
                 var messages = LastBody.RootElement.GetProperty("messages");
                 string request = messages[messages.GetArrayLength() - 1].GetProperty("content").GetString() ?? "";
+                // The request that chooses relations: answer with the wanted table as listed, plus a name that does not exist.
+                bool selecting = path == "/ollama/api/chat" && (messages[0].GetProperty("content").GetString() ?? "").Contains("decide which part", StringComparison.Ordinal);
+                if (selecting) SelectionPrompts.Add(request);
+                string wanted = System.Text.RegularExpressions.Regex.Match(request, @"^\S+\.zz_wanted_customers", System.Text.RegularExpressions.RegexOptions.Multiline).Value;
                 (int status, string body) = path switch
                 {
+                    "/ollama/api/chat" when selecting => (200, JsonSerializer.Serialize(new { message = new { role = "assistant", content = $"- `{wanted}`\n- made.up" }, done = true })),
                     "/v1/messages" when request.Contains("refuse", StringComparison.Ordinal) => (200, Message("", "refusal")),
                     "/v1/messages" => (200, Message("```sql\nSELECT count(*) FROM public.t;\n```", "end_turn")),
                     "/v1/chat/completions" => (200, """{"choices":[{"message":{"role":"assistant","content":"```sql\nSELECT 42;\n```"}}]}"""),

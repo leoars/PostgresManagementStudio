@@ -31,6 +31,16 @@
      <TextBox x:Name="LockBox" Grid.Row="1" Grid.Column="1" MaxLength="9" TextAlignment="Right" Padding="2,1" Margin="0,8,0,0" AutomationProperties.Name="Lock timeout in milliseconds"/>
     </Grid>
     <TextBlock Text="-1 keeps the server's lock timeout; 0 waits without limit. The isolation level and lock timeout take effect at the next execution, or after the open transaction ends." TextWrapping="Wrap" Foreground="#5A5A5A" Margin="0,8,0,0"/>
+    <TextBlock Text="Execution plan: warning for discarded rows" FontWeight="SemiBold" Margin="0,14,0,6"/>
+    <Grid>
+     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <Label Content="Discarded rows, in ti_mes the rows returned:" Target="{Binding ElementName=PlanRatioBox}" Padding="0" VerticalAlignment="Center"/>
+     <TextBox x:Name="PlanRatioBox" Grid.Column="1" MaxLength="7" TextAlignment="Right" Padding="2,1" AutomationProperties.Name="Discarded rows in times the rows returned"/>
+     <Label Grid.Row="1" Content="Minimum _discarded rows:" Target="{Binding ElementName=PlanMinimumBox}" Padding="0" VerticalAlignment="Center" Margin="0,8,0,0"/>
+     <TextBox x:Name="PlanMinimumBox" Grid.Row="1" Grid.Column="1" MaxLength="10" TextAlignment="Right" Padding="2,1" Margin="0,8,0,0" AutomationProperties.Name="Minimum discarded rows"/>
+    </Grid>
+    <TextBlock Text="An operator of an analyzed or actual plan gets a warning sign when Rows Removed by Filter, by Join Filter or by Index Recheck reaches both values. Applies to the next plan shown." TextWrapping="Wrap" Foreground="#5A5A5A" Margin="0,8,0,0"/>
    </StackPanel>
    <StackPanel x:Name="ResultsGridPanel" Visibility="Collapsed">
     <TextBlock Text="Results ▸ Grid" FontWeight="SemiBold" Margin="0,0,0,8"/>

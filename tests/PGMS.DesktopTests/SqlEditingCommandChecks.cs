@@ -54,3 +54,4 @@ internal static class SqlEditingCommandChecks
         finally{if(active is not null)active.IsDirty=false;shell.Close();await shell.CloseCompletion;}
     }
 }
+

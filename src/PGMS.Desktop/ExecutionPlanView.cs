@@ -99,6 +99,8 @@ public sealed class ExecutionPlanView : UserControl
     public event EventHandler? SaveRequested;
     /// <summary>Show Execution Plan In New Tab of the context menu.</summary>
     public event EventHandler? ShowInNewTabRequested;
+    /// <summary>Missing Index Details… of the context menu, with the suggestions to script.</summary>
+    public event Action<IReadOnlyList<PlanIndexSuggestion>>? MissingIndexDetailsRequested;
     /// <summary>Asks the percentage for Custom Zoom: receives the current one, null cancels. Replaced by tests.</summary>
     internal Func<int, int?>? CustomZoomPrompt { get; set; }
     public const int MinZoomPercent = 10, MaxZoomPercent = 400;
@@ -241,29 +243,48 @@ public sealed class ExecutionPlanView : UserControl
         Add("_Save Execution Plan As…", "PlanSaveAs", () => SaveRequested?.Invoke(this, EventArgs.Empty));
         var newTab = Add("Show Execution Plan In New _Tab", "PlanShowInNewTab", () => ShowInNewTabRequested?.Invoke(this, EventArgs.Empty));
         Add("Find _Node", "PlanFindNode", OpenFind);
+        var missing = Add("_Missing Index Details…", "PlanMissingIndex", () => { if (MissingIndexTarget is { Count: > 0 } target) MissingIndexDetailsRequested?.Invoke(target); });
         menu.Items.Add(new Separator());
         Add("Zoom _In", "PlanZoomIn", () => Zoom *= ZoomStep);
         Add("Zoom _Out", "PlanZoomOut", () => Zoom /= ZoomStep);
         Add("_Custom Zoom…", "PlanCustomZoom", CustomZoom);
         Add("Zoom to _Fit", "PlanZoomFit", ZoomToFit);
+        // As in SSMS, the item is always listed and gray when the plan has no suggestion.
         menu.Opened += (_, _) =>
         {
-            foreach (var item in menu.Items.OfType<MenuItem>()) item.IsEnabled = shown.Count > 0;
+            foreach (var item in menu.Items.OfType<MenuItem>()) item.IsEnabled = shown.Count > 0 && (item != missing || MissingIndexTarget.Count > 0);
             // A plan already in a tab of its own has nowhere newer to go: the item shows only where a host opens the tab (the query tab).
             newTab.Visibility = ShowInNewTabRequested is null ? Visibility.Collapsed : Visibility.Visible;
         };
         return menu;
     }
 
-    private static Border Header(ExecutionPlanStatement statement) => new()
+    internal const string MissingIndexTag = "PlanMissingIndexLine";
+    private static readonly Brush MissingIndexText = Frozen(0x00, 0x80, 0x00);
+
+    /// <summary>Statement header. Index suggestions follow the text in green, where SSMS 22.11 shows its Missing Index line (M1057).</summary>
+    private static Border Header(ExecutionPlanStatement statement)
     {
-        BorderBrush = Frozen(0xAB, 0xAD, 0xB3), BorderThickness = new Thickness(1), Margin = new Thickness(4, 4, 4, 0), Background = Frozen(0xFA, 0xFC, 0xFE),
-        Child = new TextBox
+        TextBox Line(string text, double maxHeight) => new()
         {
-            Text = statement.Header + "\n" + statement.QueryText, IsReadOnly = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent, FontFamily = DiagramFont, FontSize = 12,
-            TextWrapping = TextWrapping.Wrap, MaxHeight = 62, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(2),
-        },
-    };
+            Text = text, IsReadOnly = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent, FontFamily = DiagramFont, FontSize = 12,
+            TextWrapping = TextWrapping.Wrap, MaxHeight = maxHeight, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(2),
+        };
+        var lines = new StackPanel();
+        lines.Children.Add(Line(statement.Header + "\n" + statement.QueryText, 62));
+        if (statement.MissingIndexes.Count > 0)
+        {
+            var missing = Line(string.Join("\n", statement.MissingIndexes.Select(s => s.HeaderLine)), 48);
+            missing.Foreground = MissingIndexText; missing.Tag = MissingIndexTag; missing.Padding = new Thickness(2, 0, 2, 2);
+            AutomationProperties.SetName(missing, "Missing index suggestions");
+            lines.Children.Add(missing);
+        }
+        return new Border { BorderBrush = Frozen(0xAB, 0xAD, 0xB3), BorderThickness = new Thickness(1), Margin = new Thickness(4, 4, 4, 0), Background = Frozen(0xFA, 0xFC, 0xFE), Child = lines };
+    }
+
+    /// <summary>What Missing Index Details shows: the suggestions of the selected statement, or of the first statement that has any.</summary>
+    internal IReadOnlyList<PlanIndexSuggestion> MissingIndexTarget =>
+        SelectedStatement is { MissingIndexes.Count: > 0 } selected ? selected.MissingIndexes : shown.Select(s => s.Statement.MissingIndexes).FirstOrDefault(m => m.Count > 0) ?? [];
 
     private Canvas Diagram(ExecutionPlanStatement statement)
     {
@@ -320,9 +341,13 @@ public sealed class ExecutionPlanView : UserControl
         var text = new TextBlock { Text = string.Join("\n", op.Lines), FontFamily = DiagramFont, FontSize = 11, TextAlignment = TextAlignment.Center, Foreground = Brushes.Black, LineHeight = 13.5, LineStackingStrategy = LineStackingStrategy.BlockLineHeight };
         var label = new Border { Child = text, Padding = new Thickness(4, 1, 4, 1), Background = Brushes.Transparent };
         var panel = new StackPanel { Background = Brushes.Transparent, Focusable = true, Cursor = Cursors.Arrow };
-        panel.Children.Add(new Viewbox { Width = 26, Height = 26, Margin = new Thickness(0, 0, 0, 3), HorizontalAlignment = HorizontalAlignment.Center, Child = Icon(op.Icon) });
+        var icon = new Grid { Width = 26, Height = 26, Margin = new Thickness(0, 0, 0, 3), HorizontalAlignment = HorizontalAlignment.Center };
+        icon.Children.Add(new Viewbox { Child = Icon(op.Icon) });
+        if (op.Warnings.Count > 0) icon.Children.Add(WarningSign());
+        panel.Children.Add(icon);
         panel.Children.Add(label);
         AutomationProperties.SetName(panel, op.Title + (op.ObjectName is null ? "" : " " + op.ObjectName));
+        if (op.Warnings.Count > 0) AutomationProperties.SetHelpText(panel, "Warning: " + string.Join(" ", op.Warnings));
         panel.MouseLeftButtonDown += (_, e) => { Select(op); panel.Focus(); e.Handled = true; };
         var tip = new ToolTip { Background = TipBack, BorderBrush = Brushes.Black, Padding = new Thickness(6) };
         tip.Opened += (_, _) => tip.Content ??= Card(op);
@@ -383,7 +408,24 @@ public sealed class ExecutionPlanView : UserControl
             card.Children.Add(new TextBlock { Text = detail.Label, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) });
             card.Children.Add(new TextBlock { Text = detail.Text.Length <= 600 ? detail.Text : detail.Text[..600] + "…", TextWrapping = TextWrapping.Wrap });
         }
+        if (op.Warnings.Count > 0)
+        {
+            card.Children.Add(new TextBlock { Text = "Warnings", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) });
+            foreach (string warning in op.Warnings) card.Children.Add(new TextBlock { Text = warning, TextWrapping = TextWrapping.Wrap });
+        }
         return card;
+    }
+
+    internal const string WarningSignTag = "PlanWarning";
+    private static readonly Brush WarningFill = Frozen(0xFF, 0xE1, 0x1A), WarningEdge = Frozen(0x8A, 0x6D, 0x00);
+
+    /// <summary>The yellow triangle SSMS puts over the lower right corner of an operator's icon when it has warnings (seen in 22.11, M1057).</summary>
+    private static FrameworkElement WarningSign()
+    {
+        var sign = new Grid { Width = 13, Height = 12, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, -5, -3), Tag = WarningSignTag, IsHitTestVisible = false };
+        sign.Children.Add(new Path { Data = Geometry.Parse("M6.5,0.5 L12.5,11.5 0.5,11.5 Z"), Fill = WarningFill, Stroke = WarningEdge, StrokeThickness = 1, StrokeLineJoin = PenLineJoin.Round });
+        sign.Children.Add(new Path { Data = Geometry.Parse("M6.5,4 L6.5,8 M6.5,9.3 L6.5,10.3"), Stroke = Brushes.Black, StrokeThickness = 1.4 });
+        return sign;
     }
 
     private static Path Icon(ExecutionPlanIcon icon) => new()

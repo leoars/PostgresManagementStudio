@@ -7,6 +7,13 @@ public enum ExecutionPlanIcon { Statement, TableScan, IndexScan, BitmapScan, Joi
 
 public sealed record ExecutionPlanDetail(string Label, string Text);
 
+/// <summary>When an operator of an analyzed plan gets a warning for the rows it read and threw away (PGMS-040): a counter warns when it reaches
+/// <paramref name="RemovedRowsMinimum"/> rows and <paramref name="RemovedRowsRatio"/> times the rows the operator returned.</summary>
+public sealed record ExecutionPlanWarningOptions(int RemovedRowsRatio = ExecutionPlanWarningOptions.DefaultRatio, int RemovedRowsMinimum = ExecutionPlanWarningOptions.DefaultMinimum)
+{
+    public const int DefaultRatio = 10, MinRatio = 2, MaxRatio = 1000000, DefaultMinimum = 1000, MaxMinimum = 1000000000;
+}
+
 /// <summary>One box of the graphical plan. The statement box is a pseudo operator placed before the server's root node, as in SSMS.</summary>
 public sealed class ExecutionPlanOperator
 {
@@ -22,6 +29,10 @@ public sealed class ExecutionPlanOperator
     public string Description { get; init; } = "";
     public IReadOnlyList<KeyValuePair<string, string>> Summary { get; init; } = [];
     public IReadOnlyList<ExecutionPlanDetail> Details { get; init; } = [];
+    /// <summary>Shown as a warning sign on the icon and in the Warnings section of the tooltip; also the "Warnings" property.</summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    /// <summary>Set on a scan warned for Rows Removed by Filter whose conditions suggest an index (PGMS-041); not yet checked against the catalog.</summary>
+    public PlanIndexCandidate? IndexCandidate { get; init; }
     public required IReadOnlyDictionary<string, string> Properties { get; init; }
     public IReadOnlyList<ExecutionPlanOperator> Children { get; init; } = [];
 
@@ -52,6 +63,8 @@ public sealed class ExecutionPlanOperator
 
 public sealed record ExecutionPlanStatement(int Number, string QueryText, double BatchPercent, ExecutionPlanOperator Root, QueryPlan Source)
 {
+    /// <summary>Index suggestions that passed the catalog check (QuerySession.AdviseIndexesAsync); empty until then and for plans opened without a session.</summary>
+    public IReadOnlyList<PlanIndexSuggestion> MissingIndexes { get; init; } = [];
     public string Header => $"Query {Number}: Query cost (relative to the batch): {BatchPercent.ToString("0", CultureInfo.InvariantCulture)}%";
 }
 
@@ -101,15 +114,16 @@ public static class ExecutionPlanBuilder
     private const int MaxObjectName = 34;
 
     /// <summary>Builds every statement of a batch; <paramref name="queryText"/> is used for plans that do not carry their own text.</summary>
-    public static IReadOnlyList<ExecutionPlanStatement> Build(IReadOnlyList<QueryPlan> plans, string? queryText = null, CancellationToken token = default)
+    public static IReadOnlyList<ExecutionPlanStatement> Build(IReadOnlyList<QueryPlan> plans, string? queryText = null, CancellationToken token = default, ExecutionPlanWarningOptions? warnings = null)
     {
+        warnings ??= new();
         var parsed = plans.Select(plan =>
         {
             var root = QueryPlanTree.Parse(plan, token);
             return (Plan: plan, Node: root, Text: ReadQueryText(plan) ?? queryText ?? "", Cost: Number(root, "Total Cost") ?? 0);
         }).ToList();
         double batchCost = parsed.Sum(p => p.Cost);
-        return parsed.Select((p, index) => new ExecutionPlanStatement(index + 1, Flatten(p.Text), batchCost > 0 ? 100 * p.Cost / batchCost : 100.0 / parsed.Count, Statement(p.Node, p.Text), p.Plan)).ToList();
+        return parsed.Select((p, index) => new ExecutionPlanStatement(index + 1, Flatten(p.Text), batchCost > 0 ? 100 * p.Cost / batchCost : 100.0 / parsed.Count, Statement(p.Node, p.Text, warnings), p.Plan)).ToList();
     }
 
     private static string? ReadQueryText(QueryPlan plan)
@@ -120,7 +134,7 @@ public static class ExecutionPlanBuilder
 
     private static string Flatten(string sql) => string.Join(' ', sql.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
-    private static ExecutionPlanOperator Statement(QueryPlanNode root, string text)
+    private static ExecutionPlanOperator Statement(QueryPlanNode root, string text, ExecutionPlanWarningOptions warnings)
     {
         double total = TotalSelfCost(root);
         var properties = new Dictionary<string, string>(root.Properties, StringComparer.Ordinal);
@@ -131,7 +145,7 @@ public static class ExecutionPlanBuilder
             Description = "The statement sent to the server.", Properties = properties,
             Summary = [new("Estimated Subtree Cost", Text(root, "Total Cost")), new("Estimated Number of Rows", Text(root, "Plan Rows"))],
             Details = text.Length > 0 ? [new("Statement", Flatten(text))] : [],
-            Children = [Operator(root, total)],
+            Children = [Operator(root, total, warnings, [])],
         };
     }
 
@@ -154,7 +168,26 @@ public static class ExecutionPlanBuilder
     private static double SelfCost(QueryPlanNode node) => Math.Max(0, (Number(node, "Total Cost") ?? 0) - node.Children.Sum(c => Number(c, "Total Cost") ?? 0));
     private static double TotalSelfCost(QueryPlanNode node) => SelfCost(node) + node.Children.Sum(TotalSelfCost);
 
-    private static ExecutionPlanOperator Operator(QueryPlanNode node, double totalCost)
+    private static readonly string[] RemovedRowCounters = ["Rows Removed by Filter", "Rows Removed by Join Filter", "Rows Removed by Index Recheck"];
+
+    /// <summary>The server reports each counter as an average per loop, so it is multiplied by the loops, like the rows returned.</summary>
+    private static List<string> RemovedRowWarnings(QueryPlanNode node, double? loops, double? actualRows, ExecutionPlanWarningOptions options)
+    {
+        var found = new List<string>();
+        if (loops is not { } executions || actualRows is not { } returned) return found;
+        foreach (string counter in RemovedRowCounters)
+        {
+            if (Number(node, counter) is not { } perLoop) continue;
+            double removed = perLoop * executions;
+            if (removed <= 0 || removed < options.RemovedRowsMinimum || removed < options.RemovedRowsRatio * returned) continue;
+            string text = counter + ": " + removed.ToString("0.###", CultureInfo.InvariantCulture) + ", against " + returned.ToString("0.###", CultureInfo.InvariantCulture) + (returned == 1 ? " row returned" : " rows returned");
+            found.Add(text + (returned > 0 ? " (" + (removed / returned).ToString("0", CultureInfo.InvariantCulture) + " times)." : "."));
+        }
+        return found;
+    }
+
+    /// <param name="ancestors">The nodes above this one, parent first.</param>
+    private static ExecutionPlanOperator Operator(QueryPlanNode node, double totalCost, ExecutionPlanWarningOptions warningOptions, IReadOnlyList<QueryPlanNode> ancestors)
     {
         string type = node.Properties["Node Type"];
         double self = SelfCost(node), percent = totalCost > 0 ? 100 * self / totalCost : 0;
@@ -185,10 +218,19 @@ public static class ExecutionPlanBuilder
         foreach (string name in new[] { "Output", "Index Cond", "Recheck Cond", "Hash Cond", "Merge Cond", "Join Filter", "Filter", "Sort Key", "Group Key" })
             if (node.Properties.TryGetValue(name, out var value)) details.Add(new(name, Readable(value)));
 
+        var warnings = RemovedRowWarnings(node, loops, actualRows, warningOptions);
+        IReadOnlyDictionary<string, string> properties = node.Properties;
+        if (warnings.Count > 0) properties = new Dictionary<string, string>(node.Properties, StringComparer.Ordinal) { ["Warnings"] = string.Join(" ", warnings) };
+
+        PlanIndexCandidate? candidate = null;
+        if (warnings.Any(w => w.StartsWith(RemovedRowCounters[0] + ":", StringComparison.Ordinal)) && Number(node, RemovedRowCounters[0]) is { } filtered)
+            candidate = PlanIndexAdvisor.Candidate(node, ancestors, filtered * loops!.Value, actualRows!.Value);
+        QueryPlanNode[] below = [node, .. ancestors];
+
         return new ExecutionPlanOperator
         {
             Title = type, Subtitle = subtitle, ObjectName = ObjectName(node), Icon = IconFor(type), CostPercent = percent, Seconds = seconds, ActualRows = actualRows, EstimatedRows = estimated,
-            Description = Describe(type), Summary = summary, Details = details, Properties = node.Properties, Children = node.Children.Select(c => Operator(c, totalCost)).ToList(),
+            Description = Describe(type), Summary = summary, Details = details, Warnings = warnings, IndexCandidate = candidate, Properties = properties, Children = node.Children.Select(c => Operator(c, totalCost, warningOptions, below)).ToList(),
         };
     }
 

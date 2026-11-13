@@ -22,6 +22,22 @@ public sealed class IndexMaintenanceCatalog(string connectionString)
         await using(var command=new NpgsqlCommand("SET TRANSACTION READ ONLY",connection,transaction))await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         return await Read(connection,transaction,schema,table,index,token).ConfigureAwait(false);
     }
+    /// <summary>For an index node of Object Explorer, which holds the index OID but not its table.</summary>
+    public async Task<MaintenanceIndexSnapshot> InspectAsync(uint indexOid,CancellationToken token=default)
+    {
+        await using var connection=new NpgsqlConnection(connectionString);await connection.OpenAsync(token).ConfigureAwait(false);
+        await using var transaction=await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead,token).ConfigureAwait(false);
+        await using(var setup=new NpgsqlCommand("SET TRANSACTION READ ONLY",connection,transaction))await setup.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+        string schema,table,index;
+        await using(var command=new NpgsqlCommand("SELECT n.nspname,t.relname,c.relname FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid=i.indexrelid JOIN pg_catalog.pg_class t ON t.oid=i.indrelid JOIN pg_catalog.pg_namespace n ON n.oid=t.relnamespace WHERE i.indexrelid=@oid",connection,transaction){CommandTimeout=15})
+        {
+            command.Parameters.AddWithValue("oid",NpgsqlDbType.Oid,indexOid);
+            await using var reader=await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+            if(!await reader.ReadAsync(token).ConfigureAwait(false))throw new InvalidOperationException("The index no longer exists. Refresh Object Explorer.");
+            schema=reader.GetString(0);table=reader.GetString(1);index=reader.GetString(2);
+        }
+        return await Read(connection,transaction,schema,table,index,token).ConfigureAwait(false);
+    }
     internal static async Task<MaintenanceIndexSnapshot> Read(NpgsqlConnection connection,NpgsqlTransaction transaction,string schema,string table,string index,CancellationToken token)
     {
         SqlIdentifier.Quote(index);

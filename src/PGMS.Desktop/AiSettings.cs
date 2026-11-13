@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using PGMS.PostgreSql;
 
 namespace PGMS.Desktop;
 
@@ -11,7 +12,8 @@ public enum AiProvider { Anthropic, OpenAI, Ollama }
 
 /// <summary>One provider's settings. The API key is held only as a DPAPI blob for the current Windows user,
 /// with the provider name as entropy, so a blob copied to another provider entry or user does not open.</summary>
-public sealed record AiProviderSettings(AiProvider Provider, string Model, string Endpoint, string? ProtectedKey = null)
+/// <param name="ContextCharacters">Most characters of database structure sent with one request; 0 (files written before the setting existed) means the default.</param>
+public sealed record AiProviderSettings(AiProvider Provider, string Model, string Endpoint, string? ProtectedKey = null, int ContextCharacters = SchemaContext.DefaultMaximumCharacters)
 {
     public const int MaximumKeyLength = 512;
     public static AiProviderSettings Default(AiProvider provider) => provider switch
@@ -32,7 +34,10 @@ public sealed record AiProviderSettings(AiProvider Provider, string Model, strin
         // Keys travel in headers: never send one over plain HTTP to another computer.
         if (NeedsKey && uri.Scheme == "http" && !uri.IsLoopback) throw new ArgumentException("A provider that needs an API key must use https (http is accepted only on this computer).");
         if (!NeedsKey && ProtectedKey is not null) throw new InvalidDataException("Ollama does not use an API key.");
-        return this with { Model = (Model ?? "").Trim(), Endpoint = uri.ToString().TrimEnd('/') };
+        int context = ContextCharacters == 0 ? SchemaContext.DefaultMaximumCharacters : ContextCharacters;
+        if (context < SchemaContext.MinimumCharacters || context > SchemaContext.MaximumCharacters)
+            throw new ArgumentException($"Enter a context limit between {SchemaContext.MinimumCharacters:N0} and {SchemaContext.MaximumCharacters:N0} characters.");
+        return this with { Model = (Model ?? "").Trim(), Endpoint = uri.ToString().TrimEnd('/'), ContextCharacters = context };
     }
 
     public AiProviderSettings WithKey(string key)

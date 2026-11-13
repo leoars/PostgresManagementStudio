@@ -29,7 +29,7 @@ public partial class AiQueryDialog : Window
         Target.Text = $"Generate SQL with AI\nProvider: {settings.Provider} ({(settings.Model.Length > 0 ? settings.Model : "no model chosen")})   Server: {c.Host}:{c.Port}   Database: {c.Database}";
         IncludeSelection.Content = selectedSql is null ? "Send the SQL selected in the editor (no selection)" : $"Send the SQL selected in the editor ({selectedSql.Length:N0} characters) so the request can refer to it";
         IncludeSelection.IsEnabled = selectedSql is not null; IncludeSelection.IsChecked = selectedSql is not null;
-        ContextInfo.Text = "Sent to the provider: your request, the structure of this database (schemas, tables, views, columns, types, keys, enum labels and comments)" + (selectedSql is null ? "" : " and, if checked, the selected SQL") + ". Table data is never read or sent.";
+        ContextInfo.Text = "Sent to the provider: your request, the structure of this database (schemas, tables, views, columns, types, keys, enum labels and comments)" + (selectedSql is null ? "" : " and, if checked, the selected SQL") + ". A database too large for one request is sent in part: the provider first picks the tables from a list of names. Table data is never read or sent.";
         ready = true; Changed(this, new RoutedEventArgs());
         Loaded += (_, _) => Request.Focus();
     }
@@ -58,10 +58,27 @@ public partial class AiQueryDialog : Window
         string message; bool failed = false;
         try
         {
-            var schema = await new SchemaContextService(connection).BuildAsync(Request.Text, token: token);
-            string prompt = AiQueryGenerator.Compose(Request.Text, schema, IncludeSelection.IsChecked == true ? selectedSql : null);
-            SentContext = AiQueryGenerator.Instructions + "\n\n" + prompt;
-            ContextInfo.Text = $"Sent to {settings.Provider}: your request and the structure of {schema.Database} ({schema.Relations:N0} tables/views, {schema.Columns:N0} columns{(schema.OmittedRelations > 0 ? $", {schema.OmittedRelations:N0} more listed by name only" : "")}, {prompt.Length / 1024.0:N1} KB){(IncludeSelection.IsChecked == true && selectedSql is not null ? " plus the selected SQL" : "")}. No table data.";
+            int limit = settings.Validate().ContextCharacters;
+            string? current = IncludeSelection.IsChecked == true ? selectedSql : null;
+            // Words of the selected SQL count for choosing relations too: it usually names the tables the request is about.
+            string wording = current is null ? Request.Text : Request.Text + "\n" + current;
+            var catalog = await new SchemaContextService(connection).LoadAsync(token);
+            IReadOnlyList<string>? chosen = null; string? selection = null;
+            if (!catalog.Fits(limit))
+            {
+                // Too large to send whole: the provider picks the relations from their names before the real request.
+                selection = AiQueryGenerator.ComposeSelection(Request.Text, catalog.NameList(wording, limit), current);
+                SentContext = AiQueryGenerator.SelectionInstructions + "\n\n" + selection;
+                Feedback.Text = $"The database does not fit in one request. Asking {settings.Provider} which of its {catalog.Relations:N0} tables and views are needed…";
+                chosen = await AiQueryGenerator.SelectRelationsAsync(settings.Validate(), selection, token);
+            }
+            var schema = catalog.Build(wording, limit, chosen);
+            string prompt = AiQueryGenerator.Compose(Request.Text, schema, current);
+            SentContext = (selection is null ? "" : "-- First request: choosing the relations\n" + AiQueryGenerator.SelectionInstructions + "\n\n" + selection + "\n\n-- Second request: writing the SQL\n") + AiQueryGenerator.Instructions + "\n\n" + prompt;
+            string omitted = schema.OmittedRelations == 0 ? "" : $"; {schema.OmittedRelations:N0} more without columns, {(schema.ListedByName == schema.OmittedRelations ? "all" : schema.ListedByName.ToString("N0"))} listed by name";
+            string picked = selection is null ? "" : schema.ChosenRelations > 0 ? $" {settings.Provider} chose {schema.ChosenRelations:N0} of them from a list of names in a first request; the rest were ranked by the words of your request."
+                : $" {settings.Provider} named no existing relation in a first request, so they were ranked by the words of your request.";
+            ContextInfo.Text = $"Sent to {settings.Provider}: your request and the structure of {schema.Database} ({schema.Relations:N0} tables/views with {schema.Columns:N0} columns{omitted}; {prompt.Length / 1024.0:N1} KB){(current is not null ? " plus the selected SQL" : "")}.{picked} No table data.";
             Feedback.Text = $"Waiting for {settings.Provider}…";
             Generated = await AiQueryGenerator.GenerateAsync(settings, prompt, token);
             Result.Text = Generated.Sql;

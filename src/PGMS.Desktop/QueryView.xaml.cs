@@ -95,6 +95,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
         this.writeResultClipboard = writeResultClipboard;
         RecoveryId = recoveryId;
         using (UiPhaseScope.Start(observer, "view-xaml")) InitializeComponent();
+        PlanDiagram.MissingIndexDetailsRequested += ShowMissingIndexDetails;
         ConfigureSqlLinks();
         ConfigureSqlEditing();
         ConfigureCompletion();
