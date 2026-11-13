@@ -19,7 +19,8 @@ public partial class DefaultPrivilegeDialog : Window
     public bool HasUnconfirmedCommit { get; private set; }
     public string? ScriptSql { get; private set; }
     internal DefaultPrivilegeSnapshot? Snapshot => snapshot;
-    public DefaultPrivilegeDialog(string connection)
+    /// <summary>With a schema (the one selected in Object Explorer), the scope starts on it instead of global; a restored transaction still wins.</summary>
+    public DefaultPrivilegeDialog(string connection, string? schema = null)
     {
         this.connection=connection;InitializeComponent();
         Creator.AddHandler(System.Windows.Controls.Primitives.TextBoxBase.TextChangedEvent,new TextChangedEventHandler(ScopeChanged));
@@ -27,6 +28,7 @@ public partial class DefaultPrivilegeDialog : Window
         Target.Text=$"{settings.Host}:{settings.Port} / {settings.Database} \u2014 {settings.Username}";
         Creator.Text=settings.Username;ObjectClass.ItemsSource=Enum.GetValues<DefaultPrivilegeTarget>();ObjectClass.SelectedItem=DefaultPrivilegeTarget.Tables;
         Privilege.ItemsSource=DefaultPrivilegeRequest.Allowed(DefaultPrivilegeTarget.Tables);Privilege.SelectedIndex=0;
+        if(schema is not null){GlobalScope.IsChecked=false;SchemaName.Text=schema;}
         ready=true;RestorePending();Refresh();
     }
     private DefaultPrivilegeRequest Request => new((DefaultPrivilegeTarget)ObjectClass.SelectedItem,Creator.Text,RoleName.Text,(string?)Privilege.SelectedItem??"",GlobalScope.IsChecked==true?null:SchemaName.Text,Revoke.IsChecked==true,PublicRecipient.IsChecked==true,GrantOption.IsChecked==true);

@@ -99,17 +99,23 @@ public partial class DatabaseDiagramView
     private void TableViewClick(object sender, RoutedEventArgs e)
     {
         var menu = new ContextMenu { PlacementTarget = TableViewButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-        FillTableViewItems(menu.Items, selected.FirstOrDefault());
+        FillTableViewItems(menu.Items, selected.FirstOrDefault(), toolbar: true);
         menu.IsOpen = true;
     }
 
-    private void FillTableViewItems(ItemCollection items, DiagramTableModel? table)
+    /// <summary>The Table View items. From the toolbar with no table selected (pedido do usuário, 12/11/2026), the five views apply to every table of the diagram;
+    /// Modify Custom … stays off, since each table keeps its own custom columns.</summary>
+    /// <summary>The items the Table View button of the toolbar shows now; for tests.</summary>
+    internal void FillToolbarTableView(ItemCollection items) => FillTableViewItems(items, selected.FirstOrDefault(), toolbar: true);
+
+    private void FillTableViewItems(ItemCollection items, DiagramTableModel? table, bool toolbar = false)
     {
         items.Clear();
+        bool all = toolbar && selected.Count == 0 && tables.Count > 0;
         void Add(string header, string name, DiagramTableView view)
         {
-            var item = new MenuItem { Header = header, Name = name, IsEnabled = table is not null, IsChecked = table is not null && selected.Count > 0 && selected.All(t => t.View == view) };
-            item.Click += (_, _) => SetTableView(view);
+            var item = new MenuItem { Header = header, Name = name, IsEnabled = table is not null || all, IsChecked = all ? tables.All(t => t.View == view) : table is not null && selected.Count > 0 && selected.All(t => t.View == view) };
+            item.Click += (_, _) => { if (all) SetAllTablesView(view); else SetTableView(view); };
             items.Add(item);
         }
         Add("Standard", "DiagramViewStandard", DiagramTableView.Standard);
@@ -123,12 +129,27 @@ public partial class DatabaseDiagramView
         items.Add(modify);
     }
 
-    /// <summary>Applies a view to the selected tables; the box and the lines follow its new size.</summary>
+    /// <summary>Applies a view to the selected tables; the box and the lines follow its new size. One step of Undo.</summary>
     public void SetTableView(DiagramTableView view)
     {
         CommitEdit();
         if (selected.Count == 0) return;
-        foreach (var table in selected) table.View = view;
+        ApplyView(selected.ToList(), view);
+    }
+
+    /// <summary>Table View from the toolbar with nothing selected: every table of the diagram, in one step of Undo; the selection stays empty.</summary>
+    public void SetAllTablesView(DiagramTableView view)
+    {
+        CommitEdit();
+        if (tables.Count == 0) return;
+        ApplyView(tables, view);
+    }
+
+    private void ApplyView(IReadOnlyCollection<DiagramTableModel> targets, DiagramTableView view)
+    {
+        if (targets.All(t => t.View == view)) return;
+        PushUndo(TakeSnapshot());
+        foreach (var table in targets) table.View = view;
         Rebuild(); Touch();
     }
 

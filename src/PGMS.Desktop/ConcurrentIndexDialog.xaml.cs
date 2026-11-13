@@ -22,7 +22,10 @@ public partial class ConcurrentIndexDialog : Window
     private bool busy, initialized, unavailable, attempted, inspectedInactive;
     public bool WasApplied { get; private set; }
     public bool RequiresParentRefresh { get; private set; }
-    public ConcurrentIndexDialog(string connection, ExpressionIndexEdit? proposal = null, MaintenanceIndexSnapshot? maintenance = null)
+    /// <summary>Pending Index Operation… of a table: shows the pending operation only when it is on this table, and otherwise names the table it is on.</summary>
+    public ConcurrentIndexDialog(string connection, CatalogEntry table) : this(connection, null, null, table) { }
+
+    public ConcurrentIndexDialog(string connection, ExpressionIndexEdit? proposal = null, MaintenanceIndexSnapshot? maintenance = null, CatalogEntry? table = null)
     {
         this.connection=connection;this.maintenance=maintenance;this.proposal=proposal;store=new(connection);service=new(connection,store);InitializeComponent();
         var profile=new NpgsqlConnectionStringBuilder(connection);
@@ -43,8 +46,16 @@ public partial class ConcurrentIndexDialog : Window
         try
         {
             lease=store.AcquireLease();pending=store.Read();
+            // From a table: the pending operation of the connection is shown only when it is on that table; otherwise the table it is on is named.
+            string? relation=table is null?null:ObjectSql.Relation(table.Schema??"",table.Name);
+            ConcurrentIndexReceipt? elsewhere=null;
+            if(table is not null && pending is not null && !(table.Oid!=0 && pending.TableOid!=0 ? pending.TableOid==table.Oid : pending.Schema==table.Schema && pending.Table==table.Name)){elsewhere=pending;pending=null;}
+            if(relation is not null)Target.Text+="\n"+relation;
             if(pending is not null){Preview.Text=pending.Sql;Target.Text+=$"\nPending: {ObjectSql.Relation(pending.Schema,pending.Table)} / {pending.Index}";}
-            Feedback.Text=pending is null?(proposal is null?"No pending operation. Prepare an index proposal in Expression Index to create concurrently.":"Review the standalone command before creating the index."):"A previous operation is pending. Inspect its recorded target; the stored SQL will not be executed.";
+            Feedback.Text=elsewhere is not null?$"No pending operation on {relation}. The pending operation of this connection is on {ObjectSql.Relation(elsewhere.Schema,elsewhere.Table)} / {elsewhere.Index}; open Pending Index Operation… on that table to inspect it."
+                :pending is not null?"A previous operation is pending. Inspect its recorded target; the stored SQL will not be executed."
+                :relation is not null?$"No pending operation on {relation}."
+                :proposal is null?"No pending operation. Prepare an index proposal in Expression Index to create concurrently.":"Review the standalone command before creating the index.";
         }
         catch(Exception ex)when(Handled(ex)){unavailable=true;Feedback.Text=ex.Message;}
         initialized=true;Update();Closed+=(_,_)=>lease?.Dispose();

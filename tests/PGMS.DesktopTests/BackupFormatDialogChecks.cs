@@ -49,6 +49,26 @@ internal static class BackupFormatDialogChecks
             pending=restore.RunAsync();check(!Find<ComboBox>(restore,"FormatSelector").IsEnabled,"Running SQL restore freezes its tool selection");await restore.RunAsync();await pending;check(restore.WasCompleted && Find<ComboBox>(restore,"FormatSelector").IsEnabled,"WPF SQL restore completes and releases controls");
             check((string)(await Scalar(target,"SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid='public.items'::regclass"))! ==owner,"WPF SQL roundtrip applies the ownership selected when dumping");
             await using(var c=new NpgsqlConnection(As(target,reader))){await c.OpenAsync();await using var cmd=new NpgsqlCommand("SELECT value FROM public.items WHERE id=1",c);check((string)(await cmd.ExecuteScalarAsync())! =="UI ação 密碼","WPF SQL roundtrip preserves exact data and actual reader privileges");}
+            // Restore Database… without a database (the Databases folder): the destination is chosen, and a new name creates it first.
+            string fresh="pgms_restore_new_"+Guid.NewGuid().ToString("N")[..8];
+            var chooser=new BackupDialog(true,As("postgres"),chooseDatabase:true){ShowInTaskbar=false};chooser.Show();
+            try
+            {
+                await chooser.LoadDatabasesAsync();
+                check(Find<StackPanel>(chooser,"DatabaseFields").IsVisible && Find<TextBlock>(chooser,"Target").Text.Contains("Database: chosen below") && Find<TextBlock>(chooser,"Description").Text.Contains("chosen above") && ((IEnumerable<string>)Find<ComboBox>(chooser,"DatabasePicker").ItemsSource).Contains(target),
+                    "Restore without a database asks for the destination and lists the databases");
+                Find<ComboBox>(chooser,"FormatSelector").SelectedValue=BackupFormat.PlainSql;Find<TextBox>(chooser,"ArchivePath").Text=archive;Find<TextBox>(chooser,"ToolsPath").Text=tools;
+                await chooser.RunAsync();
+                check(!chooser.WasCompleted && Find<TextBox>(chooser,"Feedback").Text.StartsWith("Choose the database to restore into",StringComparison.Ordinal),"Without a destination nothing runs, not even into the login database");
+                string? asked=null;chooser.ConfirmCreateDatabase=name=>{asked=name;return false;};
+                Find<ComboBox>(chooser,"DatabasePicker").Text=fresh;
+                await chooser.RunAsync();
+                check(asked==fresh && !chooser.WasCompleted && await Scalar("postgres",$"SELECT 1 FROM pg_database WHERE datname='{fresh}'") is null,"A new name asks before creating the database; No creates nothing");
+                chooser.ConfirmCreateDatabase=_=>true;databases.Add(fresh);
+                await chooser.RunAsync();
+                check(chooser.WasCompleted && chooser.Database==fresh && (string?)await Scalar(fresh,"SELECT value FROM public.items WHERE id=1")=="UI ação 密碼","Yes creates the database and restores into it, not into the login database");
+            }
+            finally{chooser.Close();}
             await restore.RunAsync();check(!restore.WasCompleted && Find<ComboBox>(restore,"FormatSelector").IsEnabled && (BackupFormat)Find<ComboBox>(restore,"FormatSelector").SelectedValue==BackupFormat.PlainSql,"Conflicting SQL retry reports failure and preserves format for recovery");
             Find<ComboBox>(restore,"FormatSelector").SelectedValue=BackupFormat.Custom;check(Find<StackPanel>(restore,"RestoreFields").IsVisible && Find<CheckBox>(restore,"RestoreOwner").IsChecked==true && !Find<TextBox>(restore,"OptionsPreview").Text.Contains("--no-owner"),"Returning to archive restore preserves its independent ownership choice");
             string schemaArchive=Path.Combine(folder,"schema_密碼.sql");Find<ComboBox>(dump,"ScopeSelector").SelectedValue=BackupDataScope.SchemaOnly;Find<TextBox>(dump,"ArchivePath").Text=schemaArchive;await dump.RunAsync();check(dump.WasCompleted && Find<TextBox>(dump,"OptionsPreview").Text.Contains("--schema-only"),"WPF creates the explicitly selected schema-only SQL backup");await new BackupService(As(schemaTarget),tools).RestoreSqlAsync(schemaArchive);check(Convert.ToInt64(await Scalar(schemaTarget,"SELECT count(*) FROM public.items"))==0,"WPF schema-only choice omits row data in a real restore");

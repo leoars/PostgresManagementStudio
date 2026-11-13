@@ -57,6 +57,75 @@ internal static class ExplorerContextChecks
                 check(dialog.InspectedTable?.Oid == entries[0].Oid && ((TextBox)dialog.FindName("TableName")).Text == table, "Explorer Operations passes fresh inspected identity");
                 return Task.CompletedTask;
             });
+
+            // Tools and Permissions items follow the selection: the table, or the table above a selected child, as the table menu does.
+            MenuItem Main(string header) => FindMenuItems(window).First(m => m.Header as string == header);
+            await OpenAsync<TableEditDialog>(Main("Table Operations…"), dialog =>
+            {
+                check(dialog.InspectedTable?.Oid == entries[0].Oid, "Tools ▸ Table Operations… opens the selected table inspected, as the table menu does");
+                return Task.CompletedTask;
+            });
+            await OpenAsync<PrivilegeDialog>(Main("Object Permissions…"), dialog =>
+            {
+                check(((ComboBox)dialog.FindName("ObjectType")).SelectedItem is PrivilegeTarget.Table && ((TextBox)dialog.FindName("SchemaName")).Text == "public" && ((TextBox)dialog.FindName("ObjectName")).Text == table,
+                    "Object Permissions… starts on the selected table");
+                return Task.CompletedTask;
+            });
+            await OpenAsync<DefaultPrivilegeDialog>(Main("Default Permissions…"), dialog =>
+            {
+                check(((CheckBox)dialog.FindName("GlobalScope")).IsChecked == false && ((TextBox)dialog.FindName("SchemaName")).Text == "public", "Default Permissions… starts on the schema of the selection");
+                return Task.CompletedTask;
+            });
+            var tableNode = (CatalogNode)tree.Items[0];
+            await tableNode.LoadAsync();
+            var tableItem = (TreeViewItem)tree.ItemContainerGenerator.ContainerFromIndex(0);
+            tableItem.IsExpanded = true; tree.UpdateLayout(); tableItem.UpdateLayout();
+            var child = tableNode.Children.First();
+            ((TreeViewItem)tableItem.ItemContainerGenerator.ContainerFromItem(child)).IsSelected = true;
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            check(tree.SelectedItem == child, "A folder under the table is selected");
+            await OpenAsync<RelationEditDialog>(Main("Index Operations…"), async dialog =>
+            {
+                check(((TextBox)dialog.FindName("TableName")).Text == table, "Index Operations… with a folder of the table selected names the table above it");
+                // It inspects the table as it opens, and refuses to close meanwhile.
+                for (int i = 0; i < 200 && !((Button)dialog.FindName("CloseButton")).IsEnabled; i++) await Task.Delay(50);
+                check(((Button)dialog.FindName("CloseButton")).IsEnabled, "Index Operations… inspected the table above the folder");
+            });
+            await OpenAsync<TableEditDialog>(Main("Table Operations…"), dialog =>
+            {
+                check(dialog.InspectedTable?.Oid == entries[0].Oid, "Table Operations… with a folder of the table selected opens that table inspected");
+                return Task.CompletedTask;
+            });
+            await OpenAsync<PrivilegeDialog>(Main("Object Permissions…"), dialog =>
+            {
+                check(((ComboBox)dialog.FindName("ObjectType")).SelectedItem is PrivilegeTarget.Table && ((TextBox)dialog.FindName("ObjectName")).Text == table, "Object Permissions… with a folder of the table selected starts on that table");
+                return Task.CompletedTask;
+            });
+            ((TreeViewItem)tree.ItemContainerGenerator.ContainerFromIndex(2)).IsSelected = true;
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            await OpenAsync<PrivilegeDialog>(Main("Object Permissions…"), dialog =>
+            {
+                check(((ComboBox)dialog.FindName("ObjectType")).SelectedItem is PrivilegeTarget.Table && ((TextBox)dialog.FindName("ObjectName")).Text == table + "_view", "Object Permissions… on a view starts on it, as a table-like object");
+                return Task.CompletedTask;
+            });
+            // Restore Database… asks for the database when the selection has none (the server, or the Databases folder), never using the login database.
+            bool? asks = null;
+            window.BackupShown = dialog => { asks = ((StackPanel)dialog.FindName("DatabaseFields")).Visibility == Visibility.Visible; dialog.Loaded += (_, _) => dialog.Dispatcher.BeginInvoke(dialog.Close); };
+            try
+            {
+                ((TreeViewItem)tree.ItemContainerGenerator.ContainerFromIndex(3)).IsSelected = true;
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                Main("Restore Database…").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                check(asks == true, "Restore Database… with the server selected asks for the database");
+                asks = null;
+                ((TreeViewItem)tree.ItemContainerGenerator.ContainerFromIndex(0)).IsSelected = true;
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                Main("Restore Database…").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                check(asks == false, "Restore Database… with an object of a database selected restores into that database, without asking");
+            }
+            finally { window.BackupShown = null; }
         }
         finally
         {
@@ -79,6 +148,14 @@ internal static class ExplorerContextChecks
         timer.Start();
         try { action.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent)); await completion.Task.WaitAsync(TimeSpan.FromSeconds(15)); }
         finally { timer.Stop(); }
+    }
+    private static IEnumerable<MenuItem> FindMenuItems(DependencyObject root)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        {
+            if (child is MenuItem item) yield return item;
+            foreach (var nested in FindMenuItems(child)) yield return nested;
+        }
     }
     private static void CaptureMenu(ContextMenu menu)
     {

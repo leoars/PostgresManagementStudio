@@ -81,6 +81,28 @@ internal static class DiagramEditingChecks
         view.SetTableView(DiagramTableView.Standard);
         await Idle();
 
+        // Table View from the toolbar with nothing selected: every table, one step of Undo (pedido do usuário, 12/11/2026).
+        view.SelectNone();
+        var bar = new ContextMenu(); view.FillToolbarTableView(bar.Items);
+        var barItems = bar.Items.OfType<MenuItem>().ToList();
+        check(barItems.Where(i => i.Name != "DiagramModifyCustom").All(i => i.IsEnabled) && !barItems.Single(i => i.Name == "DiagramModifyCustom").IsEnabled, "With nothing selected the toolbar Table View offers the five views, without Modify Custom");
+        var viewsBefore = view.Tables.ToDictionary(t => t.Name, t => t.View);
+        int depthBefore = view.UndoDepth;
+        barItems.Single(i => i.Name == "DiagramViewNameOnly").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        await Idle();
+        check(view.Tables.Count > 1 && view.Tables.All(t => t.View == DiagramTableView.NameOnly) && view.SelectedTables.Count == 0 && view.UndoDepth == depthBefore + 1 && view.IsDirty, "Name Only applies to every table of the diagram, in one step of Undo, and leaves nothing selected");
+        bar = new ContextMenu(); view.FillToolbarTableView(bar.Items);
+        check(bar.Items.OfType<MenuItem>().Single(i => i.Name == "DiagramViewNameOnly").IsChecked, "The toolbar marks the view every table shows");
+        view.Undo(); await Idle();
+        check(view.Tables.All(t => t.View == viewsBefore[t.Name]), "One Undo puts every table back in its view");
+        Choose(child);
+        bar = new ContextMenu(); view.FillToolbarTableView(bar.Items);
+        bar.Items.OfType<MenuItem>().Single(i => i.Name == "DiagramViewKeys").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        await Idle();
+        check(child.View == DiagramTableView.Keys && view.Tables.Where(t => t != child).All(t => t.View == viewsBefore[t.Name]), "With a table selected the toolbar changes only that table");
+        view.SetTableView(DiagramTableView.Standard);
+        await Idle();
+
         // Editing in Standard.
         check(view.BeginCellEdit(child, "remark", DiagramColumnFields.DataType) && view.Editor is { Text: "text" }, "A cell of the Standard view opens for typing");
         view.Editor!.Text = "not a type!"; check(!view.CommitEdit() && child.Column("remark")!.Type == "text" && view.FeedbackText.Contains("data type"), "An invalid type is refused and the column stays");

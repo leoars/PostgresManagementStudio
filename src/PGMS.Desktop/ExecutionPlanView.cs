@@ -239,14 +239,19 @@ public sealed class ExecutionPlanView : UserControl
             return item;
         }
         Add("_Save Execution Plan As…", "PlanSaveAs", () => SaveRequested?.Invoke(this, EventArgs.Empty));
-        Add("Show Execution Plan In New _Tab", "PlanShowInNewTab", () => ShowInNewTabRequested?.Invoke(this, EventArgs.Empty));
+        var newTab = Add("Show Execution Plan In New _Tab", "PlanShowInNewTab", () => ShowInNewTabRequested?.Invoke(this, EventArgs.Empty));
         Add("Find _Node", "PlanFindNode", OpenFind);
         menu.Items.Add(new Separator());
         Add("Zoom _In", "PlanZoomIn", () => Zoom *= ZoomStep);
         Add("Zoom _Out", "PlanZoomOut", () => Zoom /= ZoomStep);
         Add("_Custom Zoom…", "PlanCustomZoom", CustomZoom);
         Add("Zoom to _Fit", "PlanZoomFit", ZoomToFit);
-        menu.Opened += (_, _) => { foreach (var item in menu.Items.OfType<MenuItem>()) item.IsEnabled = shown.Count > 0; };
+        menu.Opened += (_, _) =>
+        {
+            foreach (var item in menu.Items.OfType<MenuItem>()) item.IsEnabled = shown.Count > 0;
+            // A plan already in a tab of its own has nowhere newer to go: the item shows only where a host opens the tab (the query tab).
+            newTab.Visibility = ShowInNewTabRequested is null ? Visibility.Collapsed : Visibility.Visible;
+        };
         return menu;
     }
 
