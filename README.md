@@ -20,6 +20,8 @@ English | [Português (Brasil)](README.pt-BR.md)
 
 See your schema the way you see it in SSMS. Add tables and their related tables, drag one column onto another to create a foreign key, change columns and primary keys inside the diagram, and let **Arrange Tables** lay everything out. Every change to the database is shown as a SQL script for review first. Diagrams are saved on the server, in a small `pgms` schema that PGMS asks permission to create.
 
+Diagrams also show each table's **indexes** (GIN, GiST, BRIN and operator classes such as `gin_trgm_ops`, in a section closed by default) and warn about foreign keys that no index serves. Tables, columns and relationships can carry **descriptions**, stored as PostgreSQL `COMMENT ON`. **Export for AI…** writes the diagram as Markdown (columns, keys, relationships, indexes and descriptions) to give an AI agent before it writes SQL; an optional `pgms.diagram_markdown(name)` function returns the same text inside the database. See [Using diagrams with AI agents](docs/en/user-guide.md#using-diagrams-with-ai-agents).
+
 ### Visual query designer
 
 ![The Query Designer with the Diagram, Criteria and SQL panes](docs/assets/pgms-query-designer.png)
