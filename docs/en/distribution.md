@@ -1,4 +1,4 @@
-# PGMS v0.1.0-alpha.6 — portable distribution (M1062)
+# PGMS v0.1.0-alpha.7 — portable distribution (M1117)
 
 English | Português (Brasil): LEIA-ME.md in the package, or docs/pt-BR/distribution.md in the source repository.
 
@@ -9,6 +9,8 @@ Connect with the intended PostgreSQL role and appropriate TLS settings (VerifyFu
 Each query tab has its own session. F5 executes selection/document. Ctrl+C copies displayed selected cells with headers; Ctrl+Shift+C omits headers. NULL is distinct from empty text; result/copy/export limits are explicit. Export is not a full database dump.
 
 State defaults to %LOCALAPPDATA%/PGMS; PGMS_STATE_DIRECTORY allows a separate trial directory. Saved credentials, recovery and journals use Windows current-user DPAPI. Close PGMS before backing up state; keep SQL files separately and review recovered tabs with Save As. State/credentials are not universally portable between users/machines or older builds.
+
+Unexpected errors are written to a daily log in %LOCALAPPDATA%/PGMS/logs (logs under PGMS_STATE_DIRECTORY), kept 30 days, with password values in key=value text masked; nothing is sent over the network. The error window offers Copy Details, Open Log Folder, Report Issue, Continue and Close PGMS. To report a problem, use the issue templates of the repository below and attach the log after reading it: an error message can quote what the server sent.
 
 Verify integrity with ./Verify-Package.ps1 -PackagePath . in PowerShell 7; manifest hashes detect differences, not authorship. Optional managed installation also requires PowerShell 7. From the extracted package: ./Install-Pgms.ps1 -PackagePath .; inspect ./Get-PgmsInstallation.ps1; launch ./Start-Pgms.ps1; use ./Set-PgmsActiveVersion.ps1 -Milestone <installed-label> for rollback and ./Uninstall-Pgms.ps1 -Milestone <installed-label> for removal. Use -InstallRoot for an isolated managed location. These scripts preserve user state and refuse unmanaged/nonempty roots and unsafe paths; close running instances first.
 

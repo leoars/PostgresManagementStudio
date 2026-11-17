@@ -1,4 +1,4 @@
-<Window x:Class="PGMS.Desktop.SessionDetailsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Width="620" Height="440" MinWidth="460" MinHeight="320" Background="#F5F5F5" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip" Closing="OnClosing">
+<Window x:Class="PGMS.Desktop.SessionDetailsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Width="620" Height="440" MinWidth="460" MinHeight="320" Background="{DynamicResource Pgms.DialogBackground}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip" Closing="OnClosing">
  <DockPanel Margin="12">
   <Grid x:Name="Facts" DockPanel.Dock="Top" Margin="0,0,0,8">
    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>

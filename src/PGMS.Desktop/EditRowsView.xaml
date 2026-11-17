@@ -2,9 +2,9 @@
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:local="clr-namespace:PGMS.Desktop">
- <DockPanel Background="White">
+ <DockPanel Background="{DynamicResource Pgms.ContentBackground}">
   <!-- SSMS 22.11 footer: |◀ ◀ [n] of N ▶ ▶| ▶* and a stop button (M1044). -->
-  <Border DockPanel.Dock="Bottom" Background="#F5F5F5" BorderBrush="#D0D7DE" BorderThickness="0,1,0,0" Padding="4,2">
+  <Border DockPanel.Dock="Bottom" Background="{DynamicResource Pgms.DialogBackground}" BorderBrush="#D0D7DE" BorderThickness="0,1,0,0" Padding="4,2">
    <DockPanel>
     <StackPanel Orientation="Horizontal">
      <StackPanel.Resources>
@@ -23,7 +23,7 @@
   </Border>
   <DataGrid x:Name="Rows" AutoGenerateColumns="False" CanUserAddRows="True" CanUserDeleteRows="False" CanUserSortColumns="False" CanUserReorderColumns="False"
             SelectionUnit="CellOrRowHeader" SelectionMode="Extended" HeadersVisibility="All" GridLinesVisibility="All" RowHeaderWidth="20" RowHeight="22"
-            HorizontalGridLinesBrush="#E3E3E3" VerticalGridLinesBrush="#E3E3E3" BorderThickness="0" FontFamily="Segoe UI" FontSize="12"
+            HorizontalGridLinesBrush="{DynamicResource Pgms.GridLines}" VerticalGridLinesBrush="{DynamicResource Pgms.GridLines}" BorderThickness="0" FontFamily="Segoe UI" FontSize="12"
             EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="Table rows"
             PreviewKeyDown="RowsPreviewKeyDown" CurrentCellChanged="CurrentCellMoved" RowEditEnding="RowEditEnding">
    <DataGrid.RowHeaderTemplate>

@@ -36,7 +36,10 @@ public sealed class CatalogNode : INotifyPropertyChanged
     /// <summary>The label is being edited in place (Rename, F2 or a click on the selected label, as in SSMS).</summary>
     public bool IsRenaming { get => renaming; set { renaming = value; PropertyChanged?.Invoke(this, new(nameof(IsRenaming))); } }
     public string RenameText { get => renameText; set { renameText = value; PropertyChanged?.Invoke(this, new(nameof(RenameText))); } }
-    public string Name => Entry.Name + (Filter.IsActive ? " (filtered)" : "") + (busy ? " (loading)" : WasCanceled ? " (load canceled)" : Error is not null ? " (load failed)" : "");
+    private string? label;
+    /// <summary>Text shown instead of the entry name, such as the server node with its version (PGMS-051); the entry keeps its name.</summary>
+    public string? Label { get => label; set { label = value; PropertyChanged?.Invoke(this, new(nameof(Name))); } }
+    public string Name => (label ?? Entry.Name) + (Filter.IsActive ? " (filtered)" : "") + (busy ? " (loading)" : WasCanceled ? " (load canceled)" : Error is not null ? " (load failed)" : "");
     public string FilterSummary => (busy ? "Loading… " : WasCanceled ? "Load canceled; displayed items may be outdated. Refresh to retry. " : Error is not null ? "Load failed; displayed items may be outdated. Refresh to retry. " : "") + (loaded ? $"{allChildren.Count(n => Matches(n))} of {allChildren.Count} items." : "Expand or refresh to load items.");
     private bool Matches(CatalogNode node) => Filter.Matches(node.FilterName, node.Entry.Owner);
     // Routines show their arguments and login roles a suffix; the filter compares the object name.

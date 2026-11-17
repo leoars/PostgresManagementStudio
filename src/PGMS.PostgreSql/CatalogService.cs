@@ -2,7 +2,9 @@ using Npgsql;
 
 namespace PGMS.PostgreSql;
 
-public enum CatalogKind { Server, Databases, Database, Schemas, Schema, Tables, Views, MaterializedViews, Sequences, Functions, Procedures, Relation, Routine, Columns, Column, Indexes, Index, Roles, Role, Enums, Domains, DataType, DatabaseDiagrams, DatabaseDiagram, Keys, Key, Constraints, Constraint, Triggers, Trigger }
+public enum CatalogKind { Server, Databases, Database, Schemas, Schema, Tables, Views, MaterializedViews, Sequences, Functions, Procedures, Relation, Routine, Columns, Column, Indexes, Index, Roles, Role, Enums, Domains, DataType, DatabaseDiagrams, DatabaseDiagram, Keys, Key, Constraints, Constraint, Triggers, Trigger, Extensions, Extension,
+    // PGMS-063 (M1099): composite types, foreign servers and logical replication.
+    CompositeTypes, ForeignServers, ForeignServer, Replication, Publications, Publication, Subscriptions, Subscription }
 public sealed record CatalogEntry(CatalogKind Kind, string Name, string? Database = null, string? Schema = null, uint Oid = 0)
 {
     public string? RelationType { get; init; }
@@ -17,13 +19,16 @@ public sealed record CatalogEntry(CatalogKind Kind, string Name, string? Databas
     public bool IsServer => Kind == CatalogKind.Server;
     public bool CanManageEnum => Kind == CatalogKind.DataType && DataTypeKind == "e" && Oid != 0;
     public bool CanManageDomain => Kind == CatalogKind.DataType && DataTypeKind == "d" && Oid != 0;
-    public bool CanInspectObjectProperties => Kind is CatalogKind.Database or CatalogKind.Schema or CatalogKind.Routine || (Kind == CatalogKind.Relation && RelationType is "v" or "m");
+    public bool CanInspectObjectProperties => Kind is CatalogKind.Database or CatalogKind.Schema or CatalogKind.Routine or CatalogKind.ForeignServer or CatalogKind.Publication or CatalogKind.Subscription
+        || (Kind == CatalogKind.Relation && RelationType is "v" or "m" or "f") || (Kind == CatalogKind.DataType && DataTypeKind == "c");
     public bool CanManageRoutinePermissions => Kind == CatalogKind.Routine && Oid != 0;
     public bool CanInspectSequence => Kind == CatalogKind.Relation && RelationType == "S";
     public bool CanInspectTable => Kind == CatalogKind.Relation && RelationType is "r" or "p";
     public bool CanEditTable => Kind == CatalogKind.Relation && RelationType == "r";
     public bool CanManagePartitions => Kind == CatalogKind.Relation && RelationType == "p";
-    public bool CanExpand => !IsOffline && Kind is not (CatalogKind.Routine or CatalogKind.Column or CatalogKind.Index or CatalogKind.Role or CatalogKind.DataType or CatalogKind.DatabaseDiagram or CatalogKind.Key or CatalogKind.Constraint or CatalogKind.Trigger);
+    public bool CanExpand => !IsOffline && Kind is not (CatalogKind.Routine or CatalogKind.Column or CatalogKind.Index or CatalogKind.Role or CatalogKind.DataType or CatalogKind.DatabaseDiagram or CatalogKind.Key or CatalogKind.Constraint or CatalogKind.Trigger or CatalogKind.Extension
+        or CatalogKind.ForeignServer or CatalogKind.Publication or CatalogKind.Subscription);
+    public bool IsExtension => Kind == CatalogKind.Extension && Oid != 0;
     public bool IsDiagram => Kind == CatalogKind.DatabaseDiagram && Oid != 0;
 }
 
@@ -43,9 +48,13 @@ public sealed class CatalogService(string connectionString)
         {
             case CatalogKind.Server: return [Folder(CatalogKind.Databases, "Databases"), Folder(CatalogKind.Roles, "Login/Group Roles")];
             // SSMS 22.11 lists Database Diagrams first under a database (M1043).
-            case CatalogKind.Database: return [Folder(CatalogKind.DatabaseDiagrams, "Database Diagrams"), Folder(CatalogKind.Schemas, "Schemas")];
+            // Extensions are per database in PostgreSQL (PGMS-060, M1090); SSMS has no counterpart, so the folder goes last.
+            // Foreign servers and replication are per database in PostgreSQL (PGMS-063, M1099); SSMS keeps Linked Servers and Replication under the server.
+            case CatalogKind.Database: return [Folder(CatalogKind.DatabaseDiagrams, "Database Diagrams"), Folder(CatalogKind.Schemas, "Schemas"), Folder(CatalogKind.Extensions, "Extensions"),
+                Folder(CatalogKind.ForeignServers, "Foreign Servers"), Folder(CatalogKind.Replication, "Replication")];
+            case CatalogKind.Replication: return [Folder(CatalogKind.Publications, "Local Publications"), Folder(CatalogKind.Subscriptions, "Local Subscriptions")];
             case CatalogKind.DatabaseDiagrams: return await DiagramsAsync(parent, token).ConfigureAwait(false);
-            case CatalogKind.Schema: return [Folder(CatalogKind.Tables, "Tables"), Folder(CatalogKind.Views, "Views"), Folder(CatalogKind.MaterializedViews, "Materialized Views"), Folder(CatalogKind.Sequences, "Sequences"), Folder(CatalogKind.Functions, "Functions"), Folder(CatalogKind.Procedures, "Procedures"), Folder(CatalogKind.Enums, "Enums"), Folder(CatalogKind.Domains, "Domains")];
+            case CatalogKind.Schema: return [Folder(CatalogKind.Tables, "Tables"), Folder(CatalogKind.Views, "Views"), Folder(CatalogKind.MaterializedViews, "Materialized Views"), Folder(CatalogKind.Sequences, "Sequences"), Folder(CatalogKind.Functions, "Functions"), Folder(CatalogKind.Procedures, "Procedures"), Folder(CatalogKind.Enums, "Enums"), Folder(CatalogKind.Domains, "Domains"), Folder(CatalogKind.CompositeTypes, "Composite Types")];
             // SSMS 22.11 order under a table: Columns, Keys, Constraints, Triggers, Indexes (Statistics has no node here).
             case CatalogKind.Relation when parent.RelationType is "r" or "p": return [Folder(CatalogKind.Columns, "Columns"), Folder(CatalogKind.Keys, "Keys"), Folder(CatalogKind.Constraints, "Constraints"), Folder(CatalogKind.Triggers, "Triggers"), Folder(CatalogKind.Indexes, "Indexes")];
             case CatalogKind.Relation when parent.RelationType == "v": return [Folder(CatalogKind.Columns, "Columns"), Folder(CatalogKind.Triggers, "Triggers"), Folder(CatalogKind.Indexes, "Indexes")];
@@ -58,8 +67,15 @@ public sealed class CatalogService(string connectionString)
             CatalogKind.Keys => "SELECT oid, conname FROM pg_catalog.pg_constraint WHERE conrelid=@oid AND contype IN ('p','u','f') ORDER BY CASE contype WHEN 'p' THEN 0 WHEN 'u' THEN 1 ELSE 2 END, conname",
             CatalogKind.Constraints => "SELECT oid, conname FROM pg_catalog.pg_constraint WHERE conrelid=@oid AND contype IN ('c','x') ORDER BY conname",
             CatalogKind.Triggers => "SELECT oid, tgname FROM pg_catalog.pg_trigger WHERE tgrelid=@oid AND NOT tgisinternal ORDER BY tgname",
+            CatalogKind.Extensions => "SELECT oid, extname FROM pg_catalog.pg_extension ORDER BY extname",
             CatalogKind.Schemas => "SELECT oid, nspname FROM pg_catalog.pg_namespace WHERE nspname <> 'information_schema' AND nspname !~ '^pg_' ORDER BY nspname",
             CatalogKind.Roles => "SELECT oid, rolname || CASE WHEN rolcanlogin THEN ' (login)' ELSE '' END, rolname FROM pg_catalog.pg_roles ORDER BY rolname",
+            // Only standalone composite types (CREATE TYPE ... AS): every table also has a composite row type.
+            CatalogKind.CompositeTypes => "SELECT t.oid, t.typname, 'c' FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace JOIN pg_catalog.pg_class c ON c.oid=t.typrelid WHERE n.nspname=@schema AND t.typtype='c' AND c.relkind='c' ORDER BY t.typname, t.oid",
+            CatalogKind.ForeignServers => "SELECT oid, srvname FROM pg_catalog.pg_foreign_server ORDER BY srvname",
+            CatalogKind.Publications => "SELECT oid, pubname FROM pg_catalog.pg_publication ORDER BY pubname",
+            // pg_subscription is cluster-wide; the folder shows the subscriptions of this database. Its readable columns exclude subconninfo.
+            CatalogKind.Subscriptions => "SELECT s.oid, s.subname FROM pg_catalog.pg_subscription s JOIN pg_catalog.pg_database d ON d.oid=s.subdbid WHERE d.datname=pg_catalog.current_database() ORDER BY s.subname",
             CatalogKind.Enums or CatalogKind.Domains => "SELECT t.oid, t.typname, t.typtype::text FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname=@schema AND t.typtype::text=@kind ORDER BY t.typname, t.oid",
             CatalogKind.Functions or CatalogKind.Procedures => "SELECT p.oid, p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')', pg_catalog.pg_get_userbyid(p.proowner) FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=@schema AND p.prokind::text=@kind ORDER BY p.proname, p.oid",
             CatalogKind.Columns => "SELECT attnum::oid, attname || ' (' || pg_catalog.format_type(atttypid, atttypmod) || CASE WHEN attnotnull THEN ', not null)' ELSE ', null)' END FROM pg_catalog.pg_attribute WHERE attrelid=@oid AND attnum>0 AND NOT attisdropped ORDER BY attnum",
@@ -89,8 +105,10 @@ public sealed class CatalogService(string connectionString)
                 CatalogKind.Databases => CatalogKind.Database, CatalogKind.Schemas => CatalogKind.Schema,
                 CatalogKind.Roles => CatalogKind.Role, CatalogKind.Columns => CatalogKind.Column,
                 CatalogKind.Indexes => CatalogKind.Index, CatalogKind.Functions or CatalogKind.Procedures => CatalogKind.Routine,
-                CatalogKind.Enums or CatalogKind.Domains => CatalogKind.DataType,
+                CatalogKind.Enums or CatalogKind.Domains or CatalogKind.CompositeTypes => CatalogKind.DataType,
+                CatalogKind.ForeignServers => CatalogKind.ForeignServer, CatalogKind.Publications => CatalogKind.Publication, CatalogKind.Subscriptions => CatalogKind.Subscription,
                 CatalogKind.Keys => CatalogKind.Key, CatalogKind.Constraints => CatalogKind.Constraint, CatalogKind.Triggers => CatalogKind.Trigger,
+                CatalogKind.Extensions => CatalogKind.Extension,
                 _ => CatalogKind.Relation
             };
             entries.Add(new(kind, name, kind == CatalogKind.Database ? reader.GetString(2) : parent.Database,

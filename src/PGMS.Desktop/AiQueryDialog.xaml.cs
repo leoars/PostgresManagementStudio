@@ -39,6 +39,8 @@ public partial class AiQueryDialog : Window
     {
         if (!ready) return;
         GenerateButton.IsEnabled = !Busy && Request.Text.Trim().Length > 0;
+        NewConversationButton.IsEnabled = !Busy && turns.Count > 0;
+        ConversationInfo.Text = turns.Count == 0 ? "" : $"Follow-up: the next request also sends the {turns.Count} earlier request(s) and the SQL written for them.";
         InsertButton.IsEnabled = CopyButton.IsEnabled = !Busy && Generated is not null;
         ContextButton.IsEnabled = !Busy && SentContext is not null;
     }
@@ -60,6 +62,18 @@ public partial class AiQueryDialog : Window
         {
             int limit = settings.Validate().ContextCharacters;
             string? current = IncludeSelection.IsChecked == true ? selectedSql : null;
+            string fitted = "";
+            int? maximumWindow = settings.Provider == AiProvider.Ollama ? await AiQueryGenerator.OllamaContextLengthAsync(settings, token) : null;
+            if (maximumWindow is int window)
+            {
+                // A local model reads only what fits its window: cut the structure to it instead of letting Ollama drop the start.
+                int room = AiQueryGenerator.OllamaStructureCharacters(window, AiQueryGenerator.Instructions.Length + Request.Text.Length + (current?.Length ?? 0) + turns.Sum(t => t.Request.Length + t.Sql.Length + 40) + 200);
+                if (room < limit)
+                {
+                    limit = Math.Max(room, SchemaContext.MinimumCharacters);
+                    fitted = $" Structure limited to {limit:N0} characters to fit the model's window of {window:N0} tokens.";
+                }
+            }
             // Words of the selected SQL count for choosing relations too: it usually names the tables the request is about.
             string wording = current is null ? Request.Text : Request.Text + "\n" + current;
             var catalog = await new SchemaContextService(connection).LoadAsync(token);
@@ -70,19 +84,23 @@ public partial class AiQueryDialog : Window
                 selection = AiQueryGenerator.ComposeSelection(Request.Text, catalog.NameList(wording, limit), current);
                 SentContext = AiQueryGenerator.SelectionInstructions + "\n\n" + selection;
                 Feedback.Text = $"The database does not fit in one request. Asking {settings.Provider} which of its {catalog.Relations:N0} tables and views are needed…";
-                chosen = await AiQueryGenerator.SelectRelationsAsync(settings.Validate(), selection, token);
+                chosen = await AiQueryGenerator.SelectRelationsAsync(settings.Validate(), selection, token, maximumWindow);
             }
             var schema = catalog.Build(wording, limit, chosen);
-            string prompt = AiQueryGenerator.Compose(Request.Text, schema, current);
+            string prompt = AiQueryGenerator.Compose(Request.Text, schema, current, turns);
             SentContext = (selection is null ? "" : "-- First request: choosing the relations\n" + AiQueryGenerator.SelectionInstructions + "\n\n" + selection + "\n\n-- Second request: writing the SQL\n") + AiQueryGenerator.Instructions + "\n\n" + prompt;
             string omitted = schema.OmittedRelations == 0 ? "" : $"; {schema.OmittedRelations:N0} more without columns, {(schema.ListedByName == schema.OmittedRelations ? "all" : schema.ListedByName.ToString("N0"))} listed by name";
             string picked = selection is null ? "" : schema.ChosenRelations > 0 ? $" {settings.Provider} chose {schema.ChosenRelations:N0} of them from a list of names in a first request; the rest were ranked by the words of your request."
                 : $" {settings.Provider} named no existing relation in a first request, so they were ranked by the words of your request.";
-            ContextInfo.Text = $"Sent to {settings.Provider}: your request and the structure of {schema.Database} ({schema.Relations:N0} tables/views with {schema.Columns:N0} columns{omitted}; {prompt.Length / 1024.0:N1} KB){(current is not null ? " plus the selected SQL" : "")}.{picked} No table data.";
+            ContextInfo.Text = $"Sent to {settings.Provider}: your request and the structure of {schema.Database} ({schema.Relations:N0} tables/views with {schema.Columns:N0} columns{omitted}; {prompt.Length / 1024.0:N1} KB){(current is not null ? " plus the selected SQL" : "")}.{picked}{fitted} No table data.";
             Feedback.Text = $"Waiting for {settings.Provider}…";
-            Generated = await AiQueryGenerator.GenerateAsync(settings, prompt, token);
+            Generated = await AiQueryGenerator.GenerateAsync(settings, prompt, token, maximumWindow);
             Result.Text = Generated.Sql;
-            message = "Review the SQL, then choose Insert into Editor.";
+            // The conversation (M1115): this request and its SQL go with the next one, so it can ask for a change ("now group by month").
+            turns.Add(new AiTurn(Request.Text.Trim(), Generated.Sql));
+            if (turns.Count > AiQueryGenerator.MaximumTurns) turns.RemoveAt(0);
+            Request.Clear();
+            message = "Review the SQL, then choose Insert into Editor, or type a follow-up request.";
         }
         catch (OperationCanceledException) { message = "Canceled. Nothing was inserted."; }
         catch (Exception ex) when (ex is AiProviderException or NpgsqlException or IOException or TimeoutException or System.Security.Cryptography.CryptographicException)
@@ -92,6 +110,27 @@ public partial class AiQueryDialog : Window
     }
 
     private void CancelGeneration(object sender, RoutedEventArgs e) { cancellation?.Cancel(); Feedback.Text = "Canceling…"; }
+
+    private readonly List<AiTurn> turns = [];
+    /// <summary>The earlier requests of this window and the SQL written for them, oldest first, sent with the next request.</summary>
+    public IReadOnlyList<AiTurn> Turns => turns;
+
+    private void NewConversation(object sender, RoutedEventArgs e) => StartNewConversation();
+    public void StartNewConversation()
+    {
+        if (Busy) return;
+        turns.Clear();
+        Feedback.Foreground = Brushes.DimGray; Feedback.Text = "New conversation: the next request is sent without the earlier ones.";
+        Changed(this, new RoutedEventArgs());
+    }
+
+    /// <summary>Explain, Fix and Optimize (M1115) open the window with a request written for the selected SQL; nothing is sent until Generate.</summary>
+    public void Prefill(string request)
+    {
+        Request.Text = request;
+        if (IncludeSelection.IsEnabled) IncludeSelection.IsChecked = true;
+        Request.CaretIndex = Request.Text.Length;
+    }
 
     private void Insert(object sender, RoutedEventArgs e) => InsertResult();
     public void InsertResult()

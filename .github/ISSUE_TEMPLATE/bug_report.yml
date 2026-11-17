@@ -13,7 +13,7 @@ body:
     attributes:
       label: PGMS version / Versão do PGMS
       description: Release tag or build label shown in Help > About. / Tag da release ou rótulo de build exibido em Help > About.
-      placeholder: v0.1.0-alpha.1 (M1008)
+      placeholder: v0.1.0-alpha.7 (M1117)
     validations:
       required: true
   - type: input
@@ -55,6 +55,14 @@ body:
       description: Include the exact message, SQLSTATE and the Messages tab text when available. / Inclua a mensagem exata, SQLSTATE e o texto da aba Messages quando houver.
     validations:
       required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Error log / Log de erro
+      description: If PGMS showed the unexpected error window, paste the report from Copy Details or attach the file from %LOCALAPPDATA%\PGMS\logs. Read it first; an error message can quote what the server sent. / Se o PGMS mostrou a janela de erro inesperado, cole o relatório de Copy Details ou anexe o arquivo de %LOCALAPPDATA%\PGMS\logs. Leia antes; uma mensagem de erro pode citar o que o servidor enviou.
+      render: text
+    validations:
+      required: false
   - type: checkboxes
     id: confirm
     attributes:

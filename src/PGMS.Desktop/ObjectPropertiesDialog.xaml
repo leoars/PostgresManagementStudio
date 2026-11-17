@@ -1,8 +1,8 @@
 <Window x:Class="PGMS.Desktop.ObjectPropertiesDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="Object Properties" Width="800" Height="600" MinWidth="600" MinHeight="440" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+ Title="Object Properties" Width="800" Height="600" MinWidth="600" MinHeight="440" Background="{DynamicResource Pgms.DialogBackground}" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
  <Grid Margin="12">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><ScrollViewer MaxHeight="110" VerticalScrollBarVisibility="Auto"><TextBlock x:Name="Target" TextWrapping="Wrap"/></ScrollViewer></Border>
+  <Border Background="{DynamicResource Pgms.PaneBackground}" Padding="10" Margin="0,0,0,10"><ScrollViewer MaxHeight="110" VerticalScrollBarVisibility="Auto"><TextBlock x:Name="Target" TextWrapping="Wrap"/></ScrollViewer></Border>
   <TabControl x:Name="Details" Grid.Row="1">
    <TabItem Header="General"><TextBox x:Name="Summary" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="8" AutomationProperties.Name="Object properties"/></TabItem>
    <TabItem x:Name="DefinitionTab" Header="Definition" Visibility="Collapsed"><DockPanel>

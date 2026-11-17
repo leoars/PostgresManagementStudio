@@ -66,7 +66,7 @@ public sealed class SqlCompletionCatalog
 }
 
 /// <summary>Decides what to offer from the text around the caret. It reads names and clauses only; it is not a SQL parser, so it never rejects a statement.</summary>
-public static class SqlCompletionEngine
+public static partial class SqlCompletionEngine
 {
     private const int MaxText = 4 * 1024 * 1024;
     private enum TokenKind { Word, Quoted, Symbol }

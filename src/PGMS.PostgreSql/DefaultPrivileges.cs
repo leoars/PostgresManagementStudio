@@ -18,6 +18,8 @@ public sealed record DefaultPrivilegeRequest(DefaultPrivilegeTarget Target, stri
         _ => throw new ArgumentOutOfRangeException(nameof(target))
     };
 
+    public static string[] Allowed(DefaultPrivilegeTarget target, int? serverVersionNumber) => serverVersionNumber is < ServerVersionNumber.Maintain ? Allowed(target).Where(p => p != "MAINTAIN").ToArray() : Allowed(target);
+
     internal static string CatalogKind(DefaultPrivilegeTarget target) => target switch
     {
         DefaultPrivilegeTarget.Tables => "r", DefaultPrivilegeTarget.Sequences => "S",

@@ -55,7 +55,7 @@ public sealed class ConcurrentIndexInspector(string connectionString)
         {
             await reader.ReadAsync(token).ConfigureAwait(false);
             int version = reader.GetInt32(0);
-            if (version is < 170000 or >= 190000) blockers.Add("This concurrent-index flow is validated only on PostgreSQL 17 and 18.");
+            if (version is < 160000 or >= 190000) blockers.Add("This concurrent-index flow is validated only on PostgreSQL 16, 17 and 18.");
             if (reader.GetBoolean(1)) blockers.Add("Recovery server does not accept index creation.");
             if (reader.GetBoolean(2)) blockers.Add("The connection defaults to read-only transactions.");
             if (!reader.GetBoolean(3)) blockers.Add("Current role does not inherit the table owner's privileges.");

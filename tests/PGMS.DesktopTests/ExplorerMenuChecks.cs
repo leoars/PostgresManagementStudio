@@ -37,6 +37,16 @@ internal static class ExplorerMenuChecks
             var tasks = database.OfType<MenuItem>().Single(m => m.Name == "ExplorerDatabaseTasks");
             check(tasks.Items.OfType<MenuItem>().Select(m => m.Name).SequenceEqual(["ExplorerTakeOffline", "ExplorerBringOnline", "ExplorerBackupDatabase", "ExplorerRestoreDatabase", "ExplorerDatabaseOperations"]) && Names(database).Contains("ExplorerObjectProperties"), "Database menu groups Take Offline, Bring Online, Back Up and Restore under Tasks, as in SSMS");
             check(Names(await MenuFor(new CatalogEntry(CatalogKind.Databases, "Databases"))).SequenceEqual(["ExplorerNewDatabase", "-", "ExplorerRestoreDatabase", "-", "ExplorerStartPsql", "-", "ExplorerRefresh"]), "Databases folder menu matches SSMS minus SQL Server-only items");
+            // PGMS-063 (M1099): read-only objects with Properties as the default action.
+            foreach (var entry in new[] { new CatalogEntry(CatalogKind.ForeignServer, "srv", "postgres", Oid: 9), new CatalogEntry(CatalogKind.Publication, "pub", "postgres", Oid: 9), new CatalogEntry(CatalogKind.Subscription, "sub", "postgres", Oid: 9),
+                new CatalogEntry(CatalogKind.Relation, "far", "postgres", "public", 9) { RelationType = "f" }, new CatalogEntry(CatalogKind.DataType, "point", "postgres", "public", 9) { DataTypeKind = "c" } })
+            {
+                var items = await MenuFor(entry);
+                check(items.OfType<MenuItem>().SingleOrDefault(m => m.Name == "ExplorerObjectProperties") is { FontWeight: var weight } && weight == FontWeights.Bold && !Names(items).Contains("ExplorerTableProperties"),
+                    $"{entry.Kind} {entry.RelationType}{entry.DataTypeKind} offers Properties as the default action: " + string.Join(",", Names(items)));
+            }
+            check(ObjectExplorerDetailsView.TypeOf(new CatalogEntry(CatalogKind.Replication, "Replication")) == "Folder" && ObjectExplorerDetailsView.TypeOf(new CatalogEntry(CatalogKind.ForeignServer, "srv")) == "Foreign Server"
+                  && ObjectExplorerDetailsView.TypeOf(new CatalogEntry(CatalogKind.DataType, "p") { DataTypeKind = "c" }) == "Composite Type", "Object Explorer Details names the new folders and objects");
             var predefined = Names(await MenuFor(new CatalogEntry(CatalogKind.Role, "pg_monitor") { RoleName = "pg_monitor" }));
             check(predefined.SequenceEqual(["ExplorerStartPsql", "-", "ExplorerRefresh"]), "Predefined pg_ roles, like SSMS fixed server roles, offer no editing");
             var role = Names(await MenuFor(new CatalogEntry(CatalogKind.Role, "app (login)") { RoleName = "app" }));
@@ -84,6 +94,10 @@ internal static class ExplorerMenuChecks
             var c = new NpgsqlConnectionStringBuilder(connection);
             check(start.ArgumentList.SequenceEqual(["-h", c.Host!, "-p", c.Port.ToString(), "-U", c.Username!, "-d", c.Database!]) && !start.ArgumentList.Any(a => a.Contains("psql-secret", StringComparison.Ordinal)), "psql gets host, port, user and database on the command line, never the password");
             check(start.Environment["PGPASSWORD"] == "psql-secret-71" && start.Environment["PGSSLMODE"] == "require" && start.Environment["PGSSLROOTCERT"] == "C:\\certs\\root.crt" && !start.Environment.ContainsKey("PGSERVICE"), "psql receives the password, TLS mode and root certificate by environment, without inherited PG variables");
+            var withClientCert = new NpgsqlConnectionStringBuilder(withPassword) { SslCertificate = "C:\\certs\\client.crt", SslKey = "C:\\certs\\client.key", SslPassword = "psql-key-secret" }.ConnectionString;
+            var certStart = PsqlLauncher.CreateStartInfo(withClientCert, "C:\\fake\\psql.exe");
+            check(certStart.Environment["PGSSLCERT"] == "C:\\certs\\client.crt" && certStart.Environment["PGSSLKEY"] == "C:\\certs\\client.key" && !certStart.Environment.Values.Any(v => v?.Contains("psql-key-secret", StringComparison.Ordinal) == true) && !certStart.ArgumentList.Any(a => a.Contains("psql-key-secret", StringComparison.Ordinal)),
+                "psql receives the client certificate and key paths; the key password is left for psql to ask");
         }
         finally { Environment.SetEnvironmentVariable("PGSERVICE", null); }
     }

@@ -153,6 +153,12 @@ internal static class BackupFormatDialogChecks
             await Capture(dump,"m853-schema-normal",false,false,check);await Capture(dump,"m853-schema-small",true,true,check);
             Find<ComboBox>(dump,"CompressionSelector").SelectedValue=BackupCompression.Gzip;Find<ComboBox>(dump,"CompressionLevelSelector").SelectedItem=9;
             pending=dump.RunAsync();check(!Find<ComboBox>(dump,"CompressionSelector").IsEnabled && !Find<ComboBox>(dump,"CompressionLevelSelector").IsEnabled,"Running compressed backup freezes method and level");check(!Find<CheckBox>(dump,"LimitSchema").IsEnabled && !Find<TextBox>(dump,"SchemaFilterName").IsEnabled,"Running filtered backup freezes its exact selection");check(!Find<ComboBox>(dump,"LargeObjectsSelector").IsEnabled,"Running backup freezes large-object scope");await pending;
+            if((await new BackupService(As(source),tools).ToolVersionAsync("pg_dump")).Major<17)
+            {
+                // Before pg_dump 17 there is no --filter: a schema or table selection is refused before pg_dump runs, and the rest of this check needs it.
+                check(!dump.WasCompleted && !Directory.Exists(canceledArchive) && Find<TextBox>(dump,"Feedback").Text.Contains("pg_dump 17 or later"),"pg_dump before 17 refuses a filtered backup in the dialog with the reason and publishes nothing");
+                return;
+            }
             check(!dump.WasCompleted && !Directory.Exists(canceledArchive) && Find<TextBox>(dump,"Feedback").Text.Contains("permission denied"),"Large-object inclusion refuses unreadable objects without publishing a backup");
             await Scalar(source,$"GRANT SELECT ON LARGE OBJECT {uiLargeObject} TO {SqlIdentifier.Quote(owner)}");await dump.RunAsync();
             check(dump.WasCompleted && File.Exists(Path.Combine(canceledArchive,"toc.dat")),"Explicit retry after permission grant creates a complete directory archive");

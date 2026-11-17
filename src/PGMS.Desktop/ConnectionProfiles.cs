@@ -7,8 +7,9 @@ using Npgsql;
 namespace PGMS.Desktop;
 
 /// <summary>A saved connection. Group is the Registered Servers group path ("Production/Billing"); null or empty is the top level.
-/// DisableQueryHistory turns Query History off for every connection to this host and port (PGMS-043); older files without it record history.</summary>
-public sealed record ConnectionProfile(Guid Id, string Name, string Host, int Port, string Database, string Username, string SslMode, string? ProtectedPassword = null, string? RootCertificate = null, string? Group = null, bool DisableQueryHistory = false)
+/// DisableQueryHistory turns Query History off for every connection to this host and port (PGMS-043); older files without it record history.
+/// ClientCertificate and ClientKey are PEM files for PostgreSQL cert authentication; ProtectedKeyPassword is the key passphrase under DPAPI (PGMS-009).</summary>
+public sealed record ConnectionProfile(Guid Id, string Name, string Host, int Port, string Database, string Username, string SslMode, string? ProtectedPassword = null, string? RootCertificate = null, string? Group = null, bool DisableQueryHistory = false, string? ClientCertificate = null, string? ClientKey = null, string? ProtectedKeyPassword = null)
 {
     public override string ToString() => Name;
     public void Validate()
@@ -17,6 +18,7 @@ public sealed record ConnectionProfile(Guid Id, string Name, string Host, int Po
             throw new ArgumentException("Enter a profile name, server, database, user and port from 1 to 65535.");
         if (SslMode is not ("VerifyFull" or "Require" or "Prefer" or "Disable")) throw new ArgumentException("Unsupported profile SSL mode.");
         if (!string.IsNullOrEmpty(Group)) ServerGroups.Validate(Group);
+        if (string.IsNullOrEmpty(ClientCertificate) != string.IsNullOrEmpty(ClientKey)) throw new ArgumentException("Enter both the client certificate and its key, or neither.");
     }
     /// <summary>Same settings the Connect dialog uses for this profile, with the given password.</summary>
     public string ToConnectionString(string password)
@@ -27,7 +29,25 @@ public sealed record ConnectionProfile(Guid Id, string Name, string Host, int Po
             Timeout = 10, ApplicationName = "PGMS", Pooling = false, IncludeErrorDetail = false
         };
         if (!string.IsNullOrEmpty(RootCertificate)) settings.RootCertificate = RootCertificate;
+        if (!string.IsNullOrEmpty(ClientCertificate)) { settings.SslCertificate = ClientCertificate; settings.SslKey = ClientKey; }
+        if (ProtectedKeyPassword is not null) settings.SslPassword = RevealKeyPassword();
         return settings.ConnectionString;
+    }
+    // A separate entropy keeps the two secrets from being swapped between fields.
+    private byte[] KeyEntropy => [.. Id.ToByteArray(), .. Encoding.UTF8.GetBytes("client-key")];
+    public string RevealKeyPassword()
+    {
+        if (ProtectedKeyPassword is null) return "";
+        byte[] clear = System.Security.Cryptography.ProtectedData.Unprotect(Convert.FromBase64String(ProtectedKeyPassword), KeyEntropy, DataProtectionScope.CurrentUser);
+        try { return Encoding.UTF8.GetString(clear); }
+        finally { CryptographicOperations.ZeroMemory(clear); }
+    }
+    public ConnectionProfile WithKeyPassword(string keyPassword, bool remember)
+    {
+        if (!remember || keyPassword.Length == 0) return this with { ProtectedKeyPassword = null };
+        byte[] clear = Encoding.UTF8.GetBytes(keyPassword);
+        try { return this with { ProtectedKeyPassword = Convert.ToBase64String(System.Security.Cryptography.ProtectedData.Protect(clear, KeyEntropy, DataProtectionScope.CurrentUser)) }; }
+        finally { CryptographicOperations.ZeroMemory(clear); }
     }
     public string RevealPassword()
     {

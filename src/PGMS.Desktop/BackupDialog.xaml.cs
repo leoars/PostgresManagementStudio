@@ -50,9 +50,10 @@ public partial class BackupDialog : Window
         ScopeSelector.ItemsSource=new[]{new ScopeChoice(BackupDataScope.All,"Schema and data"),new(BackupDataScope.SchemaOnly,"Schema only"),new(BackupDataScope.DataOnly,"Data only")};ScopeSelector.SelectedIndex=0;
         RestoreScopeSelector.ItemsSource=ScopeSelector.ItemsSource;RestoreScopeSelector.SelectedIndex=0;
         LargeObjectsSelector.ItemsSource=new[]{new LargeObjectChoice(BackupLargeObjects.Default,"Tool default"),new(BackupLargeObjects.Include,"Include all large objects"),new(BackupLargeObjects.Exclude,"Exclude large objects")};LargeObjectsSelector.SelectedIndex=0;
-        CompressionSelector.ItemsSource=new[]{new CompressionChoice(BackupCompression.Default,"Tool default"),new(BackupCompression.None,"No compression"),new(BackupCompression.Gzip,"Gzip")};CompressionSelector.SelectedIndex=0;
+        CompressionSelector.ItemsSource=new[]{new CompressionChoice(BackupCompression.Default,"Tool default"),new(BackupCompression.None,"No compression"),new(BackupCompression.Gzip,"Gzip"),new(BackupCompression.Lz4,"LZ4 (pg_dump 16 or later)"),new(BackupCompression.Zstd,"Zstandard (pg_dump 16 or later)")};CompressionSelector.SelectedIndex=0;
         CompressionLevelSelector.ItemsSource=Enumerable.Range(1,9);CompressionLevelSelector.SelectedItem=6;
         JobsSelector.ItemsSource=Enumerable.Range(1,32);JobsSelector.SelectedIndex=0;
+        RestoreJobsSelector.ItemsSource=Enumerable.Range(1,32);RestoreJobsSelector.SelectedIndex=0;
         if(globals){FormatSelector.SelectedValue=BackupFormat.PlainSql;FormatSelector.IsEnabled=false;}
         string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PostgreSQL");
         if (Directory.Exists(root)) ToolsPath.Text = Directory.GetDirectories(root).OrderByDescending(p => int.TryParse(Path.GetFileName(p), out int version) ? version : 0).Select(p => Path.Combine(p, "bin")).FirstOrDefault(p => File.Exists(Path.Combine(p, "pg_dump.exe"))) ?? "";
@@ -87,10 +88,39 @@ public partial class BackupDialog : Window
     private BackupFormat Format=>((FormatChoice)FormatSelector.SelectedItem).Value;
     private BackupCompression Compression=>Format is BackupFormat.Custom or BackupFormat.Directory?((CompressionChoice)CompressionSelector.SelectedItem).Value:BackupCompression.Default;
     private BackupDataScope Scope=>((ScopeChoice)ScopeSelector.SelectedItem).Value;
-    private BackupOptions DumpOptions=>new(Format,Scope,Format==BackupFormat.PlainSql && SqlDumpOwner.IsChecked==true,Format==BackupFormat.PlainSql && SqlDumpAcl.IsChecked==true){Jobs=Format==BackupFormat.Directory?(int)JobsSelector.SelectedItem:1,Compression=Compression,CompressionLevel=Compression==BackupCompression.Gzip?(int)CompressionLevelSelector.SelectedItem:null,LargeObjects=Scope==BackupDataScope.SchemaOnly?BackupLargeObjects.Default:((LargeObjectChoice)LargeObjectsSelector.SelectedItem).Value,Selection=!restore && !globals && LimitSchema.IsChecked==true?(SelectionKindSelector.SelectedIndex==1?BackupSelection.ForTables([new(SchemaFilterName.Text,TableFilterName.Text)]):new BackupSelection([SchemaFilterName.Text])):null};
-    private RestoreOptions Options=>new(RestoreOwner.IsChecked==true,RestoreAcl.IsChecked==true){Scope=restore && !globals && Format!=BackupFormat.PlainSql?((ScopeChoice)RestoreScopeSelector.SelectedItem).Value:BackupDataScope.All};
+    private BackupOptions DumpOptions=>new(Format,Scope,Format==BackupFormat.PlainSql && SqlDumpOwner.IsChecked==true,Format==BackupFormat.PlainSql && SqlDumpAcl.IsChecked==true){Jobs=Format==BackupFormat.Directory?(int)JobsSelector.SelectedItem:1,Compression=Compression,CompressionLevel=BackupOptions.MaximumLevel(Compression) is not null?CompressionLevelSelector.SelectedItem as int?:null,LargeObjects=Scope==BackupDataScope.SchemaOnly?BackupLargeObjects.Default:((LargeObjectChoice)LargeObjectsSelector.SelectedItem).Value,Selection=!restore && !globals && LimitSchema.IsChecked==true?(SelectionKindSelector.SelectedIndex==1?BackupSelection.ForTables([new(SchemaFilterName.Text,TableFilterName.Text)]):new BackupSelection([SchemaFilterName.Text])):null};
+    private RestoreOptions Options=>new(RestoreOwner.IsChecked==true,RestoreAcl.IsChecked==true){Scope=restore && !globals && Format!=BackupFormat.PlainSql?((ScopeChoice)RestoreScopeSelector.SelectedItem).Value:BackupDataScope.All,
+        Jobs=restore && !globals && Format!=BackupFormat.PlainSql?(int)RestoreJobsSelector.SelectedItem:1,Items=restore && !globals && Format!=BackupFormat.PlainSql && RestoreChosenItems.IsChecked==true?chosenItems?.Select(i=>i.Line).ToList()??[]:null};
     private void OptionsChanged(object sender,RoutedEventArgs e){ClearPreviousFeedback();if(OptionsPreview is not null)UpdateOptions();}
-    private void FileChanged(object sender,System.Windows.Controls.TextChangedEventArgs e){ClearPreviousFeedback();if(GlobalReviewed is not null)GlobalReviewed.IsChecked=false;}
+    private void FileChanged(object sender,System.Windows.Controls.TextChangedEventArgs e){ClearPreviousFeedback();if(GlobalReviewed is not null)GlobalReviewed.IsChecked=false;if(chosenItems is not null){chosenItems=null;if(ready)UpdateOptions();}}
+
+    // ---- Restore of part of an archive (PGMS-064, M1100): pg_restore --list, then --use-list with the chosen lines ----
+    private IReadOnlyList<ArchiveItem>? chosenItems;
+    private int archiveItemCount;
+    private BackupCompression levelMethod=BackupCompression.Gzip;
+    internal IReadOnlyList<ArchiveItem>? ChosenItems=>chosenItems;
+    /// <summary>Shows the archive's items and returns the chosen ones, or null when cancelled. Tests replace it.</summary>
+    internal Func<IReadOnlyList<ArchiveItem>,IReadOnlyList<ArchiveItem>?,IReadOnlyList<ArchiveItem>?>? PickArchiveItems { get; set; }
+    private async void ChooseItems(object sender,RoutedEventArgs e)=>await ChooseItemsAsync();
+    internal async Task ChooseItemsAsync()
+    {
+        ClearPreviousFeedback();
+        if(string.IsNullOrWhiteSpace(ArchivePath.Text)){Feedback.Text="Choose the archive first.";return;}
+        IReadOnlyList<ArchiveItem> items;
+        ChooseItemsButton.IsEnabled=false;
+        try{items=await new BackupService(connectionString,ToolsPath.Text).ListArchiveAsync(ArchivePath.Text);}
+        catch(Exception ex)when(ex is IOException or InvalidOperationException or ArgumentException or UnauthorizedAccessException or System.ComponentModel.Win32Exception){Feedback.Text="The archive could not be listed. "+ex.Message;return;}
+        finally{ChooseItemsButton.IsEnabled=true;}
+        var picked=(PickArchiveItems??PickWithDialog)(items,chosenItems);
+        if(picked is null)return;
+        chosenItems=picked;archiveItemCount=items.Count;RestoreChosenItems.IsChecked=true;
+        UpdateOptions();
+    }
+    private IReadOnlyList<ArchiveItem>? PickWithDialog(IReadOnlyList<ArchiveItem> items,IReadOnlyList<ArchiveItem>? chosen)
+    {
+        var dialog=new ArchiveItemsDialog(items,chosen){Owner=this};
+        return dialog.ShowDialog()==true?dialog.Chosen:null;
+    }
     private void SchemaFilterChanged(object sender,System.Windows.Controls.TextChangedEventArgs e){ClearPreviousFeedback();if(ready)UpdateOptions();}
     private void ClearPreviousFeedback(){if(ready && cancellation is null)Feedback.Clear();}
     private void UpdateOptions()
@@ -106,7 +136,24 @@ public partial class BackupDialog : Window
         bool sql=Format==BackupFormat.PlainSql;
         bool directory=Format==BackupFormat.Directory;
         CompressionFields.Visibility=!restore && !globals && Format is BackupFormat.Custom or BackupFormat.Directory?Visibility.Visible:Visibility.Collapsed;
-        CompressionLevelFields.Visibility=Compression==BackupCompression.Gzip?Visibility.Visible:Visibility.Collapsed;
+        if(BackupOptions.MaximumLevel(Compression) is int maximumLevel)
+        {
+            if(levelMethod!=Compression)
+            {
+                levelMethod=Compression;
+                CompressionLevelSelector.ItemsSource=Enumerable.Range(1,maximumLevel);CompressionLevelSelector.SelectedItem=BackupOptions.DefaultLevel(Compression);
+                CompressionLevelHelp.Text=$"1 favors speed; {maximumLevel} favors smaller archives. Actual size depends on the data. {(Compression==BackupCompression.Gzip?"":"pg_dump 16 or later, built with this method, is required.")}".Trim();
+            }
+            CompressionLevelFields.Visibility=Visibility.Visible;
+        }
+        else CompressionLevelFields.Visibility=Visibility.Collapsed;
+        int restoreJobs=RestoreJobsSelector.SelectedItem as int? ?? 1;
+        RestoreJobsHelp.Text=restoreJobs==1?"One job restores in a single transaction: an error rolls everything back."
+            :$"Uses {restoreJobs} connections and does not run in one transaction: after an error, objects restored so far stay in the database. Tar archives cannot be restored in parallel.";
+        ChooseItemsButton.IsEnabled=cancellation is null && RestoreChosenItems.IsChecked==true;
+        RestoreItemsHelp.Text=RestoreChosenItems.IsChecked!=true?"Off, the whole archive is restored (within the content chosen above)."
+            :chosenItems is null?"Choose Items… lists the archive's contents (pg_restore --list); nothing is restored until items are chosen."
+            :$"{chosenItems.Count:N0} of {archiveItemCount:N0} item(s) chosen. Items the chosen ones depend on are not added automatically.";
         JobsFields.Visibility=!restore && directory && !globals?Visibility.Visible:Visibility.Collapsed;
         RunButton.Content=restore?(sql?"Run SQL":"Restore"):"Back Up";
         FileLabel.Content=directory?(restore?"_Archive directory:":"_New output directory:"):restore?(sql?"_SQL script:":"_Archive file:"):"_Output file:";
@@ -122,7 +169,7 @@ public partial class BackupDialog : Window
         try
         {
             var dumpOptions=DumpOptions;
-            OptionsPreview.Text=restore?(sql?"psql "+string.Join(" ",BackupService.SqlRestoreArguments()):"pg_restore "+string.Join(" ",Options.ToArguments())):"pg_dump "+string.Join(" ",dumpOptions.ToArguments())+(dumpOptions.Selection is null?"":" --filter <generated UTF-8 file>\n"+dumpOptions.Selection.FilterText);
+            OptionsPreview.Text=restore?(sql?"psql "+string.Join(" ",BackupService.SqlRestoreArguments()):"pg_restore "+string.Join(" ",Options.ToArguments())+(Options.Items is null?"":" --use-list=<generated file with the chosen items>")):"pg_dump "+string.Join(" ",dumpOptions.ToArguments())+(dumpOptions.Selection is null?"":" --filter <generated UTF-8 file>\n"+dumpOptions.Selection.FilterText);
             RunButton.IsEnabled=cancellation is null;
         }
         catch(ArgumentException ex){OptionsPreview.Text=ex.Message;RunButton.IsEnabled=false;}
@@ -199,7 +246,7 @@ public partial class BackupDialog : Window
         LimitSchema.IsEnabled=SchemaFilterName.IsEnabled=SelectionKindSelector.IsEnabled=TableFilterName.IsEnabled=false;
         GlobalReviewed.IsEnabled=false;
         RunButton.IsEnabled = ArchivePath.IsEnabled = ToolsPath.IsEnabled = BrowseButton.IsEnabled = ToolsButton.IsEnabled = false;
-        RestoreScopeSelector.IsEnabled=RestoreOwner.IsEnabled=RestoreAcl.IsEnabled=false;
+        RestoreScopeSelector.IsEnabled=RestoreOwner.IsEnabled=RestoreAcl.IsEnabled=RestoreJobsSelector.IsEnabled=RestoreChosenItems.IsEnabled=ChooseItemsButton.IsEnabled=false;
         LargeObjectsSelector.IsEnabled=CompressionSelector.IsEnabled=CompressionLevelSelector.IsEnabled=JobsSelector.IsEnabled=FormatSelector.IsEnabled=ScopeSelector.IsEnabled=SqlDumpOwner.IsEnabled=SqlDumpAcl.IsEnabled=false;
         CloseButton.Content = "Cancel";
         Progress.Visibility = Visibility.Visible;
@@ -220,7 +267,7 @@ public partial class BackupDialog : Window
             cancellation.Dispose(); cancellation = null;
             if (created && !WasCompleted) Feedback.Text += $" The database {Database}, created for this restore, was kept; drop it if it is not needed.";
             RunButton.IsEnabled = ArchivePath.IsEnabled = ToolsPath.IsEnabled = BrowseButton.IsEnabled = ToolsButton.IsEnabled = true;
-            RestoreScopeSelector.IsEnabled=RestoreOwner.IsEnabled=RestoreAcl.IsEnabled=true;
+            RestoreScopeSelector.IsEnabled=RestoreOwner.IsEnabled=RestoreAcl.IsEnabled=RestoreJobsSelector.IsEnabled=RestoreChosenItems.IsEnabled=true;ChooseItemsButton.IsEnabled=RestoreChosenItems.IsChecked==true;
             LargeObjectsSelector.IsEnabled=CompressionSelector.IsEnabled=CompressionLevelSelector.IsEnabled=JobsSelector.IsEnabled=FormatSelector.IsEnabled=ScopeSelector.IsEnabled=SqlDumpOwner.IsEnabled=SqlDumpAcl.IsEnabled=true;
             if(globals)FormatSelector.IsEnabled=false;
             LimitSchema.IsEnabled=SelectionKindSelector.IsEnabled=TableFilterName.IsEnabled=true;SchemaFilterName.IsEnabled=LimitSchema.IsChecked==true;

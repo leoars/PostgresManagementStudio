@@ -1,4 +1,4 @@
-# PGMS v0.1.0-alpha.6 — distribuição portátil (M1062)
+# PGMS v0.1.0-alpha.7 — distribuição portátil (M1117)
 
 [English]: READ-ME.md no pacote, ou docs/en/distribution.md no repositório. Português (Brasil).
 
@@ -9,6 +9,8 @@ Conecte com a role pretendida e TLS adequado (VerifyFull por padrão). Revise SQ
 Cada aba tem sessão própria. F5 executa seleção/documento. Ctrl+C copia células selecionadas exibidas com cabeçalhos; Ctrl+Shift+C omite cabeçalhos. NULL difere de vazio; resultados/cópia/exportação têm limites explícitos. Exportação não é dump completo do banco.
 
 Estado padrão em %LOCALAPPDATA%/PGMS; PGMS_STATE_DIRECTORY permite pasta separada de avaliação. Credenciais salvas, recuperação e diários usam DPAPI do usuário Windows atual. Feche antes de copiar estado; preserve SQL separadamente e revise abas recuperadas com Save As. Estado/credenciais não são universalmente portáteis entre usuários/máquinas ou builds antigos.
+
+Erros inesperados são gravados num log diário em %LOCALAPPDATA%/PGMS/logs (logs sob PGMS_STATE_DIRECTORY), guardado por 30 dias, com valores de senha em texto chave=valor mascarados; nada é enviado pela rede. A janela de erro oferece Copy Details, Open Log Folder, Report Issue, Continue e Close PGMS. Para relatar um problema, use os modelos de issue do repositório abaixo e anexe o log depois de lê-lo: uma mensagem de erro pode citar o que o servidor enviou.
 
 Confira integridade com ./Verify-Package.ps1 -PackagePath . no PowerShell 7; hashes detectam diferenças, não autoria. Instalação gerenciada opcional também exige PowerShell 7. No pacote extraído: ./Install-Pgms.ps1 -PackagePath .; consulte ./Get-PgmsInstallation.ps1; abra ./Start-Pgms.ps1; use ./Set-PgmsActiveVersion.ps1 -Milestone <rótulo-instalado> no rollback e ./Uninstall-Pgms.ps1 -Milestone <rótulo-instalado> na remoção. Use -InstallRoot para local gerenciado isolado. Scripts preservam estado do usuário e recusam raiz não gerenciada/não vazia e caminhos inseguros; feche instâncias primeiro.
 

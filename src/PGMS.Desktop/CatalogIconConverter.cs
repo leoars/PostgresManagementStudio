@@ -35,6 +35,8 @@ public sealed class CatalogIconConverter : IMultiValueConverter
             CatalogKind.Role => "role",
             CatalogKind.DataType => entry.DataTypeKind == "d" ? "domain" : "enum",
             CatalogKind.DatabaseDiagram => "diagram",
+            CatalogKind.Extension or CatalogKind.Publication or CatalogKind.Subscription => "extension",
+            CatalogKind.ForeignServer => "server",
             _ => values.Length > 1 && values[1] is true ? "folder-open" : "folder"
         };
         return Icons[key];
@@ -90,6 +92,8 @@ public sealed class CatalogIconConverter : IMultiValueConverter
         Add("domain", (purple, "M8,1 L15,8 8,15 1,8 Z"), (light, "M8,4 L12,8 8,12 4,8 Z"));
         // Two linked tables, after the SSMS diagram glyph.
         Add("diagram", (blue, "M0,1 L7,1 7,7 0,7 Z M9,9 L16,9 16,15 9,15 Z"), (light, "M1,3 L6,3 6,6 1,6 Z M10,11 L15,11 15,14 10,14 Z"), (ink, "M3,7 L4,7 4,12 9,12 9,13 3,13 Z"));
+        // Puzzle piece for an extension (PGMS-060): SSMS has no such node.
+        Add("extension", ("#3B8751", "M1,4 L5,4 A2,2 0 1 1 9,4 L13,4 13,8 A2,2 0 1 1 13,12 L13,15 1,15 Z"), ("#DDF0E2", "M3,6 L11,6 11,13 3,13 Z"));
         return icons;
     }
 }

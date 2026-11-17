@@ -17,6 +17,14 @@ public sealed record QueryCompletion(int DisplayedRows, int RecordsAffected, boo
 
 public sealed partial class QuerySession
 {
+    /// <summary>The column's type name. A type created after Npgsql read the catalog of this server (for example an extension installed while
+    /// PGMS was open) has no name in Npgsql ("-.-"); it is shown by its OID instead (M1116).</summary>
+    private static string TypeName(NpgsqlDataReader reader, int column)
+    {
+        string name = reader.GetDataTypeName(column);
+        return name is "-.-" or "" ? $"unknown type (oid {reader.GetDataTypeOID(column)})" : name;
+    }
+
     /// <summary>Awaits each consumer before reading more: no unbounded UI notification queue.</summary>
     public Task<QueryCompletion> StreamAsync(string sql, Func<QueryBatch, CancellationToken, ValueTask> consume, CancellationToken token = default)
         => StreamAsync(sql,consume,new QueryExecutionOptions(),token);
@@ -87,7 +95,7 @@ public sealed partial class QuerySession
                         metadataLimited = true;
                     }
                     if (retain)
-                        await consume(new(resultIndex, Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToArray(), [], ColumnTypes: Enumerable.Range(0, reader.FieldCount).Select(reader.GetDataTypeName).ToArray()), token).ConfigureAwait(false);
+                        await consume(new(resultIndex, Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToArray(), [], ColumnTypes: Enumerable.Range(0, reader.FieldCount).Select(i => TypeName(reader, i)).ToArray()), token).ConfigureAwait(false);
                     else if (!limited)
                     {
                         limited = true;

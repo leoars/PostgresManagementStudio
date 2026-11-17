@@ -24,7 +24,7 @@ internal static class EffectivePrivilegeChecks
             var denied=await limited.InspectAsync(PrivilegeTarget.Table,"item'\"",schema);
             check(denied.Name=="item'\"" && denied.Schema==schema && denied.Privileges.All(p=>!p.Allowed),"Role can inspect table grants without gaining table access");
             check(denied.SchemaUsage==true && denied.RowSecurityEnabled==false && denied.RowSecurityActive==false,"Table snapshot keeps schema and RLS flags distinct");
-            check(denied.Privileges.Any(p=>p.Privilege=="MAINTAIN"),"PG17 table inspection includes MAINTAIN");
+            check(denied.Privileges.Any(p=>p.Privilege=="MAINTAIN")==(await ServerVersionNumber.GetAsync(connection)>=ServerVersionNumber.Maintain),"Table inspection includes MAINTAIN from PostgreSQL 17 and omits it before");
             await Sql($"GRANT SELECT ON {table} TO {qRole} WITH GRANT OPTION;");
             var granted=await limited.InspectAsync(PrivilegeTarget.Table,"item'\"",schema);
             check(granted.Oid==denied.Oid && granted.Privileges.Single(p=>p.Scope=="Table" && p.Privilege=="SELECT") is {Allowed:true,GrantOption:true},"Reinspection observes effective SELECT with grant option on same OID");

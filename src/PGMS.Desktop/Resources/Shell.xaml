@@ -1,8 +1,47 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop">
+ <!-- Theme colors (PGMS-071, M1107): the surface colors the XAML used to fix, each with the same value as before. Pages and dialogs refer to them
+      with DynamicResource, so a theme can replace them at run time (Theme.cs). Drawn icons keep their own colors. -->
  <SolidColorBrush x:Key="ShellBrush" Color="#A8C7D9" />
  <SolidColorBrush x:Key="PanelBrush" Color="#F5FAFE" />
+ <SolidColorBrush x:Key="Pgms.DialogBackground" Color="#F5F5F5" />
+ <SolidColorBrush x:Key="Pgms.PaneBackground" Color="#E4EFF6" />
+ <SolidColorBrush x:Key="Pgms.ToolBarBackground" Color="#D5E5EF" />
+ <SolidColorBrush x:Key="Pgms.ContentBackground" Color="White" />
+ <SolidColorBrush x:Key="Pgms.ControlBackground" Color="#F0F0F0" />
+ <SolidColorBrush x:Key="Pgms.InfoBackground" Color="#FFF4CE" />
+ <SolidColorBrush x:Key="Pgms.ConnectionBarBackground" Color="#D5C777" />
+ <SolidColorBrush x:Key="Pgms.StatusBarBackground" Color="#425C6C" />
+ <SolidColorBrush x:Key="Pgms.StatusBarText" Color="White" />
+ <SolidColorBrush x:Key="Pgms.PaneBorder" Color="#B5C5D2" />
+ <SolidColorBrush x:Key="Pgms.ControlBorder" Color="#CCCEDB" />
+ <SolidColorBrush x:Key="Pgms.DialogBorder" Color="#C8C8C8" />
+ <SolidColorBrush x:Key="Pgms.GridLines" Color="#E3E3E3" />
+ <SolidColorBrush x:Key="Pgms.GridLinesAlt" Color="#E0E0E0" />
+ <SolidColorBrush x:Key="Pgms.PrimaryText" Color="#1E1E1E" />
+ <SolidColorBrush x:Key="Pgms.SecondaryText" Color="#5A5A5A" />
+ <SolidColorBrush x:Key="Pgms.LabelText" Color="#4B5964" />
+ <SolidColorBrush x:Key="Pgms.ErrorText" Color="#B00020" />
+ <SolidColorBrush x:Key="Pgms.ErrorTextStrong" Color="#A4262C" />
+ <SolidColorBrush x:Key="Pgms.HeadingText" Color="#294A60" />
+ <!-- M1112: results grid and tree colours that were fixed in the styles below, with the same values. -->
+ <SolidColorBrush x:Key="Pgms.GridRowBackground" Color="#F5F5F5" />
+ <SolidColorBrush x:Key="Pgms.GridSelection" Color="#A5CFF1" />
+ <SolidColorBrush x:Key="Pgms.GridBorder" Color="#ABADB3" />
+ <SolidColorBrush x:Key="Pgms.GridCurrentCell" Color="#000000" />
+ <SolidColorBrush x:Key="Pgms.TreeInactiveSelection" Color="#CCE4F7" />
+ <SolidColorBrush x:Key="Pgms.EditorInfoBar" Color="#F3F6F9" />
+ <SolidColorBrush x:Key="Pgms.EditorSplitter" Color="#D6E3ED" />
+ <SolidColorBrush x:Key="Pgms.QueryStatusBar" Color="#FFF6CD" />
+ <SolidColorBrush x:Key="Pgms.WarningText" Color="#814600" />
+ <!-- Designer property grid (Properties window, Table Designer panes) -->
+ <SolidColorBrush x:Key="Pgms.PropertyText" Color="#000000" />
+ <SolidColorBrush x:Key="Pgms.PropertyDisabledText" Color="#8A8A8A" />
+ <SolidColorBrush x:Key="Pgms.PropertyLines" Color="#E8E8E8" />
+ <SolidColorBrush x:Key="Pgms.PropertyBorder" Color="#A0A0A0" />
+ <SolidColorBrush x:Key="Pgms.PropertyCategory" Color="#EEF3FA" />
+ <SolidColorBrush x:Key="Pgms.PropertyGlyph" Color="#444444" />
  <Style TargetType="Window"><Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="12"/></Style>
- <Style TargetType="ToolBar"><Setter Property="Background" Value="#D5E5EF"/><Setter Property="BorderThickness" Value="0"/></Style>
+ <Style TargetType="ToolBar"><Setter Property="Background" Value="{DynamicResource Pgms.ToolBarBackground}"/><Setter Property="BorderThickness" Value="0"/></Style>
  <Style TargetType="ToolTip"><Setter Property="FontSize" Value="12"/></Style>
  <!-- SSMS 22.11 tree expander, sampled from its Object Explorer at 100%: 9x9 box with #919191 border, softened corners and a light-to-grey fill;
       the horizontal bar is #4B63A7 and the vertical bar of "+" is #294272. -->
@@ -68,7 +107,7 @@
      <Condition Binding="{Binding (Selector.IsSelectionActive), RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="False"/>
     </MultiDataTrigger.Conditions>
     <!-- Without focus SSMS 22.11 paints #F0F0F0, almost invisible on the panel; the user chose a visible light blue (08/11/2026, conscious deviation). -->
-    <Setter Property="Background" Value="#CCE4F7"/>
+    <Setter Property="Background" Value="{DynamicResource Pgms.TreeInactiveSelection}"/>
    </MultiDataTrigger>
   </Style.Triggers>
  </Style>
@@ -97,7 +136,7 @@
       </Trigger>
       <MultiTrigger>
        <MultiTrigger.Conditions><Condition Property="IsSelected" Value="True"/><Condition Property="IsSelectionActive" Value="False"/></MultiTrigger.Conditions>
-       <Setter Property="Foreground" Value="#1E1E1E"/>
+       <Setter Property="Foreground" Value="{DynamicResource Pgms.PrimaryText}"/>
       </MultiTrigger>
       <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/></Trigger>
      </ControlTemplate.Triggers>
@@ -127,7 +166,7 @@
        </ToggleButton.Template>
       </ToggleButton>
       <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="None" IsOpen="{TemplateBinding IsDropDownOpen}">
-       <Border MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}" Background="White" BorderBrush="#A0A0A0" BorderThickness="1"><ScrollViewer><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer></Border>
+       <Border MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}" Background="{DynamicResource Pgms.ContentBackground}" BorderBrush="#A0A0A0" BorderThickness="1"><ScrollViewer><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer></Border>
       </Popup>
      </Grid>
      <ControlTemplate.Triggers><Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="#8A8A8A"/></Trigger></ControlTemplate.Triggers>
@@ -148,12 +187,12 @@
   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Thumb"><Border Background="Transparent"/></ControlTemplate></Setter.Value></Setter>
  </Style>
  <Style x:Key="SsmsResultColumnHeader" TargetType="DataGridColumnHeader">
-  <Setter Property="Foreground" Value="#1E1E1E"/>
+  <Setter Property="Foreground" Value="{DynamicResource Pgms.PrimaryText}"/>
   <Setter Property="Template">
    <Setter.Value>
     <ControlTemplate TargetType="DataGridColumnHeader">
-     <Grid Background="#F5F5F5" SnapsToDevicePixels="True">
-      <Border BorderBrush="#CCCEDB" BorderThickness="0,0,1,1"/>
+     <Grid Background="{DynamicResource Pgms.DialogBackground}" SnapsToDevicePixels="True">
+      <Border BorderBrush="{DynamicResource Pgms.ControlBorder}" BorderThickness="0,0,1,1"/>
       <DockPanel Margin="7,0,8,1">
        <Path x:Name="SortArrow" DockPanel.Dock="Right" Width="7" Height="4" Margin="4,0,0,0" Fill="#717171" Stretch="Fill" VerticalAlignment="Center" Visibility="Collapsed" Data="M0,4 L3.5,0 7,4 Z"/>
        <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Left" RecognizesAccessKey="False"/>
@@ -170,12 +209,12 @@
   </Setter>
  </Style>
  <Style x:Key="SsmsResultRowHeader" TargetType="DataGridRowHeader">
-  <Setter Property="Foreground" Value="#1E1E1E"/>
+  <Setter Property="Foreground" Value="{DynamicResource Pgms.PrimaryText}"/>
   <Setter Property="Template">
    <Setter.Value>
     <ControlTemplate TargetType="DataGridRowHeader">
-     <Grid Background="#F5F5F5" SnapsToDevicePixels="True">
-      <Border BorderBrush="#CCCEDB" BorderThickness="0,0,1,1"/>
+     <Grid Background="{DynamicResource Pgms.DialogBackground}" SnapsToDevicePixels="True">
+      <Border BorderBrush="{DynamicResource Pgms.ControlBorder}" BorderThickness="0,0,1,1"/>
       <ContentPresenter Margin="4,0,4,1" VerticalAlignment="Center" HorizontalAlignment="Left"/>
      </Grid>
     </ControlTemplate>
@@ -184,14 +223,14 @@
  </Style>
  <Style x:Key="SsmsResultCell" TargetType="DataGridCell">
   <Setter Property="Background" Value="Transparent"/>
-  <Setter Property="Foreground" Value="#1E1E1E"/>
+  <Setter Property="Foreground" Value="{DynamicResource Pgms.PrimaryText}"/>
   <Setter Property="Template">
    <Setter.Value>
     <ControlTemplate TargetType="DataGridCell">
      <Grid x:Name="Root" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
-      <Border BorderBrush="#CCCEDB" BorderThickness="0,0,1,1"/>
+      <Border BorderBrush="{DynamicResource Pgms.ControlBorder}" BorderThickness="0,0,1,1"/>
       <ContentPresenter Margin="7,0,8,1" VerticalAlignment="Center"/>
-      <Rectangle x:Name="Current" Margin="0,0,1,1" Stroke="#000000" StrokeThickness="1" StrokeDashArray="1 1" Visibility="Collapsed" SnapsToDevicePixels="True"/>
+      <Rectangle x:Name="Current" Margin="0,0,1,1" Stroke="{DynamicResource Pgms.GridCurrentCell}" StrokeThickness="1" StrokeDashArray="1 1" Visibility="Collapsed" SnapsToDevicePixels="True"/>
      </Grid>
      <ControlTemplate.Triggers>
       <DataTrigger Value="True">
@@ -210,14 +249,14 @@
         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
         <Condition Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="True"/>
        </MultiDataTrigger.Conditions>
-       <Setter TargetName="Root" Property="Background" Value="#A5CFF1"/>
+       <Setter TargetName="Root" Property="Background" Value="{DynamicResource Pgms.GridSelection}"/>
       </MultiDataTrigger>
       <MultiDataTrigger>
        <MultiDataTrigger.Conditions>
         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
         <Condition Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="False"/>
        </MultiDataTrigger.Conditions>
-       <Setter TargetName="Root" Property="Background" Value="#A5CFF1"/>
+       <Setter TargetName="Root" Property="Background" Value="{DynamicResource Pgms.GridSelection}"/>
       </MultiDataTrigger>
      </ControlTemplate.Triggers>
     </ControlTemplate>
@@ -225,10 +264,10 @@
   </Setter>
  </Style>
  <Style x:Key="SsmsResultGrid" TargetType="DataGrid">
-  <Setter Property="Background" Value="#F5F5F5"/>
-  <Setter Property="RowBackground" Value="#F5F5F5"/>
-  <Setter Property="AlternatingRowBackground" Value="#F5F5F5"/>
-  <Setter Property="BorderBrush" Value="#ABADB3"/>
+  <Setter Property="Background" Value="{DynamicResource Pgms.DialogBackground}"/>
+  <Setter Property="RowBackground" Value="{DynamicResource Pgms.GridRowBackground}"/>
+  <Setter Property="AlternatingRowBackground" Value="{DynamicResource Pgms.GridRowBackground}"/>
+  <Setter Property="BorderBrush" Value="{DynamicResource Pgms.GridBorder}"/>
   <Setter Property="BorderThickness" Value="1"/>
   <Setter Property="GridLinesVisibility" Value="None"/>
   <Setter Property="HeadersVisibility" Value="All"/>
@@ -238,7 +277,7 @@
   <Setter Property="CanUserResizeRows" Value="False"/>
   <Setter Property="FontFamily" Value="Segoe UI"/>
   <Setter Property="FontSize" Value="12"/>
-  <Setter Property="Foreground" Value="#1E1E1E"/>
+  <Setter Property="Foreground" Value="{DynamicResource Pgms.PrimaryText}"/>
   <Setter Property="ColumnHeaderStyle" Value="{StaticResource SsmsResultColumnHeader}"/>
   <Setter Property="RowHeaderStyle" Value="{StaticResource SsmsResultRowHeader}"/>
   <Setter Property="CellStyle" Value="{StaticResource SsmsResultCell}"/>
@@ -247,7 +286,7 @@
   <Style.Resources>
    <!-- Top-left corner (select all): flat, like the headers. -->
    <Style x:Key="{ComponentResourceKey ResourceId=DataGridSelectAllButtonStyle, TypeInTargetAssembly={x:Type DataGrid}}" TargetType="Button">
-    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border Background="#F5F5F5" BorderBrush="#CCCEDB" BorderThickness="0,0,1,1"/></ControlTemplate></Setter.Value></Setter>
+    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border Background="{DynamicResource Pgms.DialogBackground}" BorderBrush="{DynamicResource Pgms.ControlBorder}" BorderThickness="0,0,1,1"/></ControlTemplate></Setter.Value></Setter>
    </Style>
   </Style.Resources>
  </Style>
@@ -309,9 +348,9 @@
   <Setter Property="Template">
    <Setter.Value>
     <ControlTemplate TargetType="ToggleButton">
-     <Border Background="#EEF3FA" Padding="5,1,0,1">
+     <Border Background="{DynamicResource Pgms.PropertyCategory}" Padding="5,1,0,1">
       <StackPanel Orientation="Horizontal">
-       <Grid Width="12" VerticalAlignment="Center"><Path x:Name="Chevron" Fill="#444444" HorizontalAlignment="Left" VerticalAlignment="Center" Data="M0,0 L8,0 L4,5 Z"/></Grid>
+       <Grid Width="12" VerticalAlignment="Center"><Path x:Name="Chevron" Fill="{DynamicResource Pgms.PropertyGlyph}" HorizontalAlignment="Left" VerticalAlignment="Center" Data="M0,0 L8,0 L4,5 Z"/></Grid>
        <ContentPresenter TextElement.FontWeight="Bold" VerticalAlignment="Center"/>
       </StackPanel>
      </Border>

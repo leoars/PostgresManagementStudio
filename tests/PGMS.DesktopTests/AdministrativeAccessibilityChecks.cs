@@ -34,6 +34,7 @@ internal static class AdministrativeAccessibilityChecks
             await ExerciseAsync(tableEdits, tableEdits.InspectTargetAsync, uiConnection, "pg_index", "m92", check);
         }
         finally { await session.ExecuteAsync($"DROP TABLE IF EXISTS {target};"); }
+        await TitleBarChecks.RunAccessibilityAsync(check);
     }
 
     private static async Task ExerciseAsync(Window dialog, Func<Task> inspect, string connection, string catalog, string milestone, Action<bool, string> check)

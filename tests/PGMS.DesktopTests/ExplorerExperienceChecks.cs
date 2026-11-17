@@ -234,6 +234,18 @@ internal static class ExplorerExperienceChecks
             await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
             check(database.Text == "Not connected" && !execute.IsEnabled,
                 "Disconnected query reports its own session state even with connected Explorer");
+            // M1067: names a screen reader hears, in English, and SSMS 22.11 colors for the selected document tab.
+            var cancelToolbar = (Button)window.FindName("CancelButton");
+            check(System.Windows.Automation.AutomationProperties.GetName(execute) == "Execute" && System.Windows.Automation.AutomationProperties.GetName(cancelToolbar) == "Cancel Executing Query",
+                "Execute and Cancel toolbar buttons have accessible names");
+            check(!cancelToolbar.IsEnabled && cancelToolbar.Content is System.Windows.Shapes.Path { Opacity: < 1 },
+                "A disabled toolbar icon is drawn greyed, as in SSMS");
+            var explorerTree = (TreeView)window.FindName("ExplorerTree");
+            var firstNode = (TreeViewItem?)explorerTree.ItemContainerGenerator.ContainerFromIndex(0);
+            check(firstNode is not null && System.Windows.Automation.AutomationProperties.GetName(firstNode) == ((CatalogNode)firstNode.DataContext).Name,
+                "Object Explorer nodes expose their own text, not the view-model type, to screen readers");
+            var selectedTab = dock.Resources[AvalonDock.Themes.VS.Themes.ResourceKeys.DocumentWellTabSelectedActiveBackground] as SolidColorBrush;
+            check(selectedTab?.Color == Color.FromRgb(0xF7, 0xFA, 0xFC), "The selected document tab uses the light SSMS 22.11 background");
             await query.ConnectAsync(connection);
             check(database.Text == query.Database && execute.IsEnabled,
                 "Connected active query exposes its database and enables execution");

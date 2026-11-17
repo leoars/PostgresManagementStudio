@@ -17,6 +17,8 @@ public sealed record PrivilegeRequest(PrivilegeTarget Target, string Name, strin
         PrivilegeTarget.Routine => ["EXECUTE"],
         _ => throw new ArgumentOutOfRangeException(nameof(target))
     };
+    /// <summary>The privileges a server of this version has; MAINTAIN exists from PostgreSQL 17. An unknown version keeps the full list.</summary>
+    public static string[] Allowed(PrivilegeTarget target, int? serverVersionNumber) => serverVersionNumber is < ServerVersionNumber.Maintain ? Allowed(target).Where(p => p != "MAINTAIN").ToArray() : Allowed(target);
     public static string[] AllowedForColumn => ["SELECT", "INSERT", "UPDATE", "REFERENCES"];
     public string ToSql()
     {

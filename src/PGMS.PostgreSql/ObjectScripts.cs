@@ -54,10 +54,20 @@ public static class ObjectScripts
     }
 }
 
+/// <summary>
+/// Tools ▸ Options ▸ Object Explorer ▸ Scripting (PGMS-073, M1095), the part of SSMS's SQL Server Object Explorer ▸ Scripting that PostgreSQL scripts can follow.
+/// The defaults keep what PGMS has always generated: headers, the database comment (in place of SSMS's USE &lt;database&gt;) and IF EXISTS on DROP
+/// (SSMS starts with Check for object existence off).
+/// </summary>
+public sealed record ScriptingOptions(bool IncludeDescriptiveHeaders = true, bool ScriptDatabaseContext = true, bool CheckObjectExistence = true);
+
 /// <summary>Builds the scripts from the catalog in one read-only snapshot, with an empty search_path so that every name the server prints is qualified.
 /// Passwords are never read. Owners and privileges are left out, as in the SSMS default.</summary>
-public sealed class ObjectScriptService(string connectionString)
+public sealed class ObjectScriptService(string connectionString, ScriptingOptions? options = null)
 {
+    private readonly ScriptingOptions settings = options ?? new ScriptingOptions();
+    /// <summary>"IF EXISTS " in DROP statements, or nothing when Check for object existence is off.</summary>
+    private string IfExists => settings.CheckObjectExistence ? "IF EXISTS " : "";
     private const string NL = "\r\n";
     private static string Id(string? name) => SqlIdentifier.Quote(name ?? throw new ObjectScriptException("The catalog returned an object without a name."));
     private static string Full(string? schema, string? name) => Id(schema) + "." + Id(name);
@@ -96,8 +106,8 @@ public sealed class ObjectScriptService(string connectionString)
         await using (var setup = new NpgsqlCommand("SET TRANSACTION READ ONLY; SET LOCAL search_path = pg_catalog", connection, transaction)) await setup.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         var catalog = new Catalog(connection, transaction, token);
         var target = await IdentifyAsync(catalog, entry).ConfigureAwait(false);
-        string prefix = entry.Kind is CatalogKind.Database or CatalogKind.Role || entry.Database is null ? "" : $"-- Database: {InComment(entry.Database)}{NL}{NL}";
-        string Stamped(string sql) => Header(target.Noun, target.Name) + sql;
+        string prefix = !settings.ScriptDatabaseContext || entry.Kind is CatalogKind.Database or CatalogKind.Role || entry.Database is null ? "" : $"-- Database: {InComment(entry.Database)}{NL}{NL}";
+        string Stamped(string sql) => (settings.IncludeDescriptiveHeaders ? Header(target.Noun, target.Name) : "") + sql;
         return prefix + verb switch
         {
             ScriptVerb.Create => Stamped(await CreateAsync(catalog, entry, false).ConfigureAwait(false)),
@@ -109,30 +119,31 @@ public sealed class ObjectScriptService(string connectionString)
         };
     }
 
-    private static async Task<Target> IdentifyAsync(Catalog catalog, CatalogEntry entry)
+    private async Task<Target> IdentifyAsync(Catalog catalog, CatalogEntry entry)
     {
+        string IF = IfExists;
         switch (entry.Kind)
         {
             case CatalogKind.Database:
             {
                 var r = await catalog.One("SELECT datname FROM pg_database WHERE oid=@oid", entry.Oid).ConfigureAwait(false);
-                return new("Database", Id((string?)r[0]), $"DROP DATABASE IF EXISTS {Id((string?)r[0])};");
+                return new("Database", Id((string?)r[0]), $"DROP DATABASE {IF}{Id((string?)r[0])};");
             }
             case CatalogKind.Schema:
             {
                 var r = await catalog.One("SELECT nspname FROM pg_namespace WHERE oid=@oid", entry.Oid).ConfigureAwait(false);
-                return new("Schema", Id((string?)r[0]), $"DROP SCHEMA IF EXISTS {Id((string?)r[0])};");
+                return new("Schema", Id((string?)r[0]), $"DROP SCHEMA {IF}{Id((string?)r[0])};");
             }
             case CatalogKind.Role:
             {
                 var r = await catalog.One("SELECT rolname FROM pg_roles WHERE oid=@oid", entry.Oid).ConfigureAwait(false);
-                return new("Role", Id((string?)r[0]), $"DROP ROLE IF EXISTS {Id((string?)r[0])};");
+                return new("Role", Id((string?)r[0]), $"DROP ROLE {IF}{Id((string?)r[0])};");
             }
             case CatalogKind.Relation:
             {
                 var r = await catalog.One("SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.oid=@oid", entry.Oid).ConfigureAwait(false);
                 string noun = ObjectScripts.Noun(entry)!, name = Full((string?)r[0], (string?)r[1]);
-                return new(noun, name, $"DROP {noun.ToUpperInvariant()} IF EXISTS {name};");
+                return new(noun, name, $"DROP {noun.ToUpperInvariant()} {IF}{name};");
             }
             case CatalogKind.Index:
             {
@@ -144,31 +155,31 @@ public sealed class ObjectScriptService(string connectionString)
                     WHERE i.indexrelid=@oid
                     """, entry.Oid).ConfigureAwait(false);
                 string name = Full((string?)r[0], (string?)r[1]);
-                return new("Index", name, r[4] is string constraint ? $"ALTER TABLE IF EXISTS {Full((string?)r[2], (string?)r[3])} DROP CONSTRAINT IF EXISTS {Id(constraint)};" : $"DROP INDEX IF EXISTS {name};");
+                return new("Index", name, r[4] is string constraint ? $"ALTER TABLE {IF}{Full((string?)r[2], (string?)r[3])} DROP CONSTRAINT {IF}{Id(constraint)};" : $"DROP INDEX {IF}{name};");
             }
             case CatalogKind.Routine:
             {
                 var r = await catalog.One("SELECT n.nspname, p.proname, p.prokind::text, pg_get_function_identity_arguments(p.oid) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE p.oid=@oid", entry.Oid).ConfigureAwait(false);
                 string noun = (string?)r[2] == "p" ? "Procedure" : "Function", name = $"{Full((string?)r[0], (string?)r[1])}({r[3]})";
-                return new(noun, name, $"DROP {noun.ToUpperInvariant()} IF EXISTS {name};");
+                return new(noun, name, $"DROP {noun.ToUpperInvariant()} {IF}{name};");
             }
             case CatalogKind.Key or CatalogKind.Constraint:
             {
                 var r = await catalog.One("SELECT n.nspname, t.relname, c.conname FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE c.oid=@oid", entry.Oid).ConfigureAwait(false);
                 string table = Full((string?)r[0], (string?)r[1]), name = Id((string?)r[2]);
-                return new(ObjectScripts.Noun(entry)!, $"{name} ON {table}", $"ALTER TABLE IF EXISTS {table} DROP CONSTRAINT IF EXISTS {name};");
+                return new(ObjectScripts.Noun(entry)!, $"{name} ON {table}", $"ALTER TABLE {IF}{table} DROP CONSTRAINT {IF}{name};");
             }
             case CatalogKind.Trigger:
             {
                 var r = await catalog.One("SELECT n.nspname, t.relname, g.tgname FROM pg_trigger g JOIN pg_class t ON t.oid=g.tgrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE g.oid=@oid", entry.Oid).ConfigureAwait(false);
                 string table = Full((string?)r[0], (string?)r[1]), name = Id((string?)r[2]);
-                return new("Trigger", $"{name} ON {table}", $"DROP TRIGGER IF EXISTS {name} ON {table};");
+                return new("Trigger", $"{name} ON {table}", $"DROP TRIGGER {IF}{name} ON {table};");
             }
             case CatalogKind.DataType:
             {
                 var r = await catalog.One("SELECT n.nspname, t.typname, t.typtype::text FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE t.oid=@oid", entry.Oid).ConfigureAwait(false);
                 bool domain = (string?)r[2] == "d"; string name = Full((string?)r[0], (string?)r[1]);
-                return new(domain ? "Domain" : "Enum", name, $"DROP {(domain ? "DOMAIN" : "TYPE")} IF EXISTS {name};");
+                return new(domain ? "Domain" : "Enum", name, $"DROP {(domain ? "DOMAIN" : "TYPE")} {IF}{name};");
             }
             default: throw new ObjectScriptException("This script is not available for the selected object.");
         }

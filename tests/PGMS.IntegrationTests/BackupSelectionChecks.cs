@@ -21,6 +21,17 @@ internal static class BackupSelectionChecks
             uint largeObject=Convert.ToUInt32(await Scalar(source,"SELECT lo_from_bytea(0,decode('00017fff80','hex'))"));
             string[] names=[schema];var selection=new BackupSelection(names);names[0]="public";
             check(selection.Schemas.Single()==schema,"Backup selection snapshots literal schema names instead of retaining a mutable array");
+            if((await new BackupService(As(source),tools).ToolVersionAsync("pg_dump")).Major<17)
+            {
+                // --filter exists from pg_dump 17: older tools refuse the selection before starting, with the reason.
+                string refusedPath=Path.Combine(folder,"refused-selection");bool selectionRefused=false;
+                try{await new BackupService(As(source),tools).BackupWithOptionsAsync(refusedPath,new(BackupFormat.Custom){Selection=selection});}
+                catch(InvalidOperationException ex)when(ex.Message.Contains("pg_dump 17 or later",StringComparison.Ordinal)){selectionRefused=true;}
+                check(selectionRefused && !File.Exists(refusedPath) && !Directory.Exists(refusedPath),"pg_dump before 17 refuses a schema selection with the reason and writes nothing");
+                var whole=Path.Combine(folder,"whole-database");await new BackupService(As(source),tools).BackupWithOptionsAsync(whole,new(BackupFormat.Custom));
+                check(new FileInfo(whole).Length>0,"pg_dump before 17 still backs up the whole database");
+                return;
+            }
             foreach(var format in Enum.GetValues<BackupFormat>())
             {
                 string destination=Path.Combine(folder,"selected-"+format),target="filter_"+(int)format+"_"+suffix;

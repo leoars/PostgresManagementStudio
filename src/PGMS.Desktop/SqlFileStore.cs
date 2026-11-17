@@ -60,16 +60,19 @@ public static class SqlFileStore
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
-    public static Task<SqlFileSnapshot> ReadAsync(string path, CancellationToken cancellationToken = default) =>
+    public static Task<SqlFileSnapshot> ReadAsync(string path, CancellationToken cancellationToken = default) => ReadAsync(path, null, cancellationToken);
+
+    /// <summary>Reads the file; with <paramref name="format"/> the bytes are decoded with that encoding instead of detecting it (Reopen with Encoding).</summary>
+    public static Task<SqlFileSnapshot> ReadAsync(string path, SqlFileFormat? format, CancellationToken cancellationToken = default) =>
         Task.Run(async () =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             path = Path.GetFullPath(path);
             await using var stream = OpenRegularFile(path, FileShare.Read, FileOptions.Asynchronous | FileOptions.SequentialScan);
-            return await ReadStreamAsync(stream, path, cancellationToken).ConfigureAwait(false);
+            return await ReadStreamAsync(stream, path, cancellationToken, format).ConfigureAwait(false);
         }, cancellationToken);
 
-    internal static async Task<SqlFileSnapshot> ReadStreamAsync(Stream stream, string path, CancellationToken cancellationToken)
+    internal static async Task<SqlFileSnapshot> ReadStreamAsync(Stream stream, string path, CancellationToken cancellationToken, SqlFileFormat? format = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         long length = stream.Length;
@@ -84,7 +87,7 @@ public static class SqlFileStore
             offset += read;
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var snapshot = Decode(path, bytes);
+        var snapshot = format is { } forced ? DecodeAs(path, bytes, forced) : Decode(path, bytes);
         cancellationToken.ThrowIfCancellationRequested();
         return snapshot;
     }
@@ -115,6 +118,22 @@ public static class SqlFileStore
             return new(path, text, format, new(path, Convert.ToHexString(SHA256.HashData(bytes))));
         }
         catch (DecoderFallbackException ex) { throw new InvalidDataException("Invalid SQL file encoding. Use UTF-8, or UTF-16/32 with a BOM; no characters were replaced.", ex); }
+    }
+
+    /// <summary>Decodes with the chosen encoding; its own byte order mark is skipped, and invalid bytes are refused instead of replaced.</summary>
+    private static SqlFileSnapshot DecodeAs(string path, byte[] bytes, SqlFileFormat format)
+    {
+        var encoding = GetEncoding(format);
+        byte[] preamble = encoding.GetPreamble();
+        if (format == SqlFileFormat.Utf8) preamble = [0xEF, 0xBB, 0xBF];
+        int skip = bytes.AsSpan().StartsWith(preamble) ? preamble.Length : 0;
+        try
+        {
+            string text = encoding.GetString(bytes, skip, bytes.Length - skip);
+            if (text.Contains('\0')) throw new InvalidDataException($"The SQL file read as {format} contains NUL characters; choose another encoding.");
+            return new(path, text, format, new(path, Convert.ToHexString(SHA256.HashData(bytes))));
+        }
+        catch (DecoderFallbackException ex) { throw new InvalidDataException($"The SQL file is not valid {format}; no characters were replaced.", ex); }
     }
 
     public static SqlFileVersion CaptureVersion(string path)

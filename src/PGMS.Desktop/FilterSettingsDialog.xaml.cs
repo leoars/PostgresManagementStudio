@@ -10,7 +10,7 @@ public sealed record FilterOperatorChoice(CatalogFilterOperator Value, string La
 /// <summary>One line of the Filter Settings grid.</summary>
 public sealed class FilterCriterion(string property, CatalogFilterOperator op, string value, string description) : INotifyPropertyChanged
 {
-    public static IReadOnlyList<FilterOperatorChoice> Operators { get; } = [new(CatalogFilterOperator.Contains, "Contains"), new(CatalogFilterOperator.Equals, "Equals"), new(CatalogFilterOperator.DoesNotContain, "Does not contain")];
+    public static IReadOnlyList<FilterOperatorChoice> Operators { get; } = [new(CatalogFilterOperator.Contains, "Contains"), new(CatalogFilterOperator.Equals, "Equals"), new(CatalogFilterOperator.DoesNotContain, "Does not contain"), new(CatalogFilterOperator.DoesNotEqual, "Does not equal")];
     public string Property => property;
     public string Description => description;
     public string OperatorName => $"{property} operator";

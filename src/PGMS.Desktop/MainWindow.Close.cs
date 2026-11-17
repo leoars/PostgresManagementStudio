@@ -38,6 +38,7 @@ public partial class MainWindow
             if (!await ForgetRecoveryAsync(query)) return false;
             if (query.EditRevision != revision) { Status.Text = "Query changed during close; tab retained."; return false; }
             acceptedTabCloses.Add(query);
+            RememberClosedTab(query, document.Title);
             document.Close();
             return !documents.ContainsKey(query);
         }
@@ -53,7 +54,8 @@ public partial class MainWindow
             { Status.Text = "Save failed; query remains open: " + ex.Message; return false; }
         }
         if (query.IsBusy) { MessageBox.Show(this, "Cancel the running operation before closing this query.", "PGMS"); return false; }
-        if (query.IsDirty)
+        // Close All Tabs already asked once for every changed query.
+        if (query.IsDirty && !discardOnClose.Contains(query))
         {
             var answer = MessageBox.Show(this, "Save changes to this query?", "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (!(answer == MessageBoxResult.No || (answer == MessageBoxResult.Yes && await SaveAsync(query) && !query.IsDirty))) return false;

@@ -13,6 +13,20 @@ internal static class MaintainPrivilegeDialogChecks
         await using var admin=new NpgsqlConnection(connection);await admin.OpenAsync();
         async Task Sql(string sql){await using var cmd=new NpgsqlCommand(sql,admin);await cmd.ExecuteNonQueryAsync();}
         async Task<bool> Has(){await using var cmd=new NpgsqlCommand("SELECT pg_catalog.has_table_privilege(@role,@table,'MAINTAIN')",admin);cmd.Parameters.AddWithValue("role",role);cmd.Parameters.AddWithValue("table",table);return (bool)(await cmd.ExecuteScalarAsync())!;}
+        if(await ServerVersionNumber.GetAsync(connection)<ServerVersionNumber.Maintain)
+        {
+            // MAINTAIN does not exist before PostgreSQL 17: the dialogs must not offer it.
+            var old=new PrivilegeDialog(connection){ShowInTaskbar=false,Opacity=0};var defaults=new DefaultPrivilegeDialog(connection){ShowInTaskbar=false,Opacity=0};
+            try
+            {
+                old.Show();await old.ServerVersionLoaded;((ComboBox)old.FindName("ObjectType")).SelectedItem=PrivilegeTarget.Table;
+                check(!((ComboBox)old.FindName("Privilege")).Items.Cast<string>().Contains("MAINTAIN") && ((ComboBox)old.FindName("Privilege")).Items.Cast<string>().Contains("TRIGGER"),"Before PostgreSQL 17 Object Permissions does not offer MAINTAIN for a table");
+                defaults.Show();await defaults.ServerVersionLoaded;
+                check(!((ComboBox)defaults.FindName("Privilege")).Items.Cast<string>().Contains("MAINTAIN") && ((ComboBox)defaults.FindName("Privilege")).Items.Cast<string>().Contains("TRIGGER"),"Before PostgreSQL 17 Default Permissions does not offer MAINTAIN for tables");
+            }
+            finally{old.Close();defaults.Close();}
+            return;
+        }
         var dialog=new PrivilegeDialog(connection){ShowInTaskbar=false,Opacity=0};
         T Find<T>(string name)where T:FrameworkElement=>(T)dialog.FindName(name);
         try

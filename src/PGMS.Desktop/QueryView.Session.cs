@@ -22,7 +22,7 @@ public partial class QueryView
         {
             await candidate.OpenAsync(cancellation.Token);
             HideSessionSettings();ClearAnalysisReview();sessionSnapshot=null;SessionProperties.ItemsSource=null;
-            session=candidate;ConnectionString=connectionString;ForgetSessionState();
+            session=candidate;ConnectionString=connectionString;ForgetSessionState();LastExecution=null;
             QueryStatus.Text=$"Connected | {Database}";
         }
         catch{await candidate.DisposeAsync();throw;}
@@ -52,6 +52,7 @@ public partial class QueryView
     /// <summary>The one place an execution is handed to Query History, after it ended. Never throws and never waits for the disk.</summary>
     private void RecordHistory(string sql, DateTime startedUtc, TimeSpan elapsed, Exception? error, bool canceled, long? rowsReturned, long? rowsAffected, QueryHistoryOrigin? origin = null)
     {
+        if (origin != QueryHistoryOrigin.QueryDesigner) NoteExecution(startedUtc, elapsed, rowsReturned, error, canceled);
         if (HistorySink is not { } sink || ConnectionString is not { } connection) return;
         var outcome = canceled ? QueryHistoryOutcome.Canceled : error is null ? QueryHistoryOutcome.Succeeded : QueryHistoryOutcome.Failed;
         try { sink(QueryHistoryCapture.FromConnection(connection, session?.Database, sql, startedUtc, elapsed, origin ?? OriginOf(sql), outcome, rowsReturned, rowsAffected, error)); }

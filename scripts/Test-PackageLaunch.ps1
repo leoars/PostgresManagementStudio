@@ -33,7 +33,28 @@ try {
     $runtime = @($process.Modules | Where-Object ModuleName -IEQ 'coreclr.dll')
     if ($runtime.Count -ne 1 -or $runtime[0].FileName -ine (Join-Path $package 'coreclr.dll')) { throw 'Process did not load the bundled runtime.' }
     $runtimePath = $runtime[0].FileName
-    if (!$process.CloseMainWindow() -or !$process.WaitForExit(15000)) { throw 'Packaged executable did not close gracefully.' }
+    # PGMS opens Connect to Server at startup, as SSMS does, once the main window is idle. While that modal dialog is open the
+    # main window ignores a close request, so wait for it (up to 10 s) and cancel it through UI Automation before closing.
+    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+    $mainElement = [Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
+    $windowCondition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Window)
+    $dialogDeadline = [DateTime]::UtcNow.AddSeconds(10)
+    $startupDialogClosed = $false
+    do {
+        Start-Sleep -Milliseconds 200
+        foreach ($dialog in $mainElement.FindAll([Windows.Automation.TreeScope]::Children, $windowCondition)) {
+            if ($dialog.Current.Name -ne 'Connect to Server') { continue }
+            $dialog.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern).Close()
+            $startupDialogClosed = $true
+        }
+    } while (!$startupDialogClosed -and [DateTime]::UtcNow -lt $dialogDeadline)
+    $closeDeadline = [DateTime]::UtcNow.AddSeconds(15)
+    $closeRequested = $false
+    do {
+        if ($process.CloseMainWindow()) { $closeRequested = $true; break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $closeDeadline)
+    if (!$closeRequested -or !$process.WaitForExit(15000)) { throw 'Packaged executable did not close gracefully.' }
     if ($process.ExitCode -ne 0) { throw "Packaged executable failed: $($process.ExitCode)" }
     if (!(Test-Path -LiteralPath (Join-Path $state 'layout.xml'))) { throw 'Isolated layout was not persisted on close.' }
     if (Test-Path -LiteralPath (Join-Path $state 'connections.json')) { throw 'Unexpected connection profile created by blank launch.' }

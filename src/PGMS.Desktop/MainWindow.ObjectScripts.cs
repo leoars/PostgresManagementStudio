@@ -104,7 +104,7 @@ public partial class MainWindow
         string connection = catalog.ConnectionFor(entry.Database);
         try
         {
-            string sql = await new ObjectScriptService(connection).ScriptAsync(entry, verb);
+            string sql = await new ObjectScriptService(connection, EnvironmentSettings.Load().ScriptingSettings).ScriptAsync(entry, verb);
             switch (destination)
             {
                 case ScriptDestination.File:

@@ -2,9 +2,9 @@
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  Title="About PGMS" Icon="Resources/PGMS.ico" Width="640" Height="650" MinWidth="560" MinHeight="480"
- Background="{StaticResource PanelBrush}" WindowStartupLocation="CenterOwner" ResizeMode="CanResizeWithGrip">
+ Background="{DynamicResource PanelBrush}" WindowStartupLocation="CenterOwner" ResizeMode="CanResizeWithGrip">
  <DockPanel>
-  <Border DockPanel.Dock="Bottom" BorderBrush="#B5C5D2" BorderThickness="0,1,0,0" Padding="20,12">
+  <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource Pgms.PaneBorder}" BorderThickness="0,1,0,0" Padding="20,12">
    <Button Content="Close" Width="88" Padding="8,5" HorizontalAlignment="Right" IsDefault="True" IsCancel="True" Click="CloseAbout"/>
   </Border>
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -24,8 +24,8 @@
     <TextBlock x:Name="LinkStatus" TextWrapping="Wrap" Foreground="#A1260D" Margin="0,4,0,0"/>
     <TextBlock Text="Queries, object navigation and PostgreSQL administration." TextWrapping="Wrap" Margin="0,16,0,8"/>
     <TextBlock Text="Supported workflows and limitations are still under review; full SSMS parity is not claimed." TextWrapping="Wrap" Margin="0,0,0,16"/>
-    <TextBlock Text="PGMS is an independent project and is not affiliated with the PostgreSQL project." TextWrapping="Wrap" Foreground="#4B5964" Margin="0,0,0,8"/>
-    <TextBlock Text="PostgreSQL and the Slonik elephant logo are trademarks or registered trademarks of the PostgreSQL Community Association of Canada." TextWrapping="Wrap" Foreground="#4B5964"/>
+    <TextBlock Text="PGMS is an independent project and is not affiliated with the PostgreSQL project." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.LabelText}" Margin="0,0,0,8"/>
+    <TextBlock Text="PostgreSQL and the Slonik elephant logo are trademarks or registered trademarks of the PostgreSQL Community Association of Canada." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.LabelText}"/>
    </StackPanel>
   </ScrollViewer>
  </DockPanel>

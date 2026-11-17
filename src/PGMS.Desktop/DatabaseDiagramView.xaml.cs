@@ -992,6 +992,9 @@ public partial class DatabaseDiagramView : UserControl
     }
 
     /// <summary>Adds tables as read now. One table goes in cascade, overlapping the previous one as SSMS does; several at once are laid out without overlap.</summary>
+    /// <summary>View of the tables Add Table puts on the diagram: Tools ▸ Options ▸ Designers ▸ Default table view (Column Names, as in SSMS 22.11).</summary>
+    public DiagramTableView DefaultTableView { get; set; } = DiagramTableView.ColumnNames;
+
     public async Task AddTablesAsync(IReadOnlyList<DiagramTableRef> chosen)
     {
         if (IsBusy || chosen.Count == 0) return;
@@ -1002,7 +1005,7 @@ public partial class DatabaseDiagramView : UserControl
             var known = tables.Select(t => t.Original.Oid).ToHashSet();
             var read = await new DiagramService(connection).ReadTablesAndIndexesAsync(chosen.Where(c => !known.Contains(c.Oid)).Select(c => new DiagramTablePlacement(c.Schema, c.Name, 0, 0) { Oid = c.Oid }).ToArray(), [], cancellation.Token);
             var (designs, missing, indexes) = read;
-            var added = designs.Where(d => !known.Contains(d.Oid)).Select(d => new DiagramTableModel(d, 0, 0) { Catalog = indexes.GetValueOrDefault(d.Oid) ?? DiagramTableIndexes.Empty, CanComment = !read.NotOwned.Contains(d.Oid) }).ToList();
+            var added = designs.Where(d => !known.Contains(d.Oid)).Select(d => new DiagramTableModel(d, 0, 0) { Catalog = indexes.GetValueOrDefault(d.Oid) ?? DiagramTableIndexes.Empty, CanComment = !read.NotOwned.Contains(d.Oid), View = DefaultTableView }).ToList();
             tables.AddRange(added);
             Rebuild();
             if (added.Count == 1)
