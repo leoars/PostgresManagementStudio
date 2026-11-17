@@ -26,6 +26,8 @@ public partial class MainWindow
         var shortcut = ShortcutFor(e.Key, e.SystemKey, Keyboard.Modifiers);
         // In Object Explorer, F5-like keys keep their meaning there.
         if (shortcut is QueryMenuShortcut.None || shortcut is QueryMenuShortcut.Execute or QueryMenuShortcut.Parse && ExplorerContent.IsKeyboardFocusWithin) return false;
+        // After Shift+Alt+L in the editor, Shift+Alt+S completes Sort Lines, as in SSMS.
+        if (shortcut is QueryMenuShortcut.ClientStatistics && query.LineChordPending) return false;
         e.Handled = true;
         switch (shortcut)
         {
@@ -43,6 +45,7 @@ public partial class MainWindow
         var query = ActiveQuery;
         QueryConnectMenu.IsEnabled = query is null || query is { HasSession: false, IsBusy: false };
         QueryDisconnectMenu.IsEnabled = QueryChangeConnectionMenu.IsEnabled = query is { HasSession: true, IsBusy: false };
+        DisconnectAllQueriesMenu.IsEnabled = OpenQueries().Any(q => q.HasSession);
     }
 
     /// <summary>Replaces the Connect dialog in tests; returns the connection string or null.</summary>
@@ -220,6 +223,8 @@ public partial class MainWindow
     private void ToggleIntelliSense(object sender, RoutedEventArgs e) { if (ActiveQuery is { } query) query.IntelliSenseEnabled = !query.IntelliSenseEnabled; RefreshResultsButtons(); }
     private async void ListMembers(object sender, RoutedEventArgs e) { if (ActiveQuery is { } query) { query.Editor.Focus(); await query.ShowCompletionAsync(); } }
     private void RefreshLocalCache(object sender, RoutedEventArgs e) => ActiveQuery?.RefreshLocalCache();
+    private async void ParameterInfo(object sender, RoutedEventArgs e) { if (ActiveQuery is { } query) { query.Editor.Focus(); await query.ShowParameterInfoAsync(); } }
+    private async void QuickInfo(object sender, RoutedEventArgs e) { if (ActiveQuery is { } query) { query.Editor.Focus(); await query.ShowQuickInfoAsync(); } }
 
     private async void ParseQuery(object sender, RoutedEventArgs e) { if (ActiveQuery is { } query) await query.ParseAsync(); }
     private void ToggleClientStatistics(object sender, RoutedEventArgs e) => ToggleClientStatistics();
@@ -229,4 +234,11 @@ public partial class MainWindow
         RefreshResultsButtons();
     }
     private void ResetClientStatistics(object sender, RoutedEventArgs e) => ActiveQuery?.ResetClientStatistics();
+    private void ToggleLiveStatistics(object sender, RoutedEventArgs e) => ToggleLiveStatistics();
+    /// <summary>Query ▸ Include Live Query Statistics (PGMS-067), per query tab as in SSMS.</summary>
+    internal void ToggleLiveStatistics()
+    {
+        if (ActiveQuery is { } query) query.IncludeLiveStatistics = !query.IncludeLiveStatistics;
+        RefreshResultsButtons();
+    }
 }

@@ -1,0 +1,21 @@
+<Window x:Class="PGMS.Desktop.WindowsDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Windows" Width="622" Height="392" MinWidth="480" MinHeight="300" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="{DynamicResource Pgms.DialogBackground}">
+ <Grid Margin="10">
+  <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+  <ListView x:Name="WindowList" SelectionMode="Extended" AutomationProperties.Name="Open windows" MouseDoubleClick="ActivateOnDoubleClick" SelectionChanged="SelectionChangedHandler">
+   <ListView.View>
+    <GridView>
+     <GridViewColumn Width="210" DisplayMemberBinding="{Binding Name}"><GridViewColumnHeader Content="Name" Click="SortByName"/></GridViewColumn>
+     <GridViewColumn Width="250" DisplayMemberBinding="{Binding Path}"><GridViewColumnHeader Content="Path" Click="SortByPath"/></GridViewColumn>
+    </GridView>
+   </ListView.View>
+  </ListView>
+  <StackPanel Grid.Column="1" Margin="10,0,0,0" Width="130">
+   <Button x:Name="ActivateButton" Content="_Activate" Height="24" Click="ActivateSelected" IsDefault="True"/>
+   <Button x:Name="SaveButton" Content="_Save" Height="24" Margin="0,8,0,0" Click="Save" ToolTip="Saves the selected query tabs; a query without a file asks for a name"/>
+   <Button x:Name="CloseWindowsButton" Content="_Close Window(s)" Height="24" Margin="0,8,0,0" Click="CloseWindows"/>
+   <TextBlock x:Name="StatusText" TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,12,0,0"/>
+  </StackPanel>
+  <Button Grid.Column="1" Content="OK" Width="130" Height="24" VerticalAlignment="Bottom" Margin="10,0,0,0" IsCancel="True" Click="Ok"/>
+ </Grid>
+</Window>

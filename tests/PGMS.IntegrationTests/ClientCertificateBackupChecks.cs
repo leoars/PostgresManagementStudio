@@ -57,9 +57,33 @@ internal static class ClientCertificateBackupChecks
             string encryptedArchive=Path.Combine(unicode,"encrypted-key.backup");
             string ownStaging="PGMS-restore-v1-*-"+Environment.ProcessId+"-*.partial";
             var before=Directory.GetFiles(Path.GetTempPath(),ownStaging).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            bool passwordRefused=false;
-            try{await new BackupService(login.ConnectionString,tools).BackupAsync(encryptedArchive);}catch(ArgumentException ex){passwordRefused=ex.Message.Contains("not supported") && !ex.Message.Contains(keyPassword,StringComparison.Ordinal);}
-            check(passwordRefused && !File.Exists(encryptedArchive) && (await File.ReadAllBytesAsync(keyFile)).SequenceEqual(encryptedKey),"Configured encrypted-key password is refused explicitly without secret echo or key rewrite");
+            // PGMS-009: an application session opens with the encrypted key and its password.
+            await using(var c=new NpgsqlConnection(login.ConnectionString)){await c.OpenAsync();await using var cmd=new NpgsqlCommand("SELECT client_dn FROM pg_stat_ssl WHERE pid=pg_backend_pid()",c);check(((string?)await cmd.ExecuteScalarAsync())?.Contains(role)==true,"Encrypted client key with its password authenticates an application session");}
+            // The tools get the password from a private temporary service file, removed afterwards.
+            await new BackupService(login.ConnectionString,tools).BackupAsync(encryptedArchive);
+            check(File.Exists(encryptedArchive) && (await File.ReadAllBytesAsync(keyFile)).SequenceEqual(encryptedKey),"pg_dump authenticates with an encrypted client key and its password without rewriting the key");
+            check(!Directory.GetFiles(Path.GetTempPath(),ownStaging).Except(before,StringComparer.OrdinalIgnoreCase).Any(),"The temporary service file and key copies are removed after the backup");
+            string encryptedTarget="cert_enc_"+suffix;await Sql($"CREATE DATABASE {SqlIdentifier.Quote(encryptedTarget)} OWNER {SqlIdentifier.Quote(role)}");
+            try
+            {
+                var restoreLogin=new NpgsqlConnectionStringBuilder(login.ConnectionString){Database=encryptedTarget};
+                await new BackupService(restoreLogin.ConnectionString,tools).RestoreAsync(encryptedArchive);
+                await using(var c=new NpgsqlConnection(restoreLogin.ConnectionString)){await c.OpenAsync();await using var cmd=new NpgsqlCommand("SELECT value FROM public.items",c);check((string)(await cmd.ExecuteScalarAsync())! =="certificado 密碼","pg_restore with an encrypted client key restores exact data");}
+            }
+            finally{await Sql($"DROP DATABASE IF EXISTS {SqlIdentifier.Quote(encryptedTarget)}");}
+            File.Delete(encryptedArchive);
+            login.SslPassword="wrong-"+keyPassword;bool wrongRefused=false;using(var wrongTimeout=new CancellationTokenSource(TimeSpan.FromSeconds(15)))
+            {
+                try{await new BackupService(login.ConnectionString,tools).BackupAsync(encryptedArchive,wrongTimeout.Token);}catch(IOException ex){wrongRefused=!wrongTimeout.IsCancellationRequested && !ex.Message.Contains(login.SslPassword,StringComparison.Ordinal);}
+            }
+            check(wrongRefused && !File.Exists(encryptedArchive),"A wrong key password fails promptly, without publishing a backup or echoing the password");
+            foreach(string bad in new[]{"line\nbreak","trailing "})
+            {
+                login.SslPassword=bad;bool badRefused=false;
+                try{await new BackupService(login.ConnectionString,tools).BackupAsync(encryptedArchive);}catch(ArgumentException ex){badRefused=ex.Message.Contains("No operation was started",StringComparison.Ordinal);}
+                check(badRefused && !File.Exists(encryptedArchive),"A key password the service file cannot carry is refused before the tool starts: "+bad.Replace("\n","\\n"));
+            }
+            check(!Directory.GetFiles(Path.GetTempPath(),ownStaging).Except(before,StringComparer.OrdinalIgnoreCase).Any(),"No temporary service file remains after refused or failed runs");
             login.SslPassword="";bool encryptedRefused=false;using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(15));
             try{await new BackupService(login.ConnectionString,tools).BackupAsync(encryptedArchive,timeout.Token);}catch(IOException){encryptedRefused=true;}
             check(encryptedRefused && !timeout.IsCancellationRequested && !File.Exists(encryptedArchive),"Encrypted key without configured password fails without an invisible prompt or publication");

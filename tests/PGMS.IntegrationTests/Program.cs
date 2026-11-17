@@ -94,16 +94,16 @@ if (args.Contains("--schema-context")) { await SchemaContextChecks.RunAsync(conn
 if (args.Length == 0) await SchemaContextChecks.RunAsync(connection,Check);
 if (args.Contains("--table-design")) { await TableDesignChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} table design checks passed."); return; }
 if (args.Length == 0) await TableDesignChecks.RunAsync(connection,Check);
-if (args.Contains("--diagrams")) { await DiagramChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} database diagram checks passed."); return; }
-if (args.Length == 0) await DiagramChecks.RunAsync(connection,Check);
-if (args.Contains("--results-text")) { await ResultsTextChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} results text checks passed."); return; }
-if (args.Length == 0) await ResultsTextChecks.RunAsync(connection,Check);
+if (args.Contains("--diagrams")) { await DiagramChecks.RunAsync(connection,Check); await CatalogObjectChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} database diagram checks passed."); return; }
+if (args.Length == 0) { await DiagramChecks.RunAsync(connection,Check); await CatalogObjectChecks.RunAsync(connection,Check); }
+if (args.Contains("--results-text")) { await ResultsTextChecks.RunAsync(connection,Check); await LiveQueryProgressChecks.RunAsync(connection,Check); await SchemaCompareChecks.RunAsync(connection,Check); await ExtensionTypeChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} results text checks passed."); return; }
+if (args.Length == 0) { await ResultsTextChecks.RunAsync(connection,Check); await LiveQueryProgressChecks.RunAsync(connection,Check); await SchemaCompareChecks.RunAsync(connection,Check); }
 if (args.Contains("--reports")) { await ServerReportChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} server report checks passed."); return; }
 if (args.Length == 0) await ServerReportChecks.RunAsync(connection,Check);
 if (args.Contains("--privilege-identity")) { await PrivilegeIdentityChecks.RunAsync(connection,Check); await PrivilegeRecipientChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} privilege identity checks passed."); return; }
 if (args.Length == 0) { await PrivilegeIdentityChecks.RunAsync(connection,Check); await PrivilegeRecipientChecks.RunAsync(connection,Check); }
 if (args.Contains("--membership-option-sql")) { MembershipOptionChecks.RunSql(Check); Console.WriteLine($"{passed} membership SQL checks passed."); return; }
-if (args.Contains("--membership-options")) { MembershipOptionChecks.RunSql(Check); await MembershipOptionChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} membership option checks passed."); return; }
+if (args.Contains("--membership-options")) { MembershipOptionChecks.RunSql(Check); await MembershipOptionChecks.RunAsync(connection,Check); await EffectiveMembershipChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} membership option checks passed."); return; }
 if (args.Contains("--column-privileges")) { ColumnPrivilegeChecks.RunSql(Check); await ColumnPrivilegeChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} column privilege checks passed."); return; }
 if (args.Contains("--column-privilege-sql")) { ColumnPrivilegeChecks.RunSql(Check); Console.WriteLine($"{passed} column SQL checks passed."); return; }
 if (args.Contains("--privilege-cancellation-guards")) { await PrivilegeCancellationChecks.RunGuardsAsync(Check); Console.WriteLine($"{passed} cancellation guard checks passed."); return; }
@@ -127,7 +127,7 @@ if (args.Contains("--streaming")) { await QueryStreamingChecks.RunAsync(connecti
 if (args.Contains("--properties")) { await ObjectPropertyChecks.RunAsync(connection, Check); Console.WriteLine($"{passed} property integration checks passed."); return; }
 if (args.Contains("--acceptance")) { await AcceptanceJourneyChecks.RunAsync(connection, Check); Console.WriteLine($"{passed} acceptance checks passed."); return; }
 MembershipOptionChecks.RunSql(Check);
-await MembershipOptionChecks.RunAsync(connection,Check);
+await MembershipOptionChecks.RunAsync(connection,Check); await EffectiveMembershipChecks.RunAsync(connection,Check);
 await PrivilegeCancellationChecks.RunAsync(connection,Check);
 await EffectivePrivilegeChecks.RunAsync(connection, Check);
 ColumnPrivilegeChecks.RunSql(Check);

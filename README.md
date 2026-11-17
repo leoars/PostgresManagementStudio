@@ -6,13 +6,23 @@ English | [Português (Brasil)](README.pt-BR.md)
 
 **The SQL Server Management Studio experience, for PostgreSQL.** A native Windows client with **database diagrams**, a **visual query designer** and **context-aware IntelliSense**, plus Object Explorer, F5 to run, execution plans, session monitoring and backup/restore, built for people who already think in SSMS.
 
-**[Download v0.1.0-alpha.6 for Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.6)** · Graphical installer (EN/pt-BR) or portable ZIP, .NET runtime included · Works with PostgreSQL 16–18
+**[Download v0.1.0-alpha.7 for Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.7)** · Graphical installer (EN/pt-BR) or portable ZIP, .NET runtime included · Works with PostgreSQL 16–18
 
 ![PGMS editor, Object Explorer and query results](docs/assets/pgms-results-m959.jpg)
 
 > Early pre-release. Querying, browsing and monitoring are the core of this alpha; administration and backup run through reviewable SQL and the official PostgreSQL tools. Full SSMS parity is not claimed. See [known limits](docs/en/validation.md) and [release notes](docs/en/release-notes.md).
 
+**Contents:** [Highlights](#highlights) · [New in alpha.7](#new-in-alpha7) · [Why PGMS](#why-pgms) · [Features](#features) · [Get started](#get-started) · [Documentation](#documentation) · [Contribute and report problems](#contribute-and-report-problems) · [License](#license)
+
 ## Highlights
+
+### Write SQL with AI
+
+Describe what you need and **Query ▸ Generate SQL with AI…** (`Ctrl+I`) writes the SQL for you to review before it reaches the editor. Keep the conversation going with follow-up requests, or select SQL and use **Explain**, **Fix** or **Optimize SQL with AI** from the Query menu. It works with Anthropic, OpenAI or a local Ollama, with your own key. What goes to the provider: your request, the database structure (names, types, keys, comments) and, for **Fix**, the SQLSTATE and main message of the last error. Table data is never read or sent, nothing is sent until you press **Generate**, and the SQL is never executed for you. On large databases the provider first picks the relevant tables by name, within a context limit you set. **View Sent Context…** shows exactly what was sent.
+
+### Configure Server TLS
+
+A guided setup that creates or imports a certificate, installs it in the server's data directory, turns on TLS with `ALTER SYSTEM`, checks a TLS session with that certificate and restores the previous settings if anything fails. Saved profiles for that server then verify the certificate. It requires a superuser connection to a PostgreSQL server running on Windows.
 
 ### Database diagrams
 
@@ -32,13 +42,26 @@ Build queries by clicking instead of typing. **Query ▸ Design Query in Editor*
 
 ![IntelliSense after JOIN suggesting a complete join from a foreign key](docs/assets/pgms-intellisense.png)
 
-Press `Ctrl+Space` and get what fits that position. After `FROM`: tables, views and table functions, found by name across all your schemas. After `JOIN`: the whole join from your foreign keys, such as `orders o ON o.customer_id = c.id`. After an alias: its columns. Typing ignores accents, so `usuar` finds `Usuários`. Parameter Info, Quick Info and CTE columns are not available yet.
+Press `Ctrl+Space` and get what fits that position. After `FROM`: tables, views and table functions, found by name across all your schemas. After `JOIN`: the whole join from your foreign keys, such as `orders o ON o.customer_id = c.id`. After an alias: its columns. Typing ignores accents, so `usuar` finds `Usuários`. Parameter Info (`Ctrl+Shift+Space`) shows the arguments of a function while you type, and Quick Info describes the name under the mouse. CTE columns are not known yet.
 
 ### Also in PGMS
 
-- **Generate SQL with AI.** Describe a query and review the SQL before it reaches the editor, using Anthropic, OpenAI or a local Ollama with your own key. Your request and the database structure go to the provider you configure; table data is never read or sent. On large databases the provider first picks the relevant tables by name, within a context limit you set.
 - **Execution plan advice.** Graphical plans flag operators that discard many rows and suggest a missing index as a commented `CREATE INDEX` script, checked against the catalog and never run for you.
-- **Configure Server TLS.** A guided setup that installs a certificate and turns on TLS, restoring the previous settings if it fails. Requires a superuser connection to a server running on Windows.
+- **Schema Compare.** Compare two databases and get a change script in a query tab connected to the target, for you to review and run.
+- **Query History.** Every query you run, grouped and searchable, stored only on your computer and encrypted for your Windows user.
+
+## New in alpha.7
+
+- **AI conversation** and **Explain / Fix / Optimize SQL with AI**.
+- **Dark theme**, Editor Appearance, Fonts and Colors, and Presenter Mode.
+- **Unexpected errors are logged** to `%LOCALAPPDATA%\PGMS\logs` and shown in a window with **Report Issue**, instead of closing PGMS silently.
+- Editor: Format SQL, Parameter Info and Quick Info, bookmarks, outlining, templates and snippets, Find in Files, spell checking of comments and strings, and the SSMS Edit ▸ Advanced commands.
+- Schema Compare, Live Query Statistics (progress, waits and blockers), Object Explorer Details (`F7`), the Properties window (`F4`), Error List and Output.
+- Object Explorer: extensions, maintenance (Vacuum, Analyze, Refresh Materialized View), menus for keys, constraints and triggers, composite types, foreign servers and logical replication.
+- Backup with LZ4/Zstandard, parallel restore and restoring only chosen items; client certificates in Connect.
+- Window layouts, Split Tab, Full Screen, Restore Closed Tab, a menu in the title bar with Search (`Ctrl+Q`), Keyboard and Query Shortcuts, Import and Export Settings and External Tools.
+
+See the [release notes](docs/en/release-notes.md) for details and limits.
 
 ## Why PGMS
 
@@ -50,13 +73,14 @@ Press `Ctrl+Space` and get what fits that position. After `FROM`: tables, views 
 
 ## Features
 
-- SQL editor: highlighting, context-aware IntelliSense, find/replace, multiple tabs, save/load and encrypted draft recovery.
+- SQL editor: highlighting, context-aware IntelliSense with Parameter Info and Quick Info, Format SQL, templates and snippets, bookmarks, find/replace and Find in Files, multiple tabs, save/load and encrypted draft recovery.
 - Database diagrams, Table Designer, View Designer and Query Designer.
-- Independent PostgreSQL sessions, execute/cancel, Results/Messages, result grids in pages of 100,000 rows (configurable), results to text or file, copy and CSV/JSON export.
-- Object Explorer, inspection, graphical execution plans (estimated and actual) and session configuration.
+- Independent PostgreSQL sessions, execute/cancel, Results/Messages, result grids in pages of 100,000 rows (configurable), results to text or file, copy, Save Grid Results and CSV/JSON export, Query History and Live Query Statistics.
+- Object Explorer and Object Explorer Details, the Properties window, Script as, extensions and maintenance, graphical execution plans (estimated and actual), Schema Compare and session configuration.
 - Reviewed SQL administration for supported databases, schemas, tables, columns, identity, indexes, constraints, sequences, roles and privileges.
 - Session/blocker monitoring, with distinct query cancellation and session termination.
-- Logical backup/restore through external PostgreSQL tools: custom, tar, SQL and directory formats, plus reviewed global operations.
+- Logical backup/restore through external PostgreSQL tools: custom, tar, SQL and directory formats, gzip/LZ4/Zstandard, parallel and partial restore, plus reviewed global operations.
+- Light, dark or system theme, Fonts and Colors, keyboard shortcuts and window layouts.
 
 ## Get started
 
@@ -75,7 +99,7 @@ Get-FileHash .\PGMS-* -Algorithm SHA256
 Compare the hashes with `SHA256SUMS.txt` in the release. Starting with v0.1.0-alpha.2 the assets are built by the [release workflow](.github/workflows/release.yml) on GitHub Actions and carry a build provenance attestation, so you can also confirm that the ZIP or installer came from that workflow and this repository (requires the [GitHub CLI](https://cli.github.com/)):
 
 ```powershell
-gh attestation verify .\PGMS-0.1.0-alpha.6-Setup-x64.exe --repo leoars/PostgresManagementStudio
+gh attestation verify .\PGMS-0.1.0-alpha.7-Setup-x64.exe --repo leoars/PostgresManagementStudio
 ```
 
 v0.1.0-alpha.1 was built on the maintainer's machine and has checksums only. Code signing through the SignPath Foundation open source program is planned.
@@ -107,6 +131,8 @@ The self-contained portable package includes .NET/WPF, but no PostgreSQL server 
 [Documentation index](docs/README.md). Public guides are maintained in both languages; the original internal development history is not included in this curated source repository. Bilingual documentation does not localize the application UI.
 
 ## Contribute and report problems
+
+**If PGMS hits an error.** An unexpected error opens a window with the details; PGMS also writes them to a daily log in `%LOCALAPPDATA%\PGMS\logs` (kept 30 days, nothing sent over the network). Choose **Report Issue**, describe what you were doing and attach the log or the text from **Copy Details** after reading it: an error message can quote what the server sent. You can usually choose **Continue**; your open queries keep their text.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md). English and Brazilian Portuguese are welcome. Issue templates guide bug reports and feature requests; usage questions go to [Discussions](https://github.com/leoars/PostgresManagementStudio/discussions). Use synthetic data and remove credentials and personal information from reports. For vulnerabilities, follow [SECURITY.md](SECURITY.md).
 

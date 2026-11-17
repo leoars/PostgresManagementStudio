@@ -12,12 +12,14 @@ public partial class OptionsDialog : Window
     private readonly Func<Task<int>>? clearHistory;
 
     /// <param name="clearHistory">Clears Query History at once (not on OK) and returns how many executions were removed; null hides the button.</param>
-    public OptionsDialog(EnvironmentOptions options, Func<Task<int>>? clearHistory = null)
+    /// <param name="commands">The main menu commands for Environment ▸ Keyboard; null lists none (dialogs opened without the main window).</param>
+    public OptionsDialog(EnvironmentOptions options, Func<Task<int>>? clearHistory = null, IReadOnlyList<KeyboardCommand>? commands = null)
     {
         InitializeComponent();
         this.options = options; this.clearHistory = clearHistory;
         var document = options.Load();
         RestoreWindowBox.IsChecked = document.RestoreWindowPlacement;
+        RecentFilesBox.Text = document.RecentCount.ToString(CultureInfo.InvariantCulture);
         SelectTopBox.Text = document.SelectTop.ToString(CultureInfo.CurrentCulture);
         EditTopBox.Text = document.EditTop.ToString(CultureInfo.CurrentCulture);
         DefaultResultsBox.SelectedIndex = document.DefaultResults switch { ResultsDestination.Text => 1, ResultsDestination.File => 2, _ => 0 };
@@ -28,7 +30,25 @@ public partial class OptionsDialog : Window
         HistoryCountBox.Text = history.MaxExecutions.ToString(CultureInfo.InvariantCulture);
         HistorySizeBox.Text = history.MaxSqlKiB.ToString(CultureInfo.InvariantCulture);
         ClearHistoryButton.Visibility = clearHistory is null ? Visibility.Collapsed : Visibility.Visible;
+        var scripting = document.ScriptingSettings;
+        ScriptHeadersBox.IsChecked = scripting.IncludeDescriptiveHeaders; ScriptDatabaseBox.IsChecked = scripting.ScriptDatabaseContext; ScriptExistenceBox.IsChecked = scripting.CheckObjectExistence;
+        var designers = document.DesignerSettings;
+        DefaultTableViewBox.SelectedItem = DefaultTableViewBox.Items.OfType<ComboBoxItem>().First(i => (string)i.Tag == designers.DefaultTableView.ToString());
+        LaunchAddTableBox.IsChecked = designers.LaunchAddTableOnNewDiagram;
+        SelectRecentBox.IsChecked = document.AutoSelectRecentConnection;
+        QueryShortcutsGrid.ItemsSource = shortcutRows = EnvironmentOptions.Document.QueryShortcutKeys.Select(k => new QueryShortcutRow(k) { Text = document.QueryShortcut(k) ?? "" }).ToList();
+        LoadFontsAndColors(document.Appearance);
+        LoadKeyboard(document, commands ?? []);
     }
+
+    private readonly List<QueryShortcutRow> shortcutRows = [];
+    /// <summary>One row of Environment ▸ Query Shortcuts.</summary>
+    public sealed class QueryShortcutRow(string shortcut)
+    {
+        public string Shortcut { get; } = shortcut;
+        public string Text { get; set; } = "";
+    }
+    internal IReadOnlyList<QueryShortcutRow> QueryShortcutRows => shortcutRows;
 
     /// <summary>Asks before clearing; tests replace it.</summary>
     internal Func<bool>? ConfirmClearHistory { get; set; }
@@ -59,6 +79,12 @@ public partial class OptionsDialog : Window
         QueryResultsPanel.Visibility = page == QueryResultsPage ? Visibility.Visible : Visibility.Collapsed;
         CommandsPanel.Visibility = page == CommandsPage ? Visibility.Visible : Visibility.Collapsed;
         HistoryPanel.Visibility = page == HistoryPage ? Visibility.Visible : Visibility.Collapsed;
+        ScriptingPanel.Visibility = page == ScriptingPage ? Visibility.Visible : Visibility.Collapsed;
+        QueryShortcutsPanel.Visibility = page == QueryShortcutsPage ? Visibility.Visible : Visibility.Collapsed;
+        KeyboardPanel.Visibility = page == KeyboardPage ? Visibility.Visible : Visibility.Collapsed;
+        DesignersPanel.Visibility = page == DesignersPage ? Visibility.Visible : Visibility.Collapsed;
+        ConnectionDialogPanel.Visibility = page == ConnectionDialogPage ? Visibility.Visible : Visibility.Collapsed;
+        FontsAndColorsPanel.Visibility = page == FontsAndColorsPage ? Visibility.Visible : Visibility.Collapsed;
         int shared = Array.IndexOf(SharedPages, page);
         QueryPages.Visibility = shared >= 0 ? Visibility.Visible : Visibility.Collapsed;
         if (shared >= 0) QueryPages.ShowPage(shared);
@@ -73,6 +99,15 @@ public partial class OptionsDialog : Window
 
     internal void Accept(object sender, RoutedEventArgs e)
     {
+        if (ParseRange(RecentFilesBox.Text, 1, RecentFileList.MaximumCount) is not { } recentCount)
+        {
+            GeneralError.Text = $"Enter a whole number of recent files from 1 to {RecentFileList.MaximumCount}.";
+            GeneralError.Visibility = Visibility.Visible;
+            GeneralPage.IsSelected = true;
+            System.Windows.Input.FocusManager.SetFocusedElement(this, RecentFilesBox);
+            RecentFilesBox.Focus(); RecentFilesBox.SelectAll();
+            return;
+        }
         int? selectTop = ParseRowCount(SelectTopBox.Text), editTop = ParseRowCount(EditTopBox.Text);
         if (selectTop is null || editTop is null)
         {
@@ -104,7 +139,16 @@ public partial class OptionsDialog : Window
         bool restore = RestoreWindowBox.IsChecked == true;
         // Turning the option off also forgets the saved size and position.
         var destination = DefaultResultsBox.SelectedIndex switch { 1 => ResultsDestination.Text, 2 => ResultsDestination.File, _ => ResultsDestination.Grid };
-        options.Update(d => d with { RestoreWindowPlacement = restore, Window = restore ? d.Window : null, SelectTopRows = selectTop.Value, EditTopRows = editTop.Value, DefaultResultsDestination = destination, QueryDefaults = queryDefaults, QueryHistory = historySettings });
+        var scripting = new PGMS.PostgreSql.ScriptingOptions(ScriptHeadersBox.IsChecked == true, ScriptDatabaseBox.IsChecked == true, ScriptExistenceBox.IsChecked == true);
+        var tableView = Enum.Parse<DiagramTableView>((string)((ComboBoxItem)DefaultTableViewBox.SelectedItem).Tag);
+        var designers = new DesignerOptions(tableView, LaunchAddTableBox.IsChecked == true);
+        bool selectRecent = SelectRecentBox.IsChecked == true;
+        if (ReadFontsAndColors() is not { } fontsAndColors) return;
+        QueryShortcutsGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        var shortcuts = shortcutRows.Where(r => !string.IsNullOrWhiteSpace(r.Text)).ToDictionary(r => r.Shortcut, r => r.Text.Trim());
+        options.Update(d => d with { RestoreWindowPlacement = restore, Window = restore ? d.Window : null, SelectTopRows = selectTop.Value, EditTopRows = editTop.Value, DefaultResultsDestination = destination, QueryDefaults = queryDefaults, QueryHistory = historySettings,
+            RecentFilesCount = recentCount, RecentFiles = d.RecentFiles?.Take(recentCount).ToList(), Scripting = scripting, Designers = designers, AutoSelectRecentConnection = selectRecent, QueryShortcuts = shortcuts,
+            KeyboardShortcuts = keyboardShortcuts.Count == 0 ? null : new Dictionary<string, string>(keyboardShortcuts), FontsAndColors = fontsAndColors == new FontsAndColorsSettings() ? null : fontsAndColors });
         try { DialogResult = true; }
         catch (InvalidOperationException) { Close(); } // shown without ShowDialog
     }

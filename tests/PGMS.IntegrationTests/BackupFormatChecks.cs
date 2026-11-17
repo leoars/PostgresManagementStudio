@@ -42,19 +42,44 @@ internal static class BackupFormatChecks
             foreach(var compressionFormat in new[]{BackupFormat.Custom,BackupFormat.Directory})
             {
                 long uncompressedLength=0;
-                foreach(var compression in new[]{BackupCompression.None,BackupCompression.Gzip})
+                foreach(var compression in new[]{BackupCompression.None,BackupCompression.Gzip,BackupCompression.Lz4,BackupCompression.Zstd})
                 {
                     string compressedPath=Path.Combine(folder,"compression_"+compressionFormat+"_"+compression),compressedTarget="compress_"+(int)compressionFormat+"_"+(int)compression+"_"+suffix;
-                    await new BackupService(As(source,owner),tools).BackupWithOptionsAsync(compressedPath,new(compressionFormat){Compression=compression,CompressionLevel=compression==BackupCompression.Gzip?9:null});
+                    await new BackupService(As(source,owner),tools).BackupWithOptionsAsync(compressedPath,new(compressionFormat){Compression=compression,CompressionLevel=compression switch{BackupCompression.Gzip=>9,BackupCompression.Lz4=>12,BackupCompression.Zstd=>19,_=>null}});
                     long length=compressionFormat==BackupFormat.Directory?Directory.EnumerateFiles(compressedPath).Sum(f=>new FileInfo(f).Length):new FileInfo(compressedPath).Length;
-                    if(compression==BackupCompression.None)uncompressedLength=length;else check(length<uncompressedLength/2,"Gzip actually reduces repetitive archive data size: "+compressionFormat);
+                    if(compression==BackupCompression.None)uncompressedLength=length;else check(length<uncompressedLength/2,compression+" actually reduces repetitive archive data size: "+compressionFormat);
                     await Create(compressedTarget,"pgms_test");var compressedService=new BackupService(As(compressedTarget),tools);
                     if(compressionFormat==BackupFormat.Directory)await compressedService.RestoreDirectoryAsync(compressedPath);else await compressedService.RestoreAsync(compressedPath);
                     check(Convert.ToInt64(await Scalar(compressedTarget,"SELECT count(*) FROM public.compressible WHERE value=repeat('compressão 密碼 ',1000)"))==100,"Compression choice roundtrips all exact Unicode payloads: "+compressionFormat+"/"+compression);
-                    if(compressionFormat==BackupFormat.Directory)check(Directory.EnumerateFiles(compressedPath,"*.gz").Any()==(compression==BackupCompression.Gzip),"Directory data suffix reflects selected compression: "+compression);
+                    if(compressionFormat==BackupFormat.Directory)foreach(var (method,extension) in new[]{(BackupCompression.Gzip,"*.gz"),(BackupCompression.Lz4,"*.lz4"),(BackupCompression.Zstd,"*.zst")})
+                        check(Directory.EnumerateFiles(compressedPath,extension).Any()==(compression==method),"Directory data suffix reflects selected compression: "+compression+" "+extension);
                 }
             }
-            foreach(var invalidCompression in new[]{new BackupOptions(BackupFormat.Tar){Compression=BackupCompression.Gzip},new(BackupFormat.PlainSql){Compression=BackupCompression.Gzip},new(){Compression=(BackupCompression)999},new(){CompressionLevel=1},new(){Compression=BackupCompression.None,CompressionLevel=1},new(){Compression=BackupCompression.Gzip,CompressionLevel=0},new(){Compression=BackupCompression.Gzip,CompressionLevel=10}})
+            // PGMS-064 (M1100): parallel restore and restoring part of an archive.
+            string customArchive=Path.Combine(folder,"compression_Custom_Gzip"),directoryArchive=Path.Combine(folder,"compression_Directory_Zstd");
+            var listing=await new BackupService(As(source,owner),tools).ListArchiveAsync(customArchive);
+            check(listing.Any(i=>i.Description.StartsWith("TABLE public compressible ",StringComparison.Ordinal)) && listing.Any(i=>i.Description.StartsWith("TABLE DATA public compressible ",StringComparison.Ordinal)) && listing.Any(i=>i.Description.StartsWith("TABLE public items ",StringComparison.Ordinal)),
+                "pg_restore --list gives the archive items: "+string.Join(" | ",listing.Select(i=>i.Description)));
+            check((await new BackupService(As(source,owner),tools).ListArchiveAsync(directoryArchive)).Count==listing.Count,"A directory archive lists the same items");
+            var chosen=listing.Where(i=>i.Description.Contains(" public compressible ",StringComparison.Ordinal) && (i.Description.StartsWith("TABLE ",StringComparison.Ordinal))).ToList();
+            string partialTarget="format_partial_"+suffix;await Create(partialTarget,"pgms_test");
+            await new BackupService(As(partialTarget),tools).RestoreWithOptionsAsync(customArchive,new RestoreOptions(){Items=chosen.Select(i=>i.Line).ToList()});
+            check(chosen.Count==2 && Convert.ToInt64(await Scalar(partialTarget,"SELECT count(*) FROM public.compressible"))==100 && (bool)(await Scalar(partialTarget,"SELECT to_regclass('public.items') IS NULL"))!,"Restoring chosen items restores only the table and data that were chosen");
+            string parallelTarget="format_parallel_"+suffix;await Create(parallelTarget,"pgms_test");
+            var parallel=new RestoreOptions(){Jobs=3};
+            check(parallel.ToArguments().Contains("--jobs=3") && !parallel.ToArguments().Contains("--single-transaction") && new RestoreOptions().ToArguments().Contains("--single-transaction"),"Parallel restore drops the single transaction, which pg_restore refuses with --jobs");
+            await new BackupService(As(parallelTarget),tools).RestoreDirectoryAsync(directoryArchive,parallel);
+            check(Convert.ToInt64(await Scalar(parallelTarget,"SELECT count(*) FROM public.compressible WHERE value=repeat('compressão 密碼 ',1000)"))==100 && Convert.ToInt64(await Scalar(parallelTarget,"SELECT count(*) FROM public.items"))==1,"A parallel restore of a zstd directory archive restores everything");
+            string parallelPartial="format_parallel_partial_"+suffix;await Create(parallelPartial,"pgms_test");
+            await new BackupService(As(parallelPartial),tools).RestoreDirectoryAsync(directoryArchive,new RestoreOptions(){Jobs=2,Items=chosen.Select(i=>i.Line).ToList()});
+            check(Convert.ToInt64(await Scalar(parallelPartial,"SELECT count(*) FROM public.compressible"))==100 && (bool)(await Scalar(parallelPartial,"SELECT to_regclass('public.items') IS NULL"))!,"Chosen items also restore in parallel from a directory archive");
+            foreach(var invalidRestore in new[]{new RestoreOptions(){Jobs=0},new RestoreOptions(){Jobs=33},new RestoreOptions(){Items=[]}})
+            {bool refused=false;try{invalidRestore.ToArguments();}catch(ArgumentException){refused=true;}check(refused,"Invalid restore jobs or an empty choice of items are refused before restoring");}
+            bool listRefused=false;try{await new BackupService(As(source,owner),tools).ListArchiveAsync(Path.Combine(folder,"missing.backup"));}catch(FileNotFoundException){listRefused=true;}
+            check(listRefused,"Listing a missing archive is refused");
+            check(ArchiveItem.Parse(";\n; Archive created at x\n3392; 0 16385 TABLE DATA public t1 postgres\n\n12; 2615 2200 SCHEMA - public pg_database_owner\r\n").Select(i=>(i.Id,i.Description)).SequenceEqual([(3392,"TABLE DATA public t1 postgres"),(12,"SCHEMA - public pg_database_owner")]),
+                "The --list parser skips comments and keeps the description after the two OIDs");
+            foreach(var invalidCompression in new[]{new BackupOptions(BackupFormat.Tar){Compression=BackupCompression.Gzip},new(BackupFormat.PlainSql){Compression=BackupCompression.Gzip},new(){Compression=(BackupCompression)999},new(){CompressionLevel=1},new(){Compression=BackupCompression.None,CompressionLevel=1},new(){Compression=BackupCompression.Gzip,CompressionLevel=0},new(){Compression=BackupCompression.Gzip,CompressionLevel=10},new(){Compression=BackupCompression.Lz4,CompressionLevel=13},new(){Compression=BackupCompression.Zstd,CompressionLevel=23},new(BackupFormat.Tar){Compression=BackupCompression.Zstd}})
             {bool refused=false;try{invalidCompression.ToArguments();}catch(ArgumentException){refused=true;}check(refused,"Invalid or unsupported compression is refused before exporting");}
             string owned=Path.Combine(folder,"ownership_密碼.sql"),ownedTarget="format_owned_"+suffix;
             await new BackupService(As(source,owner),tools).BackupWithOptionsAsync(owned,new(BackupFormat.PlainSql,SqlOwnership:true,SqlPrivileges:true));await Create(ownedTarget,"pgms_test");await new BackupService(As(ownedTarget),tools).RestoreSqlAsync(owned);

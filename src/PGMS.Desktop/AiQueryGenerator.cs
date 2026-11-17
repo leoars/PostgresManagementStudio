@@ -15,6 +15,25 @@ namespace PGMS.Desktop;
 
 public sealed record AiQueryResult(string Sql, string Provider, string Model);
 
+/// <summary>An earlier request of the conversation and the SQL the provider wrote for it (M1115). Both come from the user and the provider,
+/// never from table data.</summary>
+public sealed record AiTurn(string Request, string Sql);
+
+/// <summary>Query ▸ Explain/Fix/Optimize SQL with AI (M1115): the request written for the selected SQL; the user can change it before Generate.</summary>
+public enum AiSqlAction { Explain, Fix, Optimize }
+
+public static partial class AiQueryGenerator
+{
+    /// <summary>The request text for an action on the SQL in <current_sql>. Fix carries the SQLSTATE and the server's primary message of the last
+    /// error, which the user sees in the request box before anything is sent; the DETAIL, which can quote row values, is never added.</summary>
+    public static string ActionRequest(AiSqlAction action, string? errorCode = null, string? errorMessage = null) => action switch
+    {
+        AiSqlAction.Explain => "Explain what this SQL does, step by step. Keep the SQL unchanged and put the explanation above it as -- comments.",
+        AiSqlAction.Fix => "Fix this SQL so it runs on this database." + (string.IsNullOrEmpty(errorCode) ? "" : $" The server reported {errorCode}: {errorMessage}") + " Keep what it is meant to do; say what changed in -- comments.",
+        _ => "Optimize this SQL for PostgreSQL without changing its results: better joins, filters that can use indexes, fewer passes. Say what changed and which indexes would help in -- comments; do not create them.",
+    };
+}
+
 /// <summary>Turns a request into PostgreSQL SQL. Sends only the request, the database structure and optional editor SQL; never table data.
 /// The result is text for the editor; nothing here connects to the database or executes SQL.</summary>
 public static partial class AiQueryGenerator
@@ -27,6 +46,7 @@ public static partial class AiQueryGenerator
         Write SQL valid for the PostgreSQL version stated in <schema>. Quote identifiers only when required.
         Prefer read-only SELECT statements. Write statements that change data or structure only when the request explicitly asks for them, and then start the SQL with a comment line beginning with "-- WARNING:" that says what will change.
         When <current_sql> is present, the request is about that SQL (fix, change, extend or explain it).
+        When <previous_turns> is present, the request continues that conversation: each <turn> holds an earlier request and the SQL you wrote for it, and a request such as "now group it by month" refers to the last SQL unless <current_sql> is given.
         Reply with exactly one ```sql code block containing the complete SQL. Put any assumption or explanation inside it as short -- comments. Write nothing outside the block.
         """;
 
@@ -41,14 +61,62 @@ public static partial class AiQueryGenerator
         """;
     public const int MaximumSelectedRelations = 60;
 
+    // Ollama opens a model with a small window (4,096 tokens in 0.40) and silently drops the start of a longer prompt,
+    // so every Ollama request carries num_ctx sized to it. 3 characters per token is conservative: database structure
+    // measured 3.7 with qwen2.5-coder, and accented text takes more tokens.
+    public const double CharactersPerToken = 3.0;
+    public const int OllamaReplyTokens = 4_096, OllamaWindowStep = 2_048;
+    public static int EstimateTokens(int characters) => (int)Math.Ceiling(characters / CharactersPerToken);
+    /// <summary>Window for a prompt: its estimated tokens plus room for the answer, rounded up, never above the model's maximum when known.</summary>
+    public static int OllamaWindow(int promptCharacters, int? maximumTokens)
+    {
+        int needed = EstimateTokens(promptCharacters) + OllamaReplyTokens;
+        int window = (needed + OllamaWindowStep - 1) / OllamaWindowStep * OllamaWindowStep;
+        return maximumTokens is int maximum ? Math.Min(window, maximum) : window;
+    }
+    /// <summary>Most characters of structure that fit a window, after the instructions, the request and the room for the answer.</summary>
+    public static int OllamaStructureCharacters(int maximumTokens, int otherCharacters) =>
+        (int)((maximumTokens - OllamaReplyTokens) * CharactersPerToken) - otherCharacters;
+
+    /// <summary>The model's largest window from Ollama's /api/show (model_info "*.context_length"); null when Ollama does not say.</summary>
+    public static async Task<int?> OllamaContextLengthAsync(AiProviderSettings settings, CancellationToken token = default)
+    {
+        settings = settings.Validate();
+        var body = new JsonObject { ["model"] = settings.Model };
+        using var request = new HttpRequestMessage(HttpMethod.Post, settings.Endpoint + "/api/show") { Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json") };
+        try
+        {
+            using var response = await Http.SendAsync(request, token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return null;
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
+            if (!document.RootElement.TryGetProperty("model_info", out var info) || info.ValueKind != JsonValueKind.Object) return null;
+            foreach (var property in info.EnumerateObject())
+                if (property.Name.EndsWith(".context_length", StringComparison.Ordinal) && property.Value.TryGetInt32(out int length) && length > 0) return length;
+            return null;
+        }
+        catch (HttpRequestException) { return null; }
+        catch (JsonException) { return null; }
+        catch (TaskCanceledException) when (!token.IsCancellationRequested) { return null; }
+    }
+
     // Server-side refusal fallback ("default" routing) for the models that accept it on the Claude API.
     internal static Func<Uri, bool> IsClaudeApi { get; set; } = uri => uri.Host == "api.anthropic.com"; // Tests point it at a local stand-in.
     private static readonly HashSet<string> FallbackModels = new(StringComparer.Ordinal) { "claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5" };
 
-    public static string Compose(string request, SchemaContext schema, string? currentSql)
+    /// <summary>Earlier turns kept by a window (M1115); older ones are dropped.</summary>
+    public const int MaximumTurns = 5;
+
+    public static string Compose(string request, SchemaContext schema, string? currentSql, IReadOnlyList<AiTurn>? turns = null)
     {
         var text = new StringBuilder();
         text.Append("<schema>\n").Append(schema.Text).Append("</schema>\n\n");
+        if (turns is { Count: > 0 })
+        {
+            text.Append("<previous_turns>\n");
+            foreach (var turn in turns.TakeLast(MaximumTurns))
+                text.Append("<turn>\n<request>\n").Append(turn.Request.Trim()).Append("\n</request>\n<sql>\n").Append(turn.Sql.Trim()).Append("\n</sql>\n</turn>\n");
+            text.Append("</previous_turns>\n\n");
+        }
         if (!string.IsNullOrWhiteSpace(currentSql)) text.Append("<current_sql>\n").Append(currentSql.Trim()).Append("\n</current_sql>\n\n");
         text.Append("<request>\n").Append(request.Trim()).Append("\n</request>");
         return text.ToString();
@@ -65,8 +133,8 @@ public static partial class AiQueryGenerator
 
     /// <summary>Asks the provider which relations a request needs. Returns the names as written by the provider;
     /// the caller keeps only the ones that exist.</summary>
-    public static async Task<IReadOnlyList<string>> SelectRelationsAsync(AiProviderSettings settings, string prompt, CancellationToken token = default) =>
-        ParseSelection(await AskAsync(settings, SelectionInstructions, prompt, token).ConfigureAwait(false));
+    public static async Task<IReadOnlyList<string>> SelectRelationsAsync(AiProviderSettings settings, string prompt, CancellationToken token = default, int? maximumWindow = null) =>
+        ParseSelection(await AskAsync(settings, SelectionInstructions, prompt, token, maximumWindow).ConfigureAwait(false));
 
     /// <summary>One name per line, without list markers, code fences, backticks or trailing comments.</summary>
     public static IReadOnlyList<string> ParseSelection(string reply)
@@ -89,7 +157,7 @@ public static partial class AiQueryGenerator
     [GeneratedRegex(@"^(?:[-*•]\s+|\d+[.)]\s+)")]
     private static partial Regex ListMarker();
 
-    private static async Task<string> AskAsync(AiProviderSettings settings, string instructions, string prompt, CancellationToken token)
+    private static async Task<string> AskAsync(AiProviderSettings settings, string instructions, string prompt, CancellationToken token, int? maximumWindow = null)
     {
         settings = settings.Validate();
         if (settings.Model.Length == 0) throw new AiProviderException("Choose a model in Tools ▸ AI Assistant Settings.");
@@ -98,14 +166,15 @@ public static partial class AiQueryGenerator
         {
             AiProvider.Anthropic => await AnthropicAsync(settings, instructions, prompt, token).ConfigureAwait(false),
             AiProvider.OpenAI => await ChatAsync(settings, "/chat/completions", instructions, prompt, token).ConfigureAwait(false),
-            _ => await ChatAsync(settings, "/api/chat", instructions, prompt, token).ConfigureAwait(false)
+            _ => await ChatAsync(settings, "/api/chat", instructions, prompt, token, maximumWindow).ConfigureAwait(false)
         };
     }
 
-    public static async Task<AiQueryResult> GenerateAsync(AiProviderSettings settings, string prompt, CancellationToken token = default)
+    /// <param name="maximumWindow">Ollama only: the model's largest window, which num_ctx never exceeds.</param>
+    public static async Task<AiQueryResult> GenerateAsync(AiProviderSettings settings, string prompt, CancellationToken token = default, int? maximumWindow = null)
     {
         settings = settings.Validate();
-        string reply = await AskAsync(settings, Instructions, prompt, token).ConfigureAwait(false);
+        string reply = await AskAsync(settings, Instructions, prompt, token, maximumWindow).ConfigureAwait(false);
         string sql = ExtractSql(reply);
         if (sql.Length == 0) throw new AiProviderException($"{settings.Provider} returned no SQL.");
         return new(sql, settings.Provider.ToString(), settings.Model);
@@ -151,14 +220,19 @@ public static partial class AiQueryGenerator
         catch (AnthropicIOException ex) { throw new AiProviderException("Could not reach Anthropic at " + settings.Endpoint + ".", ex); }
     }
 
-    private static async Task<string> ChatAsync(AiProviderSettings settings, string path, string instructions, string prompt, CancellationToken token)
+    private static async Task<string> ChatAsync(AiProviderSettings settings, string path, string instructions, string prompt, CancellationToken token, int? maximumWindow = null)
     {
         var body = new JsonObject
         {
             ["model"] = settings.Model,
             ["messages"] = new JsonArray(new JsonObject { ["role"] = "system", ["content"] = instructions }, new JsonObject { ["role"] = "user", ["content"] = prompt })
         };
-        if (settings.Provider == AiProvider.Ollama) body["stream"] = false;
+        if (settings.Provider == AiProvider.Ollama)
+        {
+            body["stream"] = false;
+            // The caller has already cut the structure to the model's maximum; here the window only has to hold this prompt.
+            body["options"] = new JsonObject { ["num_ctx"] = OllamaWindow(instructions.Length + prompt.Length, maximumWindow) };
+        }
         using var request = new HttpRequestMessage(HttpMethod.Post, settings.Endpoint + path) { Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json") };
         if (settings.NeedsKey) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.RevealKey());
         try

@@ -62,6 +62,7 @@ public partial class MainWindow
             var query = NewQuery(path: file.Path, activate: selectionRevision == documentSelectionRevision, prepared: opened.Document);
             query.FileFormat = file.Format;
             query.FileVersion = file.Version;
+            RememberRecentFile(file.Path);
             completion.SetResult(query);
         }
         catch (OperationCanceledException) { completion.SetCanceled(cancellation.Token); }
@@ -138,6 +139,7 @@ public partial class MainWindow
                 return SqlFileStore.Write(path, text.Materialize(), format, expected);
             });
             query.FilePath = saved.Path; query.FileVersion = saved.Version;
+            RememberRecentFile(saved.Path);
             query.IsDirty = query.EditRevision != revision || query.FileFormat != format;
             documents[query].Title = Path.GetFileName(saved.Path) + (query.IsDirty ? "*" : "");
             Status.Text = query.IsDirty ? "Snapshot saved; newer edits remain unsaved" : "Item saved";

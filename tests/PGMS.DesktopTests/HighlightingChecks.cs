@@ -50,8 +50,22 @@ internal static class HighlightingChecks
             }
             await SqlLineCommentChecks.RunAsync(check);
             await SqlEditingCommandChecks.RunAsync(check);
+            await SqlTextCommandChecks.RunAsync(check);
+            await SqlFormatChecks.RunAsync(check);
+            await EditorInfoBarChecks.RunAsync(check);
+            await QuickInfoChecks.RunAsync(check);
+            await BookmarkChecks.RunAsync(check);
+            await IssueChecks.RunAsync(check);
+            await HelpChecks.RunAsync(check);
+            await TemplateChecks.RunAsync(check);
+            await FileTabChecks.RunAsync(check);
+        await FindInFilesChecks.RunAsync(check);
+        await PaneChecks.RunAsync(check);
+        await PrintChecks.RunAsync(check);
+        await FontsAndColorsChecks.RunAsync(check);
             await WhitespaceChecks.RunAsync(check);
             await NavigationChecks.RunAsync(check);
+            await LongLineDisplayChecks.RunAsync(check); await EditorConvenienceChecks.RunAsync(check); await ToolWindowChecks.RunAsync(check); await SettingsTransferChecks.RunAsync(check); await CustomizationChecks.RunAsync(check); await ThemeChecks.RunAsync(check); await EditorAppearanceChecks.RunAsync(check); await SpellCheckerChecks.RunAsync(check); await ResultsAreaChecks.RunAsync(check); await TitleBarChecks.RunAsync(check); await SearchSettingsChecks.RunAsync(check); await CrashReportChecks.RunAsync(check);
             HighlightingCacheChecks.Run(editor,check);
             await DollarHighlightingChecks.RunAsync(view,editor,check);
         }

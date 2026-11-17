@@ -7,42 +7,143 @@
  xmlns:local="clr-namespace:PGMS.Desktop"
  xmlns:vm="clr-namespace:PGMS.Desktop.ViewModels"
  Title="PGMS — Postgres Management Studio" Icon="Resources/PGMS.ico" Width="1440" Height="900" MinWidth="900" MinHeight="600"
- Background="{StaticResource ShellBrush}" WindowStartupLocation="CenterScreen"
+ Background="{DynamicResource ShellBrush}" WindowStartupLocation="CenterScreen"
  Loaded="WindowLoaded" Closing="WindowClosing">
- <Window.Resources><local:CatalogIconConverter x:Key="CatalogIcon"/></Window.Resources>
- <DockPanel>
-  <Menu DockPanel.Dock="Top" Background="Transparent" Padding="4,2">
-   <MenuItem Header="_File">
-    <MenuItem Header="New _Query" Command="New" InputGestureText="Ctrl+N"/>
-    <MenuItem Header="_Open…" Command="Open" InputGestureText="Ctrl+O"/>
+ <!-- PGMS-048 (M1111): the menu sits in the title band, as in SSMS 22.11; Windows still does dragging, snapping, double click and the system menu. -->
+ <WindowChrome.WindowChrome><WindowChrome CaptionHeight="30" GlassFrameThickness="0,0,0,1" CornerRadius="0" UseAeroCaptionButtons="False"/></WindowChrome.WindowChrome>
+ <Window.Resources>
+  <local:CatalogIconConverter x:Key="CatalogIcon"/>
+  <Style x:Key="CaptionButton" TargetType="Button">
+   <Setter Property="Width" Value="44"/><Setter Property="Height" Value="30"/><Setter Property="Focusable" Value="False"/><Setter Property="Background" Value="Transparent"/>
+   <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Window}}"/>
+   <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border Background="{TemplateBinding Background}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Setter.Value></Setter>
+   <Style.Triggers>
+    <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#40FFFFFF"/></Trigger>
+    <Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="#66FFFFFF"/></Trigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="CloseCaptionButton" TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+   <Style.Triggers>
+    <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#E81123"/><Setter Property="Foreground" Value="White"/></Trigger>
+    <Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="#F1707A"/><Setter Property="Foreground" Value="White"/></Trigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="CaptionGlyph" TargetType="Path">
+   <Setter Property="Width" Value="10"/><Setter Property="Height" Value="10"/><Setter Property="StrokeThickness" Value="1"/><Setter Property="SnapsToDevicePixels" Value="True"/>
+   <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+  </Style>
+ </Window.Resources>
+ <DockPanel x:Name="ShellRoot">
+  <Grid x:Name="TitleBand" DockPanel.Dock="Top" Height="30">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <Image x:Name="TitleIcon" Source="Resources/PGMS.ico" Width="16" Height="16" Margin="8,0,6,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"
+    WindowChrome.IsHitTestVisibleInChrome="True" MouseLeftButtonUp="TitleIconClicked" ToolTip="PGMS — Postgres Management Studio" AutomationProperties.Name="System menu"/>
+   <StackPanel x:Name="CaptionButtons" Grid.Column="3" Orientation="Horizontal">
+    <Button x:Name="MinimizeButton" Style="{StaticResource CaptionButton}" Click="MinimizeClicked" ToolTip="Minimize" AutomationProperties.Name="Minimize"><Path Style="{StaticResource CaptionGlyph}" Data="M0,5.5 L10,5.5"/></Button>
+    <Button x:Name="MaximizeButton" Style="{StaticResource CaptionButton}" Click="MaximizeClicked" ToolTip="Maximize" AutomationProperties.Name="Maximize"><Path x:Name="MaximizeGlyph" Style="{StaticResource CaptionGlyph}" Data="M0.5,0.5 L9.5,0.5 9.5,9.5 0.5,9.5 Z"/></Button>
+    <Button x:Name="CloseButton" Style="{StaticResource CloseCaptionButton}" Click="CloseClicked" ToolTip="Close" AutomationProperties.Name="Close"><Path Style="{StaticResource CaptionGlyph}" Data="M0,0 L10,10 M10,0 L0,10"/></Button>
+   </StackPanel>
+  <Menu x:Name="MainMenu" Grid.Column="1" VerticalAlignment="Center" Background="Transparent" Padding="0,2" WindowChrome.IsHitTestVisibleInChrome="True">
+   <MenuItem x:Name="FileMenu" Header="_File" SubmenuOpened="FileMenuOpened">
+    <MenuItem x:Name="NewMenu" Header="_New">
+     <MenuItem x:Name="NewQueryCurrentMenu" Header="_Query with Current Connection" Command="New" InputGestureText="Ctrl+N" ToolTip="New query tab connected to the server of the active query or of Object Explorer"/>
+     <MenuItem x:Name="NewDatabaseEngineQueryMenu" Header="_Database Engine Query" Click="NewDatabaseEngineQuery" ToolTip="Asks for the connection, then opens a query tab on it"/>
+    </MenuItem>
+    <MenuItem x:Name="OpenMenu" Header="_Open">
+     <MenuItem x:Name="OpenFileMenu" Header="_File…" Command="Open" InputGestureText="Ctrl+O" ToolTip="Opens each file in a tab connected to the server of the active query or of Object Explorer; without one, the tab stays disconnected. Nothing is executed"/>
+     <MenuItem x:Name="OpenFileWithNewConnectionMenu" Header="File with New _Connection…" Click="OpenFileWithNewConnection" ToolTip="Opens each file in a tab with its own new connection to the server of the active query; nothing is executed"/>
+     <MenuItem x:Name="OpenFileDisconnectedMenu" Header="File _Disconnected…" Click="OpenFileDisconnected" ToolTip="Opens each file in a tab without connecting it"/>
+    </MenuItem>
     <MenuItem x:Name="OpenPlanFileMenu" Header="Open Execution _Plan…" Click="OpenPlanFile"/>
     <Separator/>
     <MenuItem Header="_Save" Command="Save" InputGestureText="Ctrl+S"/>
     <MenuItem Header="Save _As…" Click="SaveAs"/>
+    <MenuItem x:Name="SaveAllMenu" Header="Save A_ll" Command="{x:Static local:MainWindow.SaveAllCommand}" InputGestureText="Ctrl+Shift+S"/>
+    <Separator/><MenuItem x:Name="PageSetupMenu" Header="Page Set_up..." Click="PageSetupClicked" ToolTip="Paper size, orientation and margins for printing"/><MenuItem x:Name="PrintMenu" Header="_Print..." Click="PrintClicked" ToolTip="Prints the SQL of the active query tab, or its selection"/>
+    <Separator/><MenuItem x:Name="RecentFilesMenu" Header="Recent _Files"/>
     <Separator/><MenuItem Header="E_xit" Click="Exit"/>
    </MenuItem>
-   <MenuItem Header="_Edit">
+   <MenuItem x:Name="EditMenu" Header="_Edit" SubmenuOpened="EditMenuOpened">
     <MenuItem Header="_Undo" Command="Undo"/><MenuItem Header="_Redo" Command="Redo"/>
     <Separator/><MenuItem Header="Cu_t" Command="Cut"/><MenuItem Header="_Copy" Command="Copy"/><MenuItem Header="_Paste" Command="Paste"/>
-    <Separator/><MenuItem Header="_Find…" Click="Find" InputGestureText="Ctrl+F"/>
+    <MenuItem x:Name="ClipboardHistoryMenu" Header="Show Clip_board History" Command="{x:Static local:SqlEditorCommands.ShowClipboardHistory}" InputGestureText="Ctrl+Shift+V" ToolTip="What was copied or cut in the SQL editors of this session; choose one to paste it"/>
+    <MenuItem x:Name="DuplicateMenu" Header="_Duplicate" Command="{x:Static local:SqlEditorCommands.Duplicate}" ToolTip="Copies the selection right after it, or the current line below it. Ctrl+D stays Results to Grid, as in SSMS"/>
+    <Separator/><MenuItem x:Name="FindAndReplaceMenu" Header="_Find and Replace">
+     <MenuItem Header="_Quick Find" Click="Find" InputGestureText="Ctrl+F"/>
+     <MenuItem x:Name="ReplaceMenu" Header="Quick _Replace" Command="Replace" InputGestureText="Ctrl+H"/>
+     <MenuItem x:Name="FindInFilesMenu" Header="Find in _Files" Click="FindInFilesClicked"/>
+     <MenuItem x:Name="ReplaceInFilesMenu" Header="Replace in F_iles" Command="{x:Static local:MainWindow.ReplaceInFilesCommand}" InputGestureText="Ctrl+Shift+H"/>
+    </MenuItem>
     <MenuItem Header="Go To _Line…" Command="{x:Static local:QueryView.GoToLineCommand}" InputGestureText="Ctrl+G"/>
-    <MenuItem x:Name="ReplaceMenu" Header="_Replace…" Command="Replace" InputGestureText="Ctrl+H"/>
-    <Separator/><MenuItem x:Name="CommentSelectionMenu" Header="Comment Selection" Command="{x:Static local:SqlEditorCommands.Comment}" InputGestureText="Ctrl+K, Ctrl+C"/>
+    <MenuItem x:Name="NextIssueMenu" Header="Go To Next Issue in File" Command="{x:Static local:SqlBookmarkCommands.NextIssue}" InputGestureText="Alt+PgDn" ToolTip="The position of the error the server reported in the last run"/>
+    <MenuItem x:Name="PreviousIssueMenu" Header="Go To Previous Issue in File" Command="{x:Static local:SqlBookmarkCommands.PreviousIssue}" InputGestureText="Alt+PgUp"/>
+    <MenuItem x:Name="LastEditLocationMenu" Header="Go To Last Edit Location" Command="{x:Static local:SqlEditorCommands.GoToLastEditLocation}" InputGestureText="Ctrl+Shift+Backspace" ToolTip="The query tab changed last, at the place of the change"/>    <Separator/><MenuItem x:Name="InsertFileAsTextMenu" Header="Insert File As Te_xt…" Click="InsertFileAsText" ToolTip="Inserts the text of a file at the caret; nothing is executed"/>
+    <MenuItem x:Name="AdvancedEditMenu" Header="Ad_vanced" SubmenuOpened="AdvancedMenuOpened">
+     <MenuItem x:Name="SpellCheckerMenu" Header="Toggle Spell Checker" IsCheckable="False" Click="ToggleSpellChecker" ToolTip="Underlines misspelled words in comments and strings with the spell checker of Windows; off by default"/>
+     <MenuItem x:Name="FormatSqlMenu" Header="Format SQL" Command="{x:Static local:SqlEditorCommands.FormatSql}" InputGestureText="Ctrl+K, Ctrl+Q" ToolTip="Lays out the selection, or the whole document, as in SSMS; only spaces, line breaks and keyword case change, and nothing is executed"/>
+     <MenuItem x:Name="TabifyMenu" Header="Tabify Selected Lines" Command="{x:Static local:SqlEditorCommands.Tabify}"/>
+     <MenuItem x:Name="UntabifyMenu" Header="Untabify Selected Lines" Command="{x:Static local:SqlEditorCommands.Untabify}"/>
+     <MenuItem x:Name="MakeUppercaseMenu" Header="Make Uppercase" Command="{x:Static local:SqlEditorCommands.MakeUppercase}" InputGestureText="Ctrl+Shift+U"/>
+     <MenuItem x:Name="MakeLowercaseMenu" Header="Make Lowercase" Command="{x:Static local:SqlEditorCommands.MakeLowercase}" InputGestureText="Ctrl+Shift+L"/>
+     <MenuItem x:Name="MoveLinesUpMenu" Header="Move Selected Lines Up" Command="{x:Static local:SqlEditorCommands.MoveLinesUp}" InputGestureText="Alt+Up Arrow"/>
+     <MenuItem x:Name="MoveLinesDownMenu" Header="Move Selected Lines Down" Command="{x:Static local:SqlEditorCommands.MoveLinesDown}" InputGestureText="Alt+Down Arrow"/>
+     <MenuItem x:Name="DeleteHorizontalWhiteSpaceMenu" Header="Delete Horizontal White Space" Command="{x:Static local:SqlEditorCommands.DeleteHorizontalWhiteSpace}" InputGestureText="Ctrl+K, Ctrl+\"/>
+     <MenuItem x:Name="ExpandToBlockMenu" Header="Expand Selection to Containing Block" Command="{x:Static local:SqlEditorCommands.ExpandToContainingBlock}" InputGestureText="Shift+Alt+]" ToolTip="The parentheses around the selection, or its statement"/>
+     <MenuItem x:Name="ExpandSelectionMenu" Header="Expand Selection" Command="{x:Static local:SqlEditorCommands.ExpandSelection}" InputGestureText="Shift+Alt+=" ToolTip="Word, quoted text, parentheses, statement, document: the next larger one each time"/>
+     <MenuItem x:Name="AdvancedWhiteSpaceMenu" Header="View White Space" IsCheckable="True" Click="ToggleWhiteSpace" ToolTip="Show spaces and tabs in the active SQL document"/>
+     <MenuItem x:Name="AdvancedWordWrapMenu" Header="Word Wrap" IsCheckable="True" Click="ToggleWordWrap" ToolTip="Wrap SQL visually without inserting line breaks"/>
+     <MenuItem x:Name="IncrementalSearchMenu" Header="Incremental Search" Command="{x:Static local:SqlEditorCommands.IncrementalSearch}" ToolTip="Type to search forward; Ctrl+I or F3 for the next match, Enter or Esc to stop. Ctrl+I alone stays Generate SQL with AI"/>
+     <MenuItem x:Name="ToggleLineCommentMenu" Header="Toggle Line Comment" Command="{x:Static local:SqlEditorCommands.ToggleLineComment}" InputGestureText="Ctrl+/"/>
+     <MenuItem x:Name="ToggleBlockCommentMenu" Header="Toggle Block Comment" Command="{x:Static local:SqlEditorCommands.ToggleBlockComment}" InputGestureText="Ctrl+Shift+/"/>
+     <MenuItem x:Name="SortLinesMenu" Header="Sort Lines" Command="{x:Static local:SqlEditorCommands.SortLines}" InputGestureText="Shift+Alt+L, Shift+Alt+S"/>
+     <MenuItem x:Name="JoinLinesMenu" Header="Join Lines" Command="{x:Static local:SqlEditorCommands.JoinLines}" InputGestureText="Shift+Alt+L, Shift+Alt+J"/>
+     <MenuItem x:Name="NextSubwordMenu" Header="Next subword" Command="{x:Static local:SqlEditorCommands.NextSubword}" InputGestureText="Ctrl+Alt+Right Arrow"/>
+     <MenuItem x:Name="PreviousSubwordMenu" Header="Previous subword" Command="{x:Static local:SqlEditorCommands.PreviousSubword}" InputGestureText="Ctrl+Alt+Left Arrow"/>
+     <MenuItem x:Name="ExpandToLineMenu" Header="Expand Selection to Line" Command="{x:Static local:SqlEditorCommands.ExpandToLine}" InputGestureText="Shift+Alt+E"/>
+     <MenuItem x:Name="CommentSelectionMenu" Header="Comment Selection" Command="{x:Static local:SqlEditorCommands.Comment}" InputGestureText="Ctrl+K, Ctrl+C"/>
+     <MenuItem x:Name="UncommentSelectionMenu" Header="Uncomment Selection" Command="{x:Static local:SqlEditorCommands.Uncomment}" InputGestureText="Ctrl+K, Ctrl+U"/>
+     <MenuItem x:Name="IncreaseIndentMenu" Header="Increase Line Indent" Command="{x:Static local:SqlEditorCommands.IncreaseIndent}"/>
+     <MenuItem x:Name="DecreaseIndentMenu" Header="Decrease Line Indent" Command="{x:Static local:SqlEditorCommands.DecreaseIndent}"/>
+     <MenuItem x:Name="SetLineEndingsMenu" Header="Set End of Line Sequence"><MenuItem Header="CRLF" Command="{x:Static local:SqlEditorCommands.LineEndingsCrLf}"/><MenuItem Header="LF" Command="{x:Static local:SqlEditorCommands.LineEndingsLf}"/><MenuItem Header="CR" Command="{x:Static local:SqlEditorCommands.LineEndingsCr}"/></MenuItem>
+     <MenuItem x:Name="SetIndentationMenu" Header="Set Indentation"><MenuItem Header="Spaces" Command="{x:Static local:SqlEditorCommands.IndentWithSpaces}"/><MenuItem Header="Tabs" Command="{x:Static local:SqlEditorCommands.IndentWithTabs}"/></MenuItem>
+     <MenuItem x:Name="SetEncodingMenu" Header="Set Encoding"><MenuItem Header="Reopen with Encoding" Command="{x:Static local:SqlEditorCommands.ReopenWithEncoding}"/><MenuItem Header="Save with Encoding" Command="{x:Static local:SqlEditorCommands.SaveWithEncoding}"/></MenuItem>
+    </MenuItem>
+    <MenuItem x:Name="BookmarksMenu" Header="_Bookmarks">
+     <MenuItem Header="Toggle Bookmark" Command="{x:Static local:SqlBookmarkCommands.ToggleBookmark}" InputGestureText="Ctrl+K, Ctrl+K"/>
+     <MenuItem Header="Previous Bookmark" Command="{x:Static local:SqlBookmarkCommands.PreviousBookmark}" InputGestureText="Ctrl+K, Ctrl+P"/>
+     <MenuItem Header="Next Bookmark" Command="{x:Static local:SqlBookmarkCommands.NextBookmark}" InputGestureText="Ctrl+K, Ctrl+N"/>
+     <MenuItem Header="Clear Bookmarks" Command="{x:Static local:SqlBookmarkCommands.ClearBookmarks}" InputGestureText="Ctrl+K, Ctrl+L" ToolTip="Deletes the bookmarks of every query tab, after confirming"/>
+     <MenuItem Header="Previous Bookmark In Document" Command="{x:Static local:SqlBookmarkCommands.PreviousBookmarkInDocument}"/>
+     <MenuItem Header="Next Bookmark In Document" Command="{x:Static local:SqlBookmarkCommands.NextBookmarkInDocument}"/>
+     <MenuItem Header="Clear All Bookmarks In Document" Command="{x:Static local:SqlBookmarkCommands.ClearBookmarksInDocument}"/>
+    </MenuItem>
+    <MenuItem x:Name="OutliningMenu" Header="_Outlining" ToolTip="Ctrl+M stays Include Actual Execution Plan; the outlining commands have no shortcut">
+     <MenuItem Header="Toggle Outlining Expansion" Command="{x:Static local:SqlBookmarkCommands.ToggleOutliningExpansion}"/>
+     <MenuItem Header="Toggle All Outlining" Command="{x:Static local:SqlBookmarkCommands.ToggleAllOutlining}"/>
+     <MenuItem Header="Stop Outlining" Command="{x:Static local:SqlBookmarkCommands.StopOutlining}"/>
+     <MenuItem Header="Start Automatic Outlining" Command="{x:Static local:SqlBookmarkCommands.StartOutlining}"/>
+    </MenuItem>
     <MenuItem x:Name="IntelliSenseEditMenu" Header="_IntelliSense">
      <MenuItem x:Name="ListMembersMenu" Header="List _Members" InputGestureText="Ctrl+J" Click="ListMembers"/>
+     <MenuItem x:Name="ParameterInfoMenu" Header="_Parameter Info" InputGestureText="Ctrl+Shift+Space" Click="ParameterInfo" ToolTip="Signature of the function whose parentheses hold the caret, from the IntelliSense cache"/>
+     <MenuItem x:Name="QuickInfoMenu" Header="_Quick Info" InputGestureText="Ctrl+K, Ctrl+I" Click="QuickInfo" ToolTip="What the name at the caret is (table, view, column, function or schema), from the IntelliSense cache"/>
      <MenuItem x:Name="CompleteWordMenu" Header="Complete _Word" InputGestureText="Ctrl+Space" Click="ListMembers"/>
      <MenuItem x:Name="RefreshCacheMenu" Header="_Refresh Local Cache" InputGestureText="Ctrl+Shift+R" Click="RefreshLocalCache"/>
+     <MenuItem x:Name="SurroundWithMenu" Header="_Surround With…" InputGestureText="Ctrl+K, Ctrl+S" Click="SurroundWithClicked" ToolTip="Wraps the selection in a snippet (transaction, DO block, IF, WHILE…)"/>
+     <MenuItem x:Name="InsertSnippetMenu" Header="Insert S_nippet…" InputGestureText="Ctrl+K, Ctrl+X" Click="InsertSnippetClicked" ToolTip="Inserts a code snippet; Tab moves between its fields"/>
     </MenuItem>
-    <MenuItem x:Name="UncommentSelectionMenu" Header="Uncomment Selection" Command="{x:Static local:SqlEditorCommands.Uncomment}" InputGestureText="Ctrl+K, Ctrl+U"/>
    </MenuItem>
-   <MenuItem Header="_View" SubmenuOpened="ViewMenuOpened"><MenuItem Header="Object _Explorer" Click="ShowExplorer" InputGestureText="F8"/><MenuItem Header="Re_gistered Servers" Click="ShowRegisteredServers" InputGestureText="Ctrl+Alt+G" ToolTip="Saved connection profiles organized in server groups"/><MenuItem x:Name="ActivityMonitorMenu" Header="Activity _Monitor" Click="ShowActivity" InputGestureText="Ctrl+Alt+A" ToolTip="Opens a document tab; a tab already monitoring the same server and user is activated"/><MenuItem Header="Query Statistics…" Click="ShowQueryStatistics" ToolTip="Read-only pg_stat_statements view; the extension must already be loaded and created"/><MenuItem x:Name="QueryHistoryMenu" Header="Query _History…" Click="ShowQueryHistory" InputGestureText="Ctrl+Alt+H" ToolTip="Queries executed in PGMS query tabs, recorded on this computer and encrypted for this Windows user; never sent to a server"/><Separator/><MenuItem x:Name="WordWrapMenu" Header="Word Wrap" IsCheckable="True" Click="ToggleWordWrap" ToolTip="Wrap SQL visually without inserting line breaks"/><MenuItem x:Name="WhiteSpaceMenu" Header="Show White Space" IsCheckable="True" Click="ToggleWhiteSpace" ToolTip="Show spaces and tabs in the active SQL document"/></MenuItem>
+   <MenuItem Header="_View" SubmenuOpened="ViewMenuOpened"><MenuItem Header="Object _Explorer" Click="ShowExplorer" InputGestureText="F8"/><MenuItem x:Name="ObjectExplorerDetailsMenu" Header="Object Explorer _Details" Click="ShowObjectExplorerDetails" InputGestureText="F7" ToolTip="A document listing what the node selected in Object Explorer contains; it follows the selection"/><MenuItem Header="Re_gistered Servers" Click="ShowRegisteredServers" InputGestureText="Ctrl+Alt+G" ToolTip="Saved connection profiles organized in server groups"/><MenuItem x:Name="TemplateExplorerMenu" Header="_Template Explorer" Click="ShowTemplateExplorer" InputGestureText="Ctrl+Alt+T" ToolTip="PostgreSQL templates grouped in folders, plus your own .sql files; opening one starts a query tab"/><MenuItem x:Name="ErrorListMenu" Header="Error L_ist" Click="ShowErrorList" InputGestureText="Ctrl+\, E" ToolTip="The error of the last run of each open query tab; double-click goes to it"/><MenuItem x:Name="OutputMenu" Header="_Output" Click="ShowOutput" InputGestureText="Ctrl+Alt+O" ToolTip="Messages and executions of this session, with the time"/><MenuItem x:Name="ActivityMonitorMenu" Header="Activity _Monitor" Click="ShowActivity" InputGestureText="Ctrl+Alt+A" ToolTip="Opens a document tab; a tab already monitoring the same server and user is activated"/><MenuItem Header="Query Statistics…" Click="ShowQueryStatistics" ToolTip="Read-only pg_stat_statements view; the extension must already be loaded and created"/><MenuItem x:Name="QueryHistoryMenu" Header="Query _History…" Click="ShowQueryHistory" InputGestureText="Ctrl+Alt+H" ToolTip="Queries executed in PGMS query tabs, recorded on this computer and encrypted for this Windows user; never sent to a server"/><Separator/><MenuItem x:Name="WordWrapMenu" Header="Word Wrap" IsCheckable="True" Click="ToggleWordWrap" ToolTip="Wrap SQL visually without inserting line breaks"/><MenuItem x:Name="WhiteSpaceMenu" Header="Show White Space" IsCheckable="True" Click="ToggleWhiteSpace" ToolTip="Show spaces and tabs in the active SQL document"/><Separator/><MenuItem x:Name="PresenterModeMenu" Header="_Presenter Mode" SubmenuOpened="PresenterModeMenuOpened"><MenuItem x:Name="TogglePresenterModeMenu" Header="Toggle _Presenter Mode" Command="{x:Static local:MainWindow.PresenterModeCommand}" InputGestureText="Ctrl+Shift+F5" ToolTip="Larger fonts in the editor, the results and the main window, for this session"/><MenuItem Header="_Edit Presenter Mode Settings" Click="EditPresenterModeSettings"/><MenuItem Header="_Restore Default Font Settings" Click="RestoreDefaultFontSettingsClicked" ToolTip="Fonts and sizes of Fonts and Colors back to the PGMS defaults; colors are kept"/></MenuItem><MenuItem x:Name="ToolbarsMenu" Header="_Toolbars" SubmenuOpened="ToolbarsMenuOpened"><MenuItem x:Name="StandardToolbarMenu" Header="Standard" IsCheckable="True" Click="ToggleToolbar" Tag="Standard"/><MenuItem x:Name="SqlEditorToolbarMenu" Header="SQL Editor" IsCheckable="True" Click="ToggleToolbar" Tag="SQL Editor"/><Separator/><MenuItem Header="_Customize…" Click="ShowCustomize"/></MenuItem><MenuItem x:Name="FullScreenMenu" Header="F_ull Screen" IsCheckable="False" Command="{x:Static local:MainWindow.FullScreenCommand}" InputGestureText="Shift+Alt+Enter" ToolTip="No title bar or toolbars; the same command returns"/><MenuItem x:Name="PropertiesWindowMenu" Header="Propert_ies Window" Click="ShowPropertiesWindow" InputGestureText="F4" ToolTip="Docked window with the properties of the active document; for a query tab, its connection and last execution"/></MenuItem>
    <MenuItem Header="_Query">
     <MenuItem x:Name="ConnectionMenu" Header="Co_nnection" SubmenuOpened="ConnectionMenuOpened">
      <MenuItem x:Name="QueryConnectMenu" Header="_Connect…" Click="QueryConnect"/>
      <MenuItem x:Name="QueryDisconnectMenu" Header="_Disconnect" Click="QueryDisconnect"/>
+     <MenuItem x:Name="DisconnectAllQueriesMenu" Header="Disconnect _All Queries" Click="DisconnectAllQueries" ToolTip="Disconnects every query tab; Object Explorer stays connected"/>
      <MenuItem x:Name="QueryChangeConnectionMenu" Header="Change C_onnection…" Click="QueryChangeConnection"/>
     </MenuItem>
     <MenuItem x:Name="OpenServerMenu" Header="Open Ser_ver in Object Explorer" InputGestureText="Alt+F8" Click="OpenServerInExplorer" IsEnabled="False"/>
+    <MenuItem x:Name="SpecifyTemplateParametersMenu" Header="Specify Values for Te_mplate Parameters…" Command="{x:Static local:MainWindow.SpecifyTemplateParametersCommand}" InputGestureText="Ctrl+Shift+M" ToolTip="Fills every &lt;name, type, value&gt; parameter of the query"/>
     <Separator/>
     <MenuItem Header="_Execute" Click="Execute" InputGestureText="Alt+X" x:Name="ExecuteMenu" IsEnabled="False"/>
     <MenuItem Header="_Cancel Executing Query" Click="CancelQuery" InputGestureText="Alt+Break" x:Name="CancelMenu" IsEnabled="False"/>
@@ -54,7 +155,8 @@
     <MenuItem x:Name="DesignQueryMenu" Header="_Design Query in Editor…" Command="{x:Static local:MainWindow.DesignQueryInEditor}" InputGestureText="Ctrl+Shift+Q"/>
     <Separator/>
     <MenuItem x:Name="ActualPlanMenu" Header="Include Actual Execution _Plan" InputGestureText="Ctrl+M" Click="ToggleActualPlan" IsEnabled="False"/>
-    <MenuItem x:Name="ClientStatisticsMenu" Header="Include C_lient Statistics" InputGestureText="Shift+Alt+S" Click="ToggleClientStatistics" IsEnabled="False"/>
+    <MenuItem x:Name="LiveStatisticsMenu" Header="Include Li_ve Query Statistics" Click="ToggleLiveStatistics" IsEnabled="False" ToolTip="While the query runs: state, waits, blocking and the progress PostgreSQL reports (no live plan)"/>
+                <MenuItem x:Name="ClientStatisticsMenu" Header="Include C_lient Statistics" InputGestureText="Shift+Alt+S" Click="ToggleClientStatistics" IsEnabled="False"/>
     <MenuItem x:Name="ResetClientStatisticsMenu" Header="Reset Client Statistics" Click="ResetClientStatistics" IsEnabled="False"/>
     <Separator/>
     <MenuItem x:Name="ResultsToMenu" Header="Results _To" SubmenuOpened="ResultsToMenuOpened">
@@ -64,7 +166,7 @@
     </MenuItem>
     <MenuItem x:Name="QueryOptionsMenu" Header="Query _Options…" Command="{x:Static local:MainWindow.ShowQueryOptions}" Icon="{StaticResource QueryOptionsIcon}"/>
     <Separator/>
-    <MenuItem x:Name="GenerateSqlMenu" Header="Generate SQL with _AI…" Command="{x:Static local:MainWindow.GenerateSqlWithAi}" InputGestureText="Ctrl+I"/>
+    <MenuItem x:Name="GenerateSqlMenu" Header="Generate SQL with _AI…" Command="{x:Static local:MainWindow.GenerateSqlWithAi}" InputGestureText="Ctrl+I"/><MenuItem x:Name="ExplainSqlAiMenu" Header="Explain SQL with AI…" Click="ExplainSqlWithAi" ToolTip="Opens the AI assistant with the selected SQL (or the whole query) and a request to explain it; nothing is sent until Generate"/><MenuItem x:Name="FixSqlAiMenu" Header="Fix SQL with AI…" Click="FixSqlWithAi" ToolTip="Opens the AI assistant with the SQL and the SQLSTATE and message of the last error; nothing is sent until Generate"/><MenuItem x:Name="OptimizeSqlAiMenu" Header="Optimize SQL with AI…" Click="OptimizeSqlWithAi" ToolTip="Opens the AI assistant with the SQL and a request to make it faster without changing its results; nothing is sent until Generate"/>
    </MenuItem>
    <MenuItem x:Name="TableDesignerMenu" Header="Table _Designer" Visibility="Collapsed" SubmenuOpened="TableDesignerMenuOpened">
     <MenuItem x:Name="DesignerPrimaryKeyMenu" Header="Set Primary Key" Icon="{StaticResource DesignerIconKey}" Click="DesignerPrimaryKey"/>
@@ -97,26 +199,68 @@
     <MenuItem x:Name="BackupGlobalsMenu" Header="Back Up Global Objects…" Click="BackupGlobals" IsEnabled="False"/>
     <MenuItem x:Name="RestoreGlobalsMenu" Header="Restore Global Objects…" Click="RestoreGlobals" IsEnabled="False"/>
     <Separator/>
+    <MenuItem x:Name="SchemaCompareMenu" Header="S_chema Compare" Click="ShowSchemaCompare" ToolTip="Compare the structure of two databases and generate the script that makes the target look like the source; the script is never run"/>
+    <Separator/>
     <MenuItem x:Name="AiSettingsMenu" Header="AI Assistant Settings…" Click="AiAssistantSettings"/>
+    <MenuItem x:Name="ExternalToolsMenu" Header="E_xternal Tools…" Click="ShowExternalTools" ToolTip="Programs of this computer added to the Tools menu; each one runs only when you pick it"/>
+    <MenuItem x:Name="ThemeMenu" Header="_Theme" SubmenuOpened="ThemeMenuOpened">
+     <MenuItem Header="_Light" Tag="Light" Click="ThemeMenuClicked"/>
+     <MenuItem Header="_Dark" Tag="Dark" Click="ThemeMenuClicked"/>
+     <MenuItem Header="Use _system setting" Tag="System" Click="ThemeMenuClicked" ToolTip="Light or dark as Windows is set for apps; follows a change while PGMS is open"/>
+    </MenuItem>
+    <MenuItem x:Name="EditorAppearanceMenu" Header="Editor _Appearance" SubmenuOpened="EditorAppearanceMenuOpened">
+     <MenuItem Header="_Match Theme" Tag="MatchTheme" Click="EditorAppearanceClicked" ToolTip="Editor colors follow Tools ▸ Theme"/>
+     <MenuItem Header="_Light" Tag="Light" Click="EditorAppearanceClicked"/>
+     <MenuItem Header="_Dark" Tag="Dark" Click="EditorAppearanceClicked"/>
+     <MenuItem Header="Light _Extra Contrast" Tag="LightExtraContrast" Click="EditorAppearanceClicked"/>
+     <MenuItem Header="Dark E_xtra Contrast" Tag="DarkExtraContrast" Click="EditorAppearanceClicked"/>
+    </MenuItem>
+    <MenuItem x:Name="ImportExportSettingsMenu" Header="_Import and Export Settings…" Click="ImportExportSettings" ToolTip="Save the Tools ▸ Options settings to a file, load them from one, or reset them to the defaults"/>
+    <MenuItem x:Name="CustomizeMenu" Header="_Customize…" Click="ShowCustomize" ToolTip="Show or hide the toolbars; keyboard shortcuts are in Options ▸ Environment ▸ Keyboard"/>
     <MenuItem x:Name="OptionsMenu" Header="_Options…" Click="ShowOptions"/>
    </MenuItem>
    <MenuItem Header="_Permissions"><MenuItem Header="Object Permissions…" Click="ObjectPermissions"/><MenuItem x:Name="DefaultPermissionsMenu" Header="Default Permissions…" Click="DefaultPermissions"/><MenuItem Header="Role Properties…" Click="RoleProperties"/><MenuItem Header="Role Memberships…" Click="RoleMemberships"/><MenuItem Header="Rename Role…" Click="RenameRole"/><MenuItem Header="Drop Role…" Click="DropRole"/><MenuItem Header="Set Role Password…" Click="SetRolePassword"/></MenuItem>
-   <MenuItem Header="_Window"><MenuItem Header="Reset Window _Layout" Click="ResetLayout"/></MenuItem>
-   <MenuItem Header="_Help"><MenuItem Header="_About PGMS" Click="About"/></MenuItem>
+   <MenuItem x:Name="WindowMenu" Header="_Window" SubmenuOpened="WindowMenuOpened">
+    <MenuItem x:Name="NextPaneMenu" Header="Ne_xt Pane" Command="{x:Static local:MainWindow.NextPaneCommand}" InputGestureText="F6" ToolTip="Moves between the SQL editor, its split view and the results"/>
+    <MenuItem x:Name="PreviousPaneMenu" Header="Pre_vious Pane" Command="{x:Static local:MainWindow.PreviousPaneCommand}" InputGestureText="Shift+F6"/>
+    <MenuItem x:Name="ShowResultsPaneMenu" Header="Show Results _Pane" Command="{x:Static local:MainWindow.ShowResultsPaneCommand}" InputGestureText="Ctrl+R" ToolTip="Hides or shows Results and Messages; running a query shows them again"/>
+    <MenuItem x:Name="SplitTabMenu" Header="Split Tab" Click="SplitTabClicked" ToolTip="A second view of the same SQL above the editor"/>
+    <MenuItem x:Name="DockMenu" Header="_Dock" Click="DockActiveClicked"/>
+    <MenuItem x:Name="AutoHideMenu" Header="A_uto Hide" Click="AutoHideActiveClicked"/>
+    <MenuItem x:Name="MoveToNewWindowMenu" Header="_Move To New Window" Click="FloatActiveClicked"/>
+    <MenuItem x:Name="SaveWindowLayoutMenu" Header="_Save Window Layout" Click="SaveWindowLayoutClicked"/>
+    <MenuItem x:Name="ApplyLayoutMenu" Header="Appl_y Window Layout"><MenuItem Header="No Saved Layouts" IsEnabled="False"/></MenuItem>
+    <MenuItem x:Name="ManageLayoutsMenu" Header="Ma_nage Window Layouts" Click="ManageWindowLayoutsClicked"/>
+    <MenuItem Header="Reset Window _Layout" Click="ResetLayout"/>
+    <MenuItem x:Name="AutoHideAllMenu" Header="Auto Hide A_ll" Click="AutoHideAllClicked"/>
+    <MenuItem x:Name="CloseAllTabsMenu" Header="Close _All Tabs" Click="CloseAllTabs"/>
+    <MenuItem x:Name="RestoreClosedTabMenu" Header="_Restore Closed Tab" InputGestureText="Ctrl+K, Ctrl+Z" Click="RestoreClosedTab" ToolTip="Reopens the last closed query tab: a file from disk, or a query without file with the text it had. Not connected"/>
+    <MenuItem x:Name="WindowsDialogMenu" Header="_Windows…" Click="ShowWindowsDialog"/>
+   </MenuItem>
+   <MenuItem x:Name="HelpMenu" Header="_Help"><MenuItem x:Name="ViewHelpMenu" Header="View _Help" Command="{x:Static local:MainWindow.ViewHelpCommand}" InputGestureText="Ctrl+F1" ToolTip="Opens the guide shipped with PGMS (READ-ME.md or LEIA-ME.md)"/><Separator/><MenuItem x:Name="ReleaseNotesMenu" Header="_Release Notes" Click="ReleaseNotesClicked" ToolTip="Opens the release list of the project in the browser"/><Separator/><MenuItem Header="_About PGMS" Click="About"/></MenuItem>
+   <!-- SSMS 22.11 puts Search after Help in the title band; PGMS searches its menu commands (Feature Search), not code or settings. -->
+   <MenuItem x:Name="FeatureSearchMenu" Header="Search" Click="FeatureSearchClicked" AutomationProperties.Name="Search" ToolTip="Searches the menu commands and the Tools ▸ Options settings of PGMS (Ctrl+Q)">
+    <MenuItem.Icon><Path Width="13" Height="13" StrokeThickness="1.2" VerticalAlignment="Center" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=MenuItem}}" Data="M8.6,8.6 L12.5,12.5 M0.6,5.2 A4.6,4.6 0 1 0 9.8,5.2 A4.6,4.6 0 1 0 0.6,5.2 Z"/></MenuItem.Icon>
+   </MenuItem>
   </Menu>
-  <ToolBarTray DockPanel.Dock="Top" Background="Transparent" Margin="4,0,4,2">
-   <ToolBar Band="0" BandIndex="0">
-    <Button Command="Open" ToolTip="Open File (Ctrl+O)"><StackPanel Orientation="Horizontal"><Path Width="15" Height="13" Stretch="Fill" Stroke="#3B566B" Fill="#F3D280" Data="M0,2 L5,2 7,4 15,4 13,13 0,13 Z M0,2 L0,0 5,0 7,2 14,2 14,4"/><TextBlock Text="Open" Margin="5,0"/></StackPanel></Button>
-    <Button Command="Save" ToolTip="Save (Ctrl+S)"><Path Width="14" Height="14" Stretch="Fill" Stroke="#395D7A" Fill="#DAE8F2" Data="M0,0 L12,0 14,2 14,14 0,14 Z M3,0 L3,5 10,5 10,0 M3,14 L3,8 11,8 11,14"/></Button>
+  </Grid>
+  <ToolBarTray x:Name="MainToolBars" DockPanel.Dock="Top" Background="Transparent" Margin="4,0,4,2">
+   <ToolBarTray.Resources>
+    <!-- Drawn icons keep their colors when a button is disabled; SSMS 22.11 greys them (M1067). -->
+    <Style TargetType="Path"><Style.Triggers><DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType=ButtonBase}}" Value="False"><Setter Property="Opacity" Value="0.4"/></DataTrigger></Style.Triggers></Style>
+   </ToolBarTray.Resources>
+   <ToolBar x:Name="StandardToolBar" Band="0" BandIndex="0" AutomationProperties.Name="Standard">
+    <Button Command="Open" ToolTip="Open File (Ctrl+O)" AutomationProperties.Name="Open File"><StackPanel Orientation="Horizontal"><Path Width="15" Height="13" Stretch="Fill" Stroke="#3B566B" Fill="#F3D280" Data="M0,2 L5,2 7,4 15,4 13,13 0,13 Z M0,2 L0,0 5,0 7,2 14,2 14,4"/><TextBlock Text="Open" Margin="5,0"/></StackPanel></Button>
+    <Button Command="Save" ToolTip="Save (Ctrl+S)" AutomationProperties.Name="Save"><Path Width="14" Height="14" Stretch="Fill" Stroke="#395D7A" Fill="#DAE8F2" Data="M0,0 L12,0 14,2 14,14 0,14 Z M3,0 L3,5 10,5 10,0 M3,14 L3,8 11,8 11,14"/></Button>
     <Separator/>
-    <Button Command="New" ToolTip="New Query (Ctrl+N)"><StackPanel Orientation="Horizontal"><Path Width="14" Height="15" Stretch="Fill" Fill="#FFFFFF" Stroke="#526675" Data="M0,0 L9,0 14,5 14,15 0,15 Z M9,0 L9,5 14,5 M3,8 L11,8 M3,11 L10,11"/><TextBlock Text="New Query" Margin="5,0"/></StackPanel></Button>
+    <Button Command="New" ToolTip="New Query (Ctrl+N)" AutomationProperties.Name="New Query"><StackPanel Orientation="Horizontal"><Path Width="14" Height="15" Stretch="Fill" Fill="#FFFFFF" Stroke="#526675" Data="M0,0 L9,0 14,5 14,15 0,15 Z M9,0 L9,5 14,5 M3,8 L11,8 M3,11 L10,11"/><TextBlock Text="New Query" Margin="5,0"/></StackPanel></Button>
    </ToolBar>
-   <ToolBar Band="1" BandIndex="0">
+   <ToolBar x:Name="SqlEditorToolBar" Band="1" BandIndex="0" AutomationProperties.Name="SQL Editor">
     <Button Click="Connect" Content="Connect…" ToolTip="Connect to PostgreSQL"/>
     <Separator/>
     <ComboBox x:Name="DatabaseName" Width="172" IsEnabled="False" ToolTipService.ShowOnDisabled="True" DropDownOpened="DatabaseBoxOpened" DropDownClosed="DatabaseBoxClosed" AutomationProperties.Name="Available Databases"/>
-    <Button x:Name="ExecuteButton" Click="Execute" IsEnabled="False" ToolTip="Execute (F5)"><StackPanel Orientation="Horizontal"><Path Width="10" Height="12" Stretch="Fill" Fill="#2D7D3B" Data="M0,0 L10,6 0,12 Z"/><TextBlock Text="Execute" Margin="5,0"/></StackPanel></Button>
-    <Button x:Name="CancelButton" Click="CancelQuery" IsEnabled="False" ToolTip="Cancel Executing Query"><Path Width="10" Height="10" Fill="#AB3E3E" Data="M0,0 L10,0 10,10 0,10 Z"/></Button>
+    <Button x:Name="ExecuteButton" Click="Execute" IsEnabled="False" ToolTip="Execute (F5)" AutomationProperties.Name="Execute"><StackPanel Orientation="Horizontal"><Path Width="10" Height="12" Stretch="Fill" Fill="#2D7D3B" Data="M0,0 L10,6 0,12 Z"/><TextBlock Text="Execute" Margin="5,0"/></StackPanel></Button>
+    <Button x:Name="CancelButton" Click="CancelQuery" IsEnabled="False" ToolTip="Cancel Executing Query" AutomationProperties.Name="Cancel Executing Query"><Path Width="10" Height="10" Fill="#AB3E3E" Data="M0,0 L10,0 10,10 0,10 Z"/></Button>
     <Separator/>
     <Button x:Name="EstimatedPlanButton" Click="DisplayEstimatedPlan" IsEnabled="False" ToolTip="Display Estimated Execution Plan (Ctrl+L)" AutomationProperties.Name="Display Estimated Execution Plan"><Path Width="16" Height="14" Stretch="Fill" Stroke="#2B5797" Fill="#DDE8F5" Data="M0,4 L6,4 6,10 0,10 Z M10,0 L16,0 16,5 10,5 Z M10,9 L16,9 16,14 10,14 Z M6,7 L8,7 8,2.5 10,2.5 M8,7 L8,11.5 10,11.5"/></Button>
     <ToggleButton x:Name="ActualPlanButton" Click="ToggleActualPlan" IsEnabled="False" ToolTip="Include Actual Execution Plan (Ctrl+M)" AutomationProperties.Name="Include Actual Execution Plan"><Path Width="16" Height="14" Stretch="Fill" Stroke="#2D7D3B" Fill="#DCEFDF" Data="M0,4 L6,4 6,10 0,10 Z M10,0 L16,0 16,5 10,5 Z M10,9 L16,9 16,14 10,14 Z M6,7 L8,7 8,2.5 10,2.5 M8,7 L8,11.5 10,11.5"/></ToggleButton>
@@ -128,11 +272,11 @@
     <Button x:Name="QueryOptionsButton" Command="{x:Static local:MainWindow.ShowQueryOptions}" ToolTip="Query Options" AutomationProperties.Name="Query Options" Content="{StaticResource QueryOptionsIcon}"/>
    </ToolBar>
   </ToolBarTray>
-  <StatusBar DockPanel.Dock="Bottom" Background="#425C6C" Foreground="White">
+  <StatusBar DockPanel.Dock="Bottom" Background="{DynamicResource Pgms.StatusBarBackground}" Foreground="{DynamicResource Pgms.StatusBarText}">
    <StatusBarItem><TextBlock x:Name="Status" Text="Ready"/></StatusBarItem>
    <Separator/><StatusBarItem HorizontalAlignment="Right"><TextBlock Text="PGMS · Development build"/></StatusBarItem>
   </StatusBar>
-  <ad:DockingManager x:Name="DockManager" Margin="5,2,5,4" Background="{StaticResource ShellBrush}" ActiveContentChanged="ActiveChanged">
+  <ad:DockingManager x:Name="DockManager" Margin="5,2,5,4" Background="{DynamicResource ShellBrush}" ActiveContentChanged="ActiveChanged">
    <ad:DockingManager.Resources>
     <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.Background}" Color="#A8C7D9"/>
     <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.TabBackground}" Color="#A8C7D9"/>
@@ -144,13 +288,22 @@
     <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabUnselectedText}" Color="#1E1E1E"/>
     <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabUnselectedHoveredText}" Color="#1E1E1E"/>
     <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabSelectedInactiveText}" Color="#1E1E1E"/>
+    <!-- SSMS 22.11 blue draws the selected document tab light (#F7FAFC) with dark text, focused or not; VS2026 blue fills it dark teal (M1067). -->
+    <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabSelectedActiveBackground}" Color="#F7FAFC"/>
+    <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabSelectedActiveText}" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabSelectedInactiveBackground}" Color="#F7FAFC"/>
+    <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabButtonSelectedActiveGlyph}" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.DocumentWellTabButtonSelectedInactiveGlyph}" Color="#1E1E1E"/>
+    <!-- SSMS tool window captions have no dotted grip (M1067). -->
+    <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.ToolWindowCaptionActiveGrip}" Color="#F5FAFE"/>
+    <SolidColorBrush x:Key="{x:Static themeKeys:ResourceKeys.ToolWindowCaptionInactiveGrip}" Color="#F5FAFE"/>
    </ad:DockingManager.Resources>
    <ad:DockingManager.Theme><theme:VS2026BlueTheme/></ad:DockingManager.Theme>
    <ad:LayoutRoot>
     <ad:LayoutPanel Orientation="Horizontal">
      <ad:LayoutAnchorablePane DockWidth="300">
       <ad:LayoutAnchorable Title="Object Explorer" ContentId="explorer" CanClose="False" CanHide="True">
-       <DockPanel x:Name="ExplorerContent" Background="{StaticResource PanelBrush}">
+       <DockPanel x:Name="ExplorerContent" Background="{DynamicResource PanelBrush}">
         <DockPanel x:Name="ExplorerToolbar" DockPanel.Dock="Top" Margin="4,3,4,2" LastChildFill="False">
          <DockPanel.Resources>
           <Style x:Key="ExplorerToolButton" TargetType="Button" BasedOn="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"><Setter Property="Padding" Value="4,3"/><Setter Property="Margin" Value="1,0"/><Setter Property="ToolTipService.ShowOnDisabled" Value="True"/></Style>
@@ -164,8 +317,8 @@
          <Button x:Name="ExplorerFilterButton" Style="{StaticResource ExplorerToolButton}" Click="OpenExplorerFilter" IsEnabled="False" ToolTip="Filter" AutomationProperties.Name="Filter"><Image x:Name="ExplorerFilterIcon"/></Button>
          <Button x:Name="ExplorerRefreshButton" Style="{StaticResource ExplorerToolButton}" Click="RefreshExplorer" ToolTip="Refresh (F5)" AutomationProperties.Name="Refresh"><Image x:Name="ExplorerRefreshIcon"/></Button>
         </DockPanel>
-        <TreeView x:Name="ExplorerTree" SelectedItemChanged="ExplorerSelectionChanged" BorderThickness="0" Background="{StaticResource PanelBrush}" Padding="5" AutomationProperties.Name="Object Explorer Hierarchy" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.CacheLengthUnit="Item" VirtualizingPanel.CacheLength="8" TreeViewItem.Expanded="ExplorerExpanded" PreviewMouseRightButtonDown="ExplorerRightClick" ContextMenuOpening="ExplorerMenuOpening" MouseDoubleClick="ExplorerDoubleClick" PreviewMouseLeftButtonDown="ExplorerLeftClick" KeyDown="ExplorerKeyDown">
-         <TreeView.ItemContainerStyle><Style TargetType="TreeViewItem" BasedOn="{StaticResource SsmsTreeViewItem}"><Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/><Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/></Style></TreeView.ItemContainerStyle>
+        <TreeView x:Name="ExplorerTree" SelectedItemChanged="ExplorerSelectionChanged" BorderThickness="0" Background="{DynamicResource PanelBrush}" Padding="5" AutomationProperties.Name="Object Explorer Hierarchy" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.CacheLengthUnit="Item" VirtualizingPanel.CacheLength="8" TreeViewItem.Expanded="ExplorerExpanded" PreviewMouseRightButtonDown="ExplorerRightClick" ContextMenuOpening="ExplorerMenuOpening" MouseDoubleClick="ExplorerDoubleClick" PreviewMouseLeftButtonDown="ExplorerLeftClick" KeyDown="ExplorerKeyDown">
+         <TreeView.ItemContainerStyle><Style TargetType="TreeViewItem" BasedOn="{StaticResource SsmsTreeViewItem}"><Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/><Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/><Setter Property="AutomationProperties.Name" Value="{Binding Name}"/></Style></TreeView.ItemContainerStyle>
          <TreeView.ItemTemplate>
           <HierarchicalDataTemplate DataType="{x:Type vm:CatalogNode}" ItemsSource="{Binding Children}">
            <StackPanel Orientation="Horizontal" ToolTip="{Binding Error}">

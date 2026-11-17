@@ -3,6 +3,13 @@ using Npgsql;
 
 namespace PGMS.PostgreSql;
 
+/// <summary>Connection facts for the Properties window (PGMS-070): host and port as connected, login, backend PID, server version, requested SSL mode and open time.</summary>
+public sealed record QueryConnectionDetails(string Host, int Port, string UserName, int BackendPid, string ServerVersion, string SslMode, DateTimeOffset OpenedAt)
+{
+    /// <summary>host, or host:port when the port is not 5432.</summary>
+    public string ServerName => Port == 5432 ? Host : $"{Host}:{Port.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+}
+
 public sealed record QueryResult(IReadOnlyList<DataTable> Tables, int RecordsAffected, bool Truncated, QueryLimitReason LimitReasons = QueryLimitReason.None);
 
 /// <summary>Owns one physical connection for the lifetime of an editor tab.</summary>
@@ -15,8 +22,15 @@ public sealed partial class QuerySession : IAsyncDisposable
 
     public QuerySession(string connectionString) => connection = new(connectionString);
 
+    /// <summary>What Npgsql knows about the open connection, read once when it opened (no round trip); null before that.</summary>
+    public QueryConnectionDetails? Details { get; private set; }
+
     public async Task OpenAsync(CancellationToken token = default)
-    {await connection.OpenAsync(token).ConfigureAwait(false);sessionIdentity=Guid.NewGuid();}
+    {
+        await connection.OpenAsync(token).ConfigureAwait(false);sessionIdentity=Guid.NewGuid();
+        var settings = new NpgsqlConnectionStringBuilder(connection.ConnectionString);
+        Details = new(connection.Host ?? settings.Host ?? "", connection.Port, connection.UserName ?? settings.Username ?? "", connection.ProcessID, connection.ServerVersion, settings.SslMode.ToString(), DateTimeOffset.Now);
+    }
 
     // Materialized callers share the same display budgets and draining semantics as the UI.
     public Task<QueryResult> ExecuteAsync(string sql, CancellationToken token = default)

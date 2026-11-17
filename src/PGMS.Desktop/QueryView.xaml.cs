@@ -24,9 +24,9 @@ public partial class QueryView : UserControl, IAsyncDisposable
     public long EditRevision { get; private set; }
     public string? FilePath { get; internal set; }
     public SqlFileVersion? FileVersion { get; internal set; }
-    public SqlFileFormat FileFormat { get; internal set; } = SqlFileFormat.Utf8;
     public bool IsDirty { get; set; }
-    public bool IsBusy { get; private set; }
+    private bool isBusy;
+    public bool IsBusy { get => isBusy; private set { if (isBusy == value) return; isBusy = value; if (value) StartLiveStatistics(); else StopLiveStatistics(); } }
     public bool IsExporting => exporting;
     public bool IsConnected => session?.IsConnected == true;
     public bool HasSession => session is not null;
@@ -71,15 +71,8 @@ public partial class QueryView : UserControl, IAsyncDisposable
     private bool exporting;
     private bool executingQuery;
     private readonly Action<string> writeResultClipboard;
-    // Definitions are read-only after loading; each editor owns its colorizer and state.
-    private static readonly Lazy<IHighlightingDefinition> sqlHighlighting = new(() =>
-    {
-        using var stream = Application.GetResourceStream(new Uri("pack://application:,,,/PGMS;component/Resources/PostgreSQL.xshd")).Stream;
-        using var reader = XmlReader.Create(stream);
-        return HighlightingLoader.Load(reader, HighlightingManager.Instance);
-    });
-
-    internal static IHighlightingDefinition SqlDefinition => sqlHighlighting.Value;
+    // Definitions are read-only after loading; each editor owns its colorizer and state. Fonts and Colors (PGMS-071) picks the definition's colors.
+    internal static IHighlightingDefinition SqlDefinition => FontsAndColorsSettings.Current.Highlighting();
 
     public QueryView() : this(Guid.NewGuid()) { }
 
@@ -98,7 +91,12 @@ public partial class QueryView : UserControl, IAsyncDisposable
         PlanDiagram.MissingIndexDetailsRequested += ShowMissingIndexDetails;
         ConfigureSqlLinks();
         ConfigureSqlEditing();
+        ConfigureInfoBar();
         ConfigureCompletion();
+        ConfigureQuickInfo();
+        ConfigureBookmarks();
+        ConfigureIssues();
+        StateChanged += (_, _) => UpdateConnectionBar();
         QueryTimeout.TextChanged+=(_,_)=>{if(int.TryParse(QueryTimeout.Text,NumberStyles.None,CultureInfo.InvariantCulture,out int value) && value is >=0 and <=86400)CommandTimeoutSeconds=value;};
         CommandBindings.Add(new CommandBinding(GoToLineCommand,(_,e)=>{GoToLine();e.Handled=true;},(_,e)=>{e.CanExecute=true;e.Handled=true;}));
         InputBindings.Add(new KeyBinding(GoToLineCommand,Key.G,ModifierKeys.Control));
@@ -109,7 +107,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
         editorMenu.Items.Add(new MenuItem { Header = "_Design Query in Editor…", Command = MainWindow.DesignQueryInEditor, CommandTarget = Editor.TextArea, InputGestureText = "Ctrl+Shift+Q" });
         editorMenu.Items.Add(new MenuItem { Header = "Query _Options…", Command = MainWindow.ShowQueryOptions, CommandTarget = Editor.TextArea });
         Editor.ContextMenu = editorMenu;
-        using (UiPhaseScope.Start(observer, "highlight-definition")) Editor.SyntaxHighlighting = sqlHighlighting.Value;
+        using (UiPhaseScope.Start(observer, "highlight-definition")) { Editor.SyntaxHighlighting = SqlDefinition; ApplyAppearance(FontsAndColorsSettings.Current); }
         using (UiPhaseScope.Start(observer, "search-install")) search = SearchPanel.Install(Editor.TextArea);
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Replace, (_, e) => { Replace(); e.Handled = true; }));
         InputBindings.Add(new KeyBinding(ApplicationCommands.Replace, Key.H, ModifierKeys.Control));
@@ -147,13 +145,20 @@ public partial class QueryView : UserControl, IAsyncDisposable
         finally { IsBusy = false; cancellation.Dispose(); cancellation = null; UpdateExport(); StateChanged?.Invoke(this, EventArgs.Empty); }
     }
 
-    public async Task ExecuteAsync()
+    public Task ExecuteAsync() => ExecuteSqlAsync(null);
+
+    /// <summary>Tools ▸ Options ▸ Query Shortcuts (PGMS-072): runs the given text in this tab's session, like Execute, without touching the editor.
+    /// Error positions are not mapped back to the editor (the text is not there).</summary>
+    internal Task ExecuteShortcutAsync(string sql) => ExecuteSqlAsync(sql);
+
+    private async Task ExecuteSqlAsync(string? shortcutSql)
     {
         if (IsBusy || session?.IsConnected != true) return;
-        string sql = Editor.SelectionLength > 0 ? Editor.SelectedText : Editor.Text;
-        int submittedStart=Editor.SelectionLength>0?Editor.SelectionStart:0;
-        long submittedRevision=EditRevision;
+        string sql = shortcutSql ?? (Editor.SelectionLength > 0 ? Editor.SelectedText : Editor.Text);
+        int submittedStart=shortcutSql is null && Editor.SelectionLength>0?Editor.SelectionStart:0;
+        long submittedRevision=shortcutSql is null?EditRevision:-1;
         if (string.IsNullOrWhiteSpace(sql)) return;
+        SetResultsPaneVisible(true); // SSMS shows the results pane again when a query runs (Ctrl+R hid it).
         NoteSubmittedSql(sql);
         if (!int.TryParse(QueryTimeout.Text,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out int timeout) || timeout is < 0 or > 86400)
         {
@@ -246,6 +251,9 @@ public partial class QueryView : UserControl, IAsyncDisposable
         }
     }
 
+    /// <summary>Tests: a result grid without a server.</summary>
+    internal void AddResultGridForTests(DataTable table) => AddResultGrid(table);
+
     private void AddResultGrid(DataTable table, IReadOnlyList<string>? types = null)
     {
         var grid = new DataGrid { IsReadOnly = true, AutoGenerateColumns = false, CanUserAddRows = false,
@@ -253,6 +261,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
             SelectionUnit = DataGridSelectionUnit.CellOrRowHeader, ClipboardCopyMode = DataGridClipboardCopyMode.IncludeHeader };
         // SSMS look (user's captures, 08/11/2026): 19 px rows, light grid lines, numbered rows, NULL in yellow.
         ResultGridStyle.Apply(grid);
+        ApplyGridAppearance(grid, appearance);
         table.RowChanged += (_, _) => { if (table.Rows.Count is 1000 or 10000 or 100000) ResultGridStyle.FitRowHeaders(grid, table.Rows.Count); };
         foreach (DataColumn column in table.Columns)
         {
@@ -276,6 +285,13 @@ public partial class QueryView : UserControl, IAsyncDisposable
         grid.ContextMenu = new ContextMenu();
         grid.ContextMenu.Items.Add(new MenuItem { Header="Copy with _headers", Command=ApplicationCommands.Copy, CommandTarget=grid, InputGestureText="Ctrl+C", ToolTip="Selected cells as quoted tab-separated text. NULL = unquoted \\N; unselected gaps are empty." });
         grid.ContextMenu.Items.Add(new MenuItem { Header="Copy _without headers", Command=CopyWithoutHeaders, CommandTarget=grid, InputGestureText="Ctrl+Shift+C", ToolTip="Selected cells without column labels. NULL = unquoted \\N; unselected gaps are empty." });
+        grid.ContextMenu.Items.Add(new Separator());
+        var saveAs = new MenuItem { Header = "Save Results _As…", ToolTip = "Save Grid Results: the displayed rows of this result to a comma-separated (.csv) or tab-separated (.txt) file, with headers" };
+        saveAs.Click += (_, _) => SaveGridResults(grid);
+        grid.ContextMenu.Items.Add(saveAs);
+        var exportOptions = new MenuItem { Header = "Export _Options…", ToolTip = "Shows the export options above the results: CSV or JSON, rows, separator, headers" };
+        exportOptions.Click += (_, _) => ShowExportOptions(true);
+        grid.ContextMenu.Items.Add(exportOptions);
         System.Windows.Automation.AutomationProperties.SetName(grid.ContextMenu, "Result copy options");
         ResultSets.Items.Add(new TabItem { Header = $"Result {ResultSets.Items.Count + 1}", Content = grid });
     }
@@ -361,12 +377,13 @@ public partial class QueryView : UserControl, IAsyncDisposable
     private void CancelExport(object sender, RoutedEventArgs e) => cancellation?.Cancel();
     public Task ExportSelectedCsvAsync(string path,bool overwrite=false,CancellationToken token=default)=>ExportResultsAsync(path,overwrite,token,false);
     public Task ExportSelectedJsonAsync(string path,bool overwrite=false,CancellationToken token=default)=>ExportResultsAsync(path,overwrite,token,true);
-    private async Task ExportResultsAsync(string path,bool overwrite,CancellationToken token,bool json)
+    /// <summary>Save Results As… writes with <paramref name="fixedOptions"/> and all displayed rows instead of the export options strip.</summary>
+    internal async Task ExportResultsAsync(string path,bool overwrite,CancellationToken token,bool json,CsvExportOptions? fixedOptions=null)
     {
         if (IsBusy) throw new InvalidOperationException("Wait for the current operation before exporting.");
         if (ResultSets.SelectedItem is not TabItem { Content: DataGrid { ItemsSource: DataView } grid }) throw new InvalidOperationException("Select a result set to export.");
-        bool selectedRowsOnly=ExportRows.SelectedIndex==1;
-        var options=new CsvExportOptions(CsvDelimiter.SelectedIndex switch{1=>';',2=>'\t',_=>','},CsvHeaders.IsChecked==true,CsvBom.IsChecked==true);
+        bool selectedRowsOnly=fixedOptions is null && ExportRows.SelectedIndex==1;
+        var options=fixedOptions ?? new CsvExportOptions(CsvDelimiter.SelectedIndex switch{1=>';',2=>'\t',_=>','},CsvHeaders.IsChecked==true,CsvBom.IsChecked==true);
         IsBusy = exporting = true;
         cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
         UpdateExport(); StateChanged?.Invoke(this, EventArgs.Empty);

@@ -7,7 +7,25 @@ namespace PGMS.Desktop;
 
 public sealed class SqlTextEditor : TextEditor
 {
-    public SqlTextEditor() : base(new SqlTextArea()) { }
+    private readonly LongLineElementGenerator longLines = new();
+    public SqlTextEditor() : base(new SqlTextArea())
+    {
+        TextArea.TextView.ElementGenerators.Add(longLines);
+        longLines.Changed += () => TextArea.TextView.Redraw();
+        TextArea.Caret.PositionChanged += (_, _) => RevealCaretInLongLine();
+    }
+    // Find, Go To or a restored caret can land inside the hidden part of a cut line; show the lines in full then,
+    // so the caret and the selection are never invisible.
+    private void RevealCaretInLongLine()
+    {
+        if (longLines.ShowFull || Document is null) return;
+        int offset = TextArea.Caret.Offset;
+        if (offset < 0 || offset > Document.TextLength) return;
+        var line = Document.GetLineByOffset(offset);
+        if (line.Length > LongLineElementGenerator.Limit && offset > line.Offset + LongLineElementGenerator.Limit && offset < line.EndOffset) longLines.ShowFull = true;
+    }
+    /// <summary>False while lines longer than <see cref="LongLineElementGenerator.Limit"/> are drawn cut; clicking the marker sets it.</summary>
+    internal bool ShowLongLinesInFull { get => longLines.ShowFull; set => longLines.ShowFull = value; }
     protected override System.Windows.Automation.Peers.AutomationPeer OnCreateAutomationPeer()=>new SqlTextEditorAutomationPeer(this);
     protected override IVisualLineTransformer CreateColorizer(IHighlightingDefinition definition)=>new SqlHighlightingColorizer(definition);
 }

@@ -37,7 +37,7 @@ internal static class DiagramChecks
 
         // Before Install Diagram Support.
         var folders = await catalog.ChildrenAsync(databaseEntry);
-        check(folders.Select(f => f.Kind).SequenceEqual([CatalogKind.DatabaseDiagrams, CatalogKind.Schemas]) && folders[0].Name == "Database Diagrams", "Database Diagrams is the first folder under a database, as in SSMS");
+        check(folders.Select(f => f.Kind).SequenceEqual([CatalogKind.DatabaseDiagrams, CatalogKind.Schemas, CatalogKind.Extensions, CatalogKind.ForeignServers, CatalogKind.Replication]) && folders[0].Name == "Database Diagrams", "Database Diagrams is the first folder under a database, as in SSMS");
         check(!await diagrams.IsInstalledAsync() && (await diagrams.ListAsync()).Count == 0 && (await catalog.ChildrenAsync(folders[0])).Count == 0, "Without diagram support the folder is empty and nothing is created");
         check((long)(await Scalar("SELECT count(*) FROM pg_namespace WHERE nspname='pgms'"))! == 0, "Reading the folder does not create the pgms schema");
         check(await Refused(() => diagrams.SaveAsync(null, "Diagram_0", new DiagramLayout(), [])) is { } notInstalled && notInstalled.Contains("Install Diagram Support"), "Saving before installing is refused with the way out");

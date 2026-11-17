@@ -36,6 +36,9 @@ internal static class PsqlLauncher
             SslMode.VerifyCA => "verify-ca", SslMode.VerifyFull => "verify-full", _ => "prefer"
         };
         if (!string.IsNullOrEmpty(c.RootCertificate)) start.Environment["PGSSLROOTCERT"] = Path.GetFullPath(c.RootCertificate);
+        // Client certificate authentication (PGMS-009). An encrypted key's password is not passed: psql asks for it in its own console.
+        if (!string.IsNullOrEmpty(c.SslCertificate)) start.Environment["PGSSLCERT"] = Path.GetFullPath(c.SslCertificate);
+        if (!string.IsNullOrEmpty(c.SslKey)) start.Environment["PGSSLKEY"] = Path.GetFullPath(c.SslKey);
         start.Environment["PGAPPNAME"] = "PGMS psql";
         start.Environment["PGCLIENTENCODING"] = "UTF8";
         return start;

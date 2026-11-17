@@ -23,8 +23,8 @@ public sealed class DesignerProperty(string category, string name, string descri
 /// <summary>Categorized or alphabetical name/value list with a description box, the part of the SSMS property window that the Table Designer panes and dialogs share.</summary>
 public sealed class DesignerPropertyGrid : UserControl
 {
-    private static readonly Brush LineBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8));
-    private static readonly Brush DisabledBrush = new SolidColorBrush(Color.FromRgb(0x8A, 0x8A, 0x8A));
+    // Colours are resources (Resources/Shell.xaml, M1112) so the grid follows the theme; the light values are the ones it always had.
+    private const string TextKey = "Pgms.PropertyText", DisabledKey = "Pgms.PropertyDisabledText", LineKey = "Pgms.PropertyLines", BorderKey = "Pgms.PropertyBorder";
     private sealed record Row(DesignerProperty Property, FrameworkElement Container, FrameworkElement Label, FrameworkElement Editor);
 
     private readonly StackPanel rows = new();
@@ -54,11 +54,13 @@ public sealed class DesignerPropertyGrid : UserControl
         DockPanel.SetDock(bar, Dock.Top);
         box = new Border
         {
-            BorderBrush = new SolidColorBrush(Color.FromRgb(0xA0, 0xA0, 0xA0)), BorderThickness = new Thickness(1), Background = new SolidColorBrush(Color.FromRgb(0xF0, 0xF0, 0xF0)),
+            BorderThickness = new Thickness(1),
             Padding = new Thickness(6, 4, 6, 4), Margin = new Thickness(0, 4, 0, 0), Height = 58, Child = new StackPanel { Children = { descriptionTitle, descriptionText } }
         };
+        box.SetResourceReference(Border.BorderBrushProperty, BorderKey); box.SetResourceReference(Border.BackgroundProperty, "Pgms.ControlBackground");
         DockPanel.SetDock(box, Dock.Bottom);
-        var list = new Border { BorderBrush = new SolidColorBrush(Color.FromRgb(0xA0, 0xA0, 0xA0)), BorderThickness = new Thickness(1), Background = Brushes.White, Child = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = rows } };
+        var list = new Border { BorderThickness = new Thickness(1), Child = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = rows } };
+        list.SetResourceReference(Border.BorderBrushProperty, BorderKey); list.SetResourceReference(Border.BackgroundProperty, "Pgms.ContentBackground");
         Content = new DockPanel { Children = { bar, box, list } };
     }
 
@@ -73,8 +75,8 @@ public sealed class DesignerPropertyGrid : UserControl
             bool open = alphabetical.IsChecked == true || !collapsed.Contains(row.Property.Category);
             row.Container.Visibility = open && row.Property.IsVisible() ? Visibility.Visible : Visibility.Collapsed;
             bool editable = Editable(row.Property);
-            row.Label.SetValue(TextBlock.ForegroundProperty, editable ? Brushes.Black : DisabledBrush);
-            if (row.Editor is TextBox text) { if (!text.IsKeyboardFocusWithin) text.Text = row.Property.Get(); text.IsReadOnly = !editable; text.Foreground = editable ? Brushes.Black : DisabledBrush; }
+            row.Label.SetResourceReference(TextBlock.ForegroundProperty, editable ? TextKey : DisabledKey);
+            if (row.Editor is TextBox text) { if (!text.IsKeyboardFocusWithin) text.Text = row.Property.Get(); text.IsReadOnly = !editable; text.SetResourceReference(ForegroundProperty, editable ? TextKey : DisabledKey); }
             else if (row.Editor is ComboBox combo) { combo.SelectedItem = row.Property.Get(); combo.IsEnabled = editable; }
         }
         refreshing = false;
@@ -107,7 +109,8 @@ public sealed class DesignerPropertyGrid : UserControl
         FrameworkElement editor;
         if (property.Choices is { } choices)
         {
-            var combo = new ComboBox { ItemsSource = choices, BorderThickness = new Thickness(0), Background = Brushes.White, Padding = new Thickness(3, 0, 0, 0), MinHeight = 18 };
+            var combo = new ComboBox { ItemsSource = choices, BorderThickness = new Thickness(0), Padding = new Thickness(3, 0, 0, 0), MinHeight = 18 };
+            combo.SetResourceReference(BackgroundProperty, "Pgms.ContentBackground");
             combo.SetResourceReference(StyleProperty, "DesignerPropertyCombo");
             combo.SelectionChanged += (_, _) => { if (!refreshing && combo.SelectedItem is string value) Write(property, value); };
             editor = combo;
@@ -125,7 +128,8 @@ public sealed class DesignerPropertyGrid : UserControl
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(45, GridUnitType.Star) });
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55, GridUnitType.Star) });
         Grid.SetColumn(editor, 1); line.Children.Add(label); line.Children.Add(editor);
-        var border = new Border { BorderBrush = LineBrush, BorderThickness = new Thickness(0, 0, 0, 1), Child = line };
+        var border = new Border { BorderThickness = new Thickness(0, 0, 0, 1), Child = line };
+        border.SetResourceReference(Border.BorderBrushProperty, LineKey);
         rows.Children.Add(border);
         shown.Add(new(property, border, label, editor));
     }

@@ -74,7 +74,7 @@ internal static class ResultExportUiChecks
     }
     internal static async Task Capture(Window window,QueryView query,string name,double width,double height,Action<bool,string> check)
     {
-        window.Width=width;window.Height=height;await window.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);window.UpdateLayout();
+        query.ShowExportOptions(true);window.Width=width;window.Height=height;await window.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);window.UpdateLayout();
         foreach(string control in new[]{"ExportCsvButton","CsvOptionsPanel"})
         {
             var element=(FrameworkElement)query.FindName(control);if(!element.IsVisible)continue;var bounds=element.TransformToAncestor(query).TransformBounds(new Rect(element.RenderSize));

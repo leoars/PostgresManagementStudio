@@ -16,6 +16,22 @@ public sealed class BackupService(string connectionString, string toolsDirectory
         await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
     }
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string,(int Major,string Text)> ToolVersions=new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Major version and text of a PostgreSQL client tool, from its --version output (for example "pg_dump (PostgreSQL) 16.15").</summary>
+    public async Task<(int Major,string Text)> ToolVersionAsync(string tool,CancellationToken token=default)
+    {
+        string executable=Path.GetFullPath(Path.Combine(toolsDirectory,tool+(OperatingSystem.IsWindows()?".exe":"")));
+        if(ToolVersions.TryGetValue(executable,out var known))return known;
+        var start=new ProcessStartInfo(executable){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};start.ArgumentList.Add("--version");
+        using var process=Process.Start(start)??throw new InvalidOperationException(tool+" could not be started.");
+        string output=await process.StandardOutput.ReadToEndAsync(token).ConfigureAwait(false);await process.WaitForExitAsync(token).ConfigureAwait(false);
+        var match=System.Text.RegularExpressions.Regex.Match(output,@"\(PostgreSQL\)\s+(\d+)(\.\d+)?");
+        if(!match.Success)throw new InvalidOperationException(tool+" did not report a PostgreSQL version.");
+        var version=(int.Parse(match.Groups[1].Value,System.Globalization.CultureInfo.InvariantCulture),match.Value.Replace("(PostgreSQL) ","",StringComparison.Ordinal).Trim());
+        ToolVersions[executable]=version;return version;
+    }
+
     public Task BackupAsync(string destination, CancellationToken token = default)
         =>BackupWithOptionsAsync(destination,new BackupOptions(),token);
 
@@ -27,6 +43,9 @@ public sealed class BackupService(string connectionString, string toolsDirectory
         {
             if(options.Selection is not null)
             {
+                // The selection reaches pg_dump as a --filter file, which exists from pg_dump 17. Older tools would reject it.
+                var version=await ToolVersionAsync("pg_dump",token).ConfigureAwait(false);
+                if(version.Major<17)throw new InvalidOperationException($"Selecting schemas or tables needs pg_dump 17 or later; the tools found are {version.Text}. Back up the whole database, or use the client tools of PostgreSQL 17 or later (they can back up older servers).");
                 string temporaryDirectory=Path.GetFullPath(Path.GetTempPath());
                 if(OperatingSystem.IsWindows() && temporaryDirectory.Any(c=>c>127))throw new ArgumentException("Schema filters require an ASCII temporary directory for PostgreSQL tools on Windows.");
                 filter=await RestoreInputStaging.CreateTextAsync(options.Selection.FilterText,temporaryDirectory,token).ConfigureAwait(false);
@@ -83,11 +102,50 @@ public sealed class BackupService(string connectionString, string toolsDirectory
     public Task RestoreAsync(string source, CancellationToken token = default)
         =>RestoreWithOptionsAsync(source,new RestoreOptions(),token);
 
-    public Task RestoreWithOptionsAsync(string source,RestoreOptions options,CancellationToken token=default)
+    public async Task RestoreWithOptionsAsync(string source,RestoreOptions options,CancellationToken token=default)
     {
         ArgumentNullException.ThrowIfNull(options);
-        return RestoreFileAsync(source,"pg_restore",options.ToArguments(),token);
+        await using var list=await UseListAsync(options,token).ConfigureAwait(false);
+        await RestoreFileAsync(source,"pg_restore",[..options.ToArguments(),..ListArguments(list)],token).ConfigureAwait(false);
     }
+
+    /// <summary>The table of contents of a custom, tar or directory archive (pg_restore --list), for restoring part of it (PGMS-064).
+    /// Nothing connects to the server.</summary>
+    public async Task<IReadOnlyList<ArchiveItem>> ListArchiveAsync(string source,CancellationToken token=default)
+    {
+        token.ThrowIfCancellationRequested();
+        source=Path.GetFullPath(source);
+        bool directory=Directory.Exists(source);
+        if(directory && !File.Exists(Path.Combine(source,"toc.dat")))throw new DirectoryNotFoundException("Select a PostgreSQL directory archive containing toc.dat.");
+        if(!directory && !File.Exists(source))throw new FileNotFoundException("Select an existing PostgreSQL archive.",source);
+        RestoreInputStaging? staging=null;
+        try
+        {
+            if(!directory && OperatingSystem.IsWindows() && Path.GetFileName(source).Any(c=>c>127)){staging=await RestoreInputStaging.CopyAsync(source,Path.GetTempPath(),token).ConfigureAwait(false);source=staging.FilePath;}
+            string executable=Path.GetFullPath(Path.Combine(toolsDirectory,"pg_restore"+(OperatingSystem.IsWindows()?".exe":"")));
+            if(!File.Exists(executable))throw new FileNotFoundException("pg_restore was not found in the selected tools folder.",executable);
+            var start=new ProcessStartInfo(executable){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=new UTF8Encoding(false),StandardErrorEncoding=new UTF8Encoding(false),
+                WorkingDirectory=directory?source:Path.GetDirectoryName(source)!};
+            foreach(string argument in new[]{"--list","--",directory?".":Path.GetFileName(source)})start.ArgumentList.Add(argument);
+            using var process=Process.Start(start)??throw new InvalidOperationException("pg_restore could not be started.");
+            using var registration=token.Register(()=>{try{process.Kill(true);}catch(InvalidOperationException){}});
+            var output=process.StandardOutput.ReadToEndAsync(token);var error=process.StandardError.ReadToEndAsync(token);
+            await process.WaitForExitAsync(token).ConfigureAwait(false);
+            if(process.ExitCode!=0)throw new InvalidOperationException("pg_restore could not list the archive: "+(await error.ConfigureAwait(false)).Trim());
+            return ArchiveItem.Parse(await output.ConfigureAwait(false));
+        }
+        finally{if(staging is not null)await staging.DisposeAsync().ConfigureAwait(false);}
+    }
+
+    /// <summary>The chosen items as a temporary --use-list file readable only by this Windows user, deleted after the restore; null restores everything.</summary>
+    private static async Task<RestoreInputStaging?> UseListAsync(RestoreOptions options,CancellationToken token)
+    {
+        if(options.Items is null)return null;
+        string directory=Path.GetFullPath(Path.GetTempPath());
+        if(OperatingSystem.IsWindows() && directory.Any(c=>c>127))throw new ArgumentException("Restoring part of an archive requires an ASCII temporary directory for PostgreSQL tools on Windows.");
+        return await RestoreInputStaging.CreateTextAsync(string.Join("\n",options.Items)+"\n",directory,token).ConfigureAwait(false);
+    }
+    private static string[] ListArguments(RestoreInputStaging? list)=>list is null?[]:["--use-list="+list.FilePath];
 
     public Task RestoreSqlAsync(string source,CancellationToken token=default)
         =>RestoreFileAsync(source,"psql",SqlRestoreArguments(),token);
@@ -99,7 +157,9 @@ public sealed class BackupService(string connectionString, string toolsDirectory
         if(!Directory.Exists(source) || !File.Exists(Path.Combine(source,"toc.dat")))throw new DirectoryNotFoundException("Select a PostgreSQL directory archive containing toc.dat.");
         // The Unicode directory is conveyed by CreateProcessW's working directory;
         // only an ASCII relative path reaches pg_restore's CRT argv parser.
-        await RunAsync("pg_restore",[..(options??new RestoreOptions()).ToArguments(),"--","."],token,source).ConfigureAwait(false);
+        options??=new RestoreOptions();
+        await using var list=await UseListAsync(options,token).ConfigureAwait(false);
+        await RunAsync("pg_restore",[..options.ToArguments(),..ListArguments(list),"--","."],token,source).ConfigureAwait(false);
     }
 
     public static string[] SqlRestoreArguments()=>["--no-psqlrc","--single-transaction","--set","ON_ERROR_STOP=1"];
@@ -127,8 +187,8 @@ public sealed class BackupService(string connectionString, string toolsDirectory
     private async Task RunAsync(string tool, string[] arguments, CancellationToken token,string? workingDirectory=null)
     {
         var connection = new NpgsqlConnectionStringBuilder(connectionString);
-        if(!string.IsNullOrEmpty(connection.SslPassword))throw new ArgumentException("Encrypted client key passwords are not supported by backup and restore tools. No operation was started.");
         var certificateCopies=new List<RestoreInputStaging>();
+        RestoreInputStaging? serviceFile=null;string? serviceName=null;
         async Task<string?> PrepareCertificate(string? path)
         {
             token.ThrowIfCancellationRequested();
@@ -149,12 +209,29 @@ public sealed class BackupService(string connectionString, string toolsDirectory
             connection.RootCertificate=await PrepareCertificate(connection.RootCertificate).ConfigureAwait(false);
             connection.SslCertificate=await PrepareCertificate(connection.SslCertificate).ConfigureAwait(false);
             connection.SslKey=await PrepareCertificate(connection.SslKey).ConfigureAwait(false);
-            await RunCoreAsync(connection,tool,arguments,token,workingDirectory).ConfigureAwait(false);
+            if(!string.IsNullOrEmpty(connection.SslPassword))
+            {
+                // The key passphrase reaches libpq through a temporary service file readable only by this Windows user and
+                // deleted when the tool exits, never through the command line, which other processes can read (PGMS-009).
+                string password=connection.SslPassword;
+                if(password.Any(c=>c is '\r' or '\n' or '\0'))throw new ArgumentException("The client key password cannot contain line breaks for backup and restore tools. No operation was started.");
+                if(char.IsWhiteSpace(password[^1]))throw new ArgumentException("The client key password cannot end with a space for backup and restore tools. No operation was started.");
+                if(password.Length>200)throw new ArgumentException("The client key password is longer than 200 characters, which backup and restore tools cannot read. No operation was started.");
+                string serviceDirectory=Path.GetFullPath(Path.GetTempPath());
+                if(OperatingSystem.IsWindows() && serviceDirectory.Any(c=>c>127))throw new ArgumentException("An encrypted client key requires an ASCII temporary directory for PostgreSQL tools on Windows.");
+                serviceName="pgms_"+Guid.NewGuid().ToString("N");
+                serviceFile=await RestoreInputStaging.CreateTextAsync("["+serviceName+"]\nsslpassword="+password+"\n",serviceDirectory,token).ConfigureAwait(false);
+            }
+            await RunCoreAsync(connection,tool,arguments,token,workingDirectory,serviceFile?.FilePath,serviceName).ConfigureAwait(false);
         }
-        finally{foreach(var copy in certificateCopies)await copy.DisposeAsync().ConfigureAwait(false);}
+        finally
+        {
+            if(serviceFile is not null)await serviceFile.DisposeAsync().ConfigureAwait(false);
+            foreach(var copy in certificateCopies)await copy.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
-    private async Task RunCoreAsync(NpgsqlConnectionStringBuilder connection,string tool,string[] arguments,CancellationToken token,string? workingDirectory)
+    private async Task RunCoreAsync(NpgsqlConnectionStringBuilder connection,string tool,string[] arguments,CancellationToken token,string? workingDirectory,string? serviceFile=null,string? serviceName=null)
     {
         if (string.IsNullOrEmpty(connection.Host) || string.IsNullOrEmpty(connection.Database) || string.IsNullOrEmpty(connection.Username))
             throw new ArgumentException("An explicit server, database and user are required.");
@@ -167,9 +244,10 @@ public sealed class BackupService(string connectionString, string toolsDirectory
             return Uri.EscapeDataString(value);
         }
         string databaseUri="postgresql:///?host="+Encode(connection.Host)+"&port="+connection.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)+"&user="+Encode(connection.Username)+"&dbname="+Encode(connection.Database);
-        // Non-secret random value suppresses OpenSSL's hidden console prompt.
-        // Encrypted keys fail rather than waiting indefinitely for interactive input.
-        databaseUri+="&sslpassword="+Guid.NewGuid().ToString("N");
+        // With a configured key password the service file carries it (a URI value would override it). Without one, a
+        // non-secret random value suppresses OpenSSL's hidden console prompt: encrypted keys fail instead of waiting.
+        if(serviceName is not null)databaseUri+="&service="+serviceName;
+        else databaseUri+="&sslpassword="+Guid.NewGuid().ToString("N");
         // Windows CRT getenv converts Unicode through the ANSI code page. The
         // tools share PostgreSQL's UTF-8 stdin prompt, so bypass that conversion.
         bool prompt=OperatingSystem.IsWindows() && connection.Password?.Any(c=>c>127)==true;
@@ -192,6 +270,8 @@ public sealed class BackupService(string connectionString, string toolsDirectory
         start.Environment["PGSSLCERT"]=string.IsNullOrEmpty(connection.SslCertificate)?absent:Path.GetFullPath(connection.SslCertificate);
         start.Environment["PGSSLKEY"]=string.IsNullOrEmpty(connection.SslKey)?absent:Path.GetFullPath(connection.SslKey);
         start.Environment["PGSSLROOTCERT"]=string.IsNullOrEmpty(connection.RootCertificate)?absent:Path.GetFullPath(connection.RootCertificate);
+        // libpq reads the private service file, or a path that never exists so a personal pg_service.conf is not used.
+        start.Environment["PGSERVICEFILE"]=serviceFile ?? absent;
         start.Environment["PGCONNECT_TIMEOUT"] = "10";
         start.Environment["PGAPPNAME"] = "PGMS.BackupRestore";
         start.Environment["PGSSLMODE"] = connection.SslMode switch

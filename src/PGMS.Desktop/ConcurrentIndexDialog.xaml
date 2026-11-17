@@ -1,6 +1,6 @@
-<Window x:Class="PGMS.Desktop.ConcurrentIndexDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Concurrent Index" Width="800" Height="620" MinWidth="700" MinHeight="520" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+<Window x:Class="PGMS.Desktop.ConcurrentIndexDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Concurrent Index" Width="800" Height="620" MinWidth="700" MinHeight="520" Background="{DynamicResource Pgms.DialogBackground}" WindowStartupLocation="CenterOwner" Closing="OnClosing">
  <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*" MinHeight="160"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <Border Background="{DynamicResource Pgms.PaneBackground}" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
   <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel>
    <TextBlock x:Name="Intro" Text="Concurrent creation allows writes while the index is built. Failure or cancellation can leave an invalid index. A pending operation is saved on this computer and must be inspected before another creation." TextWrapping="Wrap" Margin="0,0,0,10"/>
    <ComboBox x:Name="Operation" DisplayMemberPath="Label" SelectedValuePath="Value" Visibility="Collapsed" SelectionChanged="OperationChanged" Margin="0,0,0,10" AutomationProperties.Name="Index maintenance operation"/>

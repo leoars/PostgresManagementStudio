@@ -17,9 +17,20 @@ internal static class ResultsDestinationChecks
     {
         await QueryOptionsChecks.RunAsync(connection, check);
         await QueryMenuChecks.RunAsync(connection, check);
+        await QueryConnectionChecks.RunAsync(connection, check);
+        await TableChildChecks.RunAsync(connection, check);
+        await RoutineTemplateChecks.RunAsync(connection, check);
+        await MaintenanceChecks.RunAsync(connection, check);
+        await ExtensionChecks.RunAsync(connection, check);
         await ForeignKeyScanUiChecks.RunAsync(connection, check);
         await ForeignKeyIndexScanUiChecks.RunAsync(connection, check);
         await ResultPagingChecks.RunAsync(connection, check);
+        await PropertiesWindowChecks.RunAsync(connection, check);
+        await ConnectionTextChecks.RunAsync(connection, check);
+        await OptionsPageChecks.RunAsync(connection, check);
+        await QueryShortcutChecks.RunAsync(connection, check);
+        await LiveStatisticsChecks.RunAsync(connection, check);
+        await SchemaCompareUiChecks.RunAsync(connection, check);
         await AboutChecks.RunAsync(check);
         static async Task Idle() => await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         static async Task Until(Func<bool> done) { for (int i = 0; i < 200 && !done(); i++) await Task.Delay(50); }
@@ -116,8 +127,11 @@ internal static class ResultsDestinationChecks
             double y0 = row0.TranslatePoint(new Point(0, 0), resultGrid).Y, y1 = row1.TranslatePoint(new Point(0, 0), resultGrid).Y;
             double left = row0.TranslatePoint(new Point(0, 0), resultGrid).X + resultGrid.RowHeaderWidth;
             double ColumnX(int index) => left + resultGrid.Columns.Take(index).Sum(c => c.ActualWidth);
-            check(row0.ActualHeight == 19 && y1 - y0 == 19 && Pixel(ColumnX(0) + 5, y0 + 18) == "CCCEDB" && Pixel(ColumnX(1) - 1, y0 + 5) == "CCCEDB",
-                $"Rows are 19 px with #CCCEDB grid lines, as in SSMS (row {row0.ActualHeight}, line {Pixel(ColumnX(0) + 5, y0 + 18)})");
+            // M1111: the right edge of the second cell is measured on the cell itself; adding column widths drifted when the suite ran it after other windows.
+            var secondCell = (DataGridCell)resultGrid.Columns[1].GetCellContent(row0)!.Parent;
+            double secondRight = secondCell.TranslatePoint(new Point(secondCell.ActualWidth, 0), resultGrid).X;
+            check(Math.Abs(row0.ActualHeight - 19) < 0.01 && Math.Abs(y1 - y0 - 19) < 0.01 && new[] { 17.0, 18, 19 }.Any(d => Pixel(ColumnX(1) + 5, y0 + d) == "CCCEDB") && new[] { 2.0, 1, 0 }.Any(d => Pixel(secondRight - d, y0 + 5) == "CCCEDB"),
+                $"Rows are 19 px with #CCCEDB grid lines, as in SSMS (row {row0.ActualHeight}, lines {Pixel(ColumnX(1) + 5, y0 + 17)}/{Pixel(ColumnX(1) + 5, y0 + 18)}/{Pixel(ColumnX(1) + 5, y0 + 19)}; second column, ±1 px: the first cell may show the focus border and the rows may sit on half pixels since M1110; cell edge {secondRight:0.###}, ColumnX {ColumnX(2):0.###}, rows at {y0:0.###} and {y1:0.###})");
             check(Pixel(ColumnX(2) + resultGrid.Columns[2].ActualWidth - 3, y1 + 3) == "FDFBAC" && Pixel(ColumnX(1) + 3, y0 + 3) == "F5F5F5",
                 $"NULL cells are #FDFBAC and the others #F5F5F5 ({Pixel(ColumnX(2) + resultGrid.Columns[2].ActualWidth - 3, y1 + 3)})");
             check(Pixel(ColumnX(3) + 20, y0 + 18) == "F5F5F5" && (string)row0.Header == "1" && (string)row1.Header == "2", "Grid lines end at the last column and rows are numbered");

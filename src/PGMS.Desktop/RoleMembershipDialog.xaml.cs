@@ -21,7 +21,7 @@ public partial class RoleMembershipDialog : Window
         ready = true; Update();
     }
     private RoleMembershipEdit Request => new(GrantedRole.Text, MemberRole.Text, Revoke.IsChecked == true, OptionChoice.SelectedItem is MembershipOption option ? option : null, OptionEnabled.IsChecked == true);
-    private void Changed(object sender, RoutedEventArgs e) { if (ready) { Inspection.Clear(); Update(); } }
+    private void Changed(object sender, RoutedEventArgs e) { if (ready) { Inspection.Clear(); EffectiveInspection.Clear(); Update(); } }
     private void Update()
     {
         bool selected=OptionChoice.SelectedItem is MembershipOption;
@@ -35,8 +35,14 @@ public partial class RoleMembershipDialog : Window
     public async Task InspectAsync()
     {
         if (busy) return;
-        SetBusy(true); Inspection.Clear(); Feedback.Text = "Loading…";
-        try { Inspection.Text = await new RoleMembershipService(connection).InspectAsync(MemberRole.Text); Feedback.Text = "Direct membership snapshot loaded."; }
+        SetBusy(true); Inspection.Clear(); EffectiveInspection.Clear(); Feedback.Text = "Loading…";
+        try
+        {
+            var service = new RoleMembershipService(connection);
+            Inspection.Text = await service.InspectAsync(MemberRole.Text);
+            EffectiveInspection.Text = (await service.InspectEffectiveAsync(MemberRole.Text)).ToText();
+            Feedback.Text = "Direct and effective membership snapshot loaded.";
+        }
         catch (Exception ex) when (Handled(ex)) { Feedback.Text = Describe(ex); }
         finally { SetBusy(false); }
     }
@@ -46,7 +52,7 @@ public partial class RoleMembershipDialog : Window
     {
         if (busy || !ApplyButton.IsEnabled) return;
         var request = Request; SetBusy(true); Feedback.Text = "Applying…";
-        try { await new AdministrativeEditService(connection).ApplyAsync(request); Inspection.Clear(); Feedback.Text = "Membership command completed. Inspect to refresh; effective access may use other paths."; }
+        try { await new AdministrativeEditService(connection).ApplyAsync(request); Inspection.Clear(); EffectiveInspection.Clear(); Feedback.Text = "Membership command completed. Inspect to refresh; effective access may use other paths."; }
         catch (Exception ex) when (Handled(ex)) { Feedback.Text = Describe(ex); }
         finally { SetBusy(false); }
     }

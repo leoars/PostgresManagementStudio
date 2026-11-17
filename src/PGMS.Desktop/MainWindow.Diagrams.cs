@@ -70,6 +70,7 @@ public partial class MainWindow
     /// <summary>New Database Diagram: asks to install support when missing, then opens an empty diagram named Diagram_n and the Add Table dialog, as SSMS does.</summary>
     internal async Task<DatabaseDiagramView?> NewDiagramAsync(string connection, bool showAddTable = true)
     {
+        showAddTable &= EnvironmentSettings.Load().DesignerSettings.LaunchAddTableOnNewDiagram; // Designers ▸ Launch Add Table Dialog on New Diagram (PGMS-073)
         if (!await EnsureDiagramSupportAsync(connection)) return null;
         await RefreshDiagramFoldersAsync(new Npgsql.NpgsqlConnectionStringBuilder(connection).Database);
         IReadOnlyList<DiagramInfo> existing;
@@ -97,7 +98,7 @@ public partial class MainWindow
 
     private DatabaseDiagramView OpenDiagramDocument(string connection, int? id, string name)
     {
-        var view = new DatabaseDiagramView(connection, id, name) { ConfirmPrompt = DiagramConfirmPrompt };
+        var view = new DatabaseDiagramView(connection, id, name) { ConfirmPrompt = DiagramConfirmPrompt, DefaultTableView = EnvironmentSettings.Load().DesignerSettings.DefaultTableView };
         var document = new LayoutDocument { Title = view.Title, ContentId = Guid.NewGuid().ToString(), Content = view, ToolTip = view.TabToolTip };
         diagrams.Add(view, document);
         view.TitleChanged += () => { document.Title = view.Title; RefreshCommands(); };
@@ -157,6 +158,7 @@ public partial class MainWindow
     internal bool BeginExplorerRename(CatalogNode node)
     {
         CancelPendingExplorerRename();
+        if (IsTableChild(node.Entry) && !node.IsRenaming && catalogService is not null) { node.RenameText = node.Entry.Name; node.IsRenaming = true; return true; }
         if (!node.Entry.IsDiagram || node.IsRenaming || catalogService?.ConnectionFor(node.Entry.Database) is not { } connection) return false;
         if (diagrams.Keys.FirstOrDefault(d => d.Targets(connection, (int)node.Entry.Oid)) is { IsBusy: true }) { Status.Text = "Wait for the diagram to finish its operation before renaming it."; return false; }
         node.RenameText = node.Entry.Name;
@@ -170,6 +172,15 @@ public partial class MainWindow
         if (!node.IsRenaming) return false;
         node.IsRenaming = false;
         string typed = node.RenameText.Trim();
+        if (IsTableChild(node.Entry))
+        {
+            bool done = accept && typed.Length > 0 && typed != node.Entry.Name && await RenameTableChildAsync(node, typed);
+            var parent = node.Parent;
+            var renamedNode = done ? parent?.Children.FirstOrDefault(c => c.Entry.Oid == node.Entry.Oid) : null;
+            if ((renamedNode ?? (done ? parent : node)) is { } select) select.IsSelected = true;
+            ExplorerTree.Focus();
+            return done;
+        }
         bool renamed = accept && typed.Length > 0 && typed != node.Entry.Name && catalogService?.ConnectionFor(node.Entry.Database) is { } connection
             && await RenameDiagramAsync(connection, (int)node.Entry.Oid, node.Entry.Name, typed);
         // The renamed diagram is a new node after the refresh; keep it selected, as SSMS does.

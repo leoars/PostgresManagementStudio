@@ -1,6 +1,6 @@
-<Window x:Class="PGMS.Desktop.ServerTlsDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Configure Server TLS" Width="720" Height="740" MinWidth="640" MinHeight="660" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing">
+<Window x:Class="PGMS.Desktop.ServerTlsDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Configure Server TLS" Width="720" Height="740" MinWidth="640" MinHeight="660" Background="{DynamicResource Pgms.DialogBackground}" WindowStartupLocation="CenterOwner" Closing="OnClosing">
  <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="120"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <Border Background="{DynamicResource Pgms.PaneBackground}" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
   <TextBox Grid.Row="1" x:Name="Inspection" IsReadOnly="True" VerticalScrollBarVisibility="Auto" Padding="6" FontFamily="Consolas" AutomationProperties.Name="Current server TLS settings"/>
   <StackPanel x:Name="Fields" Grid.Row="2" Margin="0,10,0,0">
    <GroupBox Header="Certificate" Padding="6,4">

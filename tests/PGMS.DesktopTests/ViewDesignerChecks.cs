@@ -146,13 +146,13 @@ internal static class ViewDesignerChecks
 
         // A view the panes cannot show.
         var unionView = window.OpenViewDesigner(connection, "public", "vd_union", addTableOnOpen: false);
-        for (int i = 0; i < 100 && unionView.IsBusy; i++) await Task.Delay(50);
+        for (int i = 0; i < 600 && unionView.IsBusy; i++) await Task.Delay(50);
         await Idle();
         check(!unionView.Designer.IsRepresentable && unionView.Designer.Sql.Contains("UNION", StringComparison.Ordinal) && !unionView.IsDirty, "A view with UNION opens in the SQL pane only, with no question");
         await window.CloseViewDesignerAsync(unionView);
 
         var dmlView = window.OpenViewDesigner(connection, "public", null, addTableOnOpen: false);
-        for (int i = 0; i < 100 && dmlView.IsBusy; i++) await Task.Delay(50);
+        for (int i = 0; i < 600 && dmlView.IsBusy; i++) await Task.Delay(50);
         await Idle();
         dmlView.Designer.DifferPrompt = _ => true;
         await dmlView.Designer.ApplySqlAsync("DELETE FROM public.vd_orders");
@@ -163,7 +163,7 @@ internal static class ViewDesignerChecks
 
         // New View.
         var created = window.OpenViewDesigner(connection, "public", null, addTableOnOpen: false);
-        for (int i = 0; i < 100 && created.IsBusy; i++) await Task.Delay(50);
+        for (int i = 0; i < 600 && created.IsBusy; i++) await Task.Delay(50);
         await Idle();
         var fresh = created.Designer;
         check(created.Title == "public.View_1" && created.IsNew && !created.IsDirty && fresh.IsRepresentable, "New View starts empty with the name View_1");

@@ -1,16 +1,16 @@
 <UserControl x:Class="PGMS.Desktop.TableDesignerView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop"
-  x:Name="Root" Background="White" Loaded="OnLoaded">
+  x:Name="Root" Background="{DynamicResource Pgms.ContentBackground}" Loaded="OnLoaded">
  <UserControl.Resources>
   <Style x:Key="DesignerHeader" TargetType="DataGridColumnHeader">
    <Setter Property="HorizontalContentAlignment" Value="Center"/>
-   <Setter Property="Background" Value="White"/>
-   <Setter Property="BorderBrush" Value="#E3E3E3"/>
+   <Setter Property="Background" Value="{DynamicResource Pgms.ContentBackground}"/>
+   <Setter Property="BorderBrush" Value="{DynamicResource Pgms.GridLines}"/>
    <Setter Property="BorderThickness" Value="0,0,1,1"/>
    <Setter Property="Height" Value="23"/>
   </Style>
   <!-- A selected row is light blue, as measured in SSMS 22.11; a selected cell alone keeps the row white. -->
   <Style x:Key="DesignerRow" TargetType="DataGridRow">
-   <Setter Property="Background" Value="White"/>
+   <Setter Property="Background" Value="{DynamicResource Pgms.ContentBackground}"/>
    <Style.Triggers>
     <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="#A6D1F0"/></Trigger>
    </Style.Triggers>
@@ -40,7 +40,7 @@
    <Setter Property="Template">
     <Setter.Value>
      <ControlTemplate TargetType="DataGridRowHeader">
-      <Border Background="White" BorderBrush="#E3E3E3" BorderThickness="0,0,1,1">
+      <Border Background="{DynamicResource Pgms.ContentBackground}" BorderBrush="{DynamicResource Pgms.GridLines}" BorderThickness="0,0,1,1">
        <Grid>
         <Path x:Name="Pointer" Data="M0,0 L5,4.5 0,9 Z" Fill="Black" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0" Visibility="Collapsed"/>
         <Canvas x:Name="Key" Width="10" Height="12" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,1,0" Visibility="Collapsed">
@@ -59,7 +59,7 @@
   </Style>
  </UserControl.Resources>
  <DockPanel>
-  <Border x:Name="ReadOnlyBanner" DockPanel.Dock="Top" Background="#FFF4CE" BorderBrush="#E0D090" BorderThickness="0,0,0,1" Padding="8,4" Visibility="Collapsed">
+  <Border x:Name="ReadOnlyBanner" DockPanel.Dock="Top" Background="{DynamicResource Pgms.InfoBackground}" BorderBrush="#E0D090" BorderThickness="0,0,0,1" Padding="8,4" Visibility="Collapsed">
    <TextBlock x:Name="ReadOnlyText" TextWrapping="Wrap"/>
   </Border>
   <DockPanel x:Name="FeedbackBar" DockPanel.Dock="Bottom" Margin="8,4" Visibility="Collapsed">
@@ -69,8 +69,8 @@
   <Grid>
    <Grid.RowDefinitions><RowDefinition MinHeight="90"/><RowDefinition Height="5"/><RowDefinition Height="270" MinHeight="120"/></Grid.RowDefinitions>
    <DataGrid local:DataGridRowNames.Enabled="True" x:Name="ColumnGrid" AutoGenerateColumns="False" CanUserAddRows="True" CanUserDeleteRows="False" CanUserSortColumns="False" CanUserReorderColumns="False" CanUserResizeRows="False"
-     SelectionUnit="CellOrRowHeader" SelectionMode="Extended" HeadersVisibility="All" RowHeaderWidth="20" GridLinesVisibility="All" HorizontalGridLinesBrush="#E3E3E3" VerticalGridLinesBrush="#E3E3E3"
-     BorderThickness="0" Background="White" RowHeight="23" ColumnHeaderStyle="{StaticResource DesignerHeader}" RowStyle="{StaticResource DesignerRow}"
+     SelectionUnit="CellOrRowHeader" SelectionMode="Extended" HeadersVisibility="All" RowHeaderWidth="20" GridLinesVisibility="All" HorizontalGridLinesBrush="{DynamicResource Pgms.GridLines}" VerticalGridLinesBrush="{DynamicResource Pgms.GridLines}"
+     BorderThickness="0" Background="{DynamicResource Pgms.ContentBackground}" RowHeight="23" ColumnHeaderStyle="{StaticResource DesignerHeader}" RowStyle="{StaticResource DesignerRow}"
      CellStyle="{StaticResource DesignerCell}" RowHeaderStyle="{StaticResource DesignerRowHeader}" CurrentCellChanged="CurrentCellChanged" PreviewMouseRightButtonDown="RowRightClick" PreviewKeyDown="GridKeyDown"
      HorizontalAlignment="Left" AutomationProperties.Name="Columns">
     <DataGrid.Columns>
@@ -106,7 +106,7 @@
     </DataGrid.ContextMenu>
    </DataGrid>
    <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#D6DBE9" AutomationProperties.Name="Resize properties"/>
-   <TabControl x:Name="PropertyTabs" Grid.Row="2" Margin="8,4,8,8" BorderBrush="#C8C8C8" Background="White">
+   <TabControl x:Name="PropertyTabs" Grid.Row="2" Margin="8,4,8,8" BorderBrush="{DynamicResource Pgms.DialogBorder}" Background="{DynamicResource Pgms.ContentBackground}">
     <TabItem x:Name="ColumnTab" Header="Column Properties"><local:DesignerPropertyGrid x:Name="ColumnProperties" Margin="6"/></TabItem>
     <TabItem x:Name="TableTab" Header="Table Properties"><local:DesignerPropertyGrid x:Name="TableProperties" Margin="6"/></TabItem>
    </TabControl>

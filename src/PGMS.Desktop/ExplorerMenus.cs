@@ -221,6 +221,7 @@ public partial class MainWindow
                 foreach (var (header, click, name) in new (string, RoutedEventHandler, string)[] { ("Back Up…", BackupDatabase, "ExplorerBackupDatabase"), ("Restore…", RestoreDatabase, "ExplorerRestoreDatabase"), ("Database Operations…", DatabaseOperations, "ExplorerDatabaseOperations") })
                 { var item = new MenuItem { Header = header, Name = name }; item.Click += click; tasks.Items.Add(item); }
                 menu.Items.Add(tasks);
+                menu.Items.Add(MaintenanceMenu(entry));
                 Add("Find Missing _Foreign Keys…", FindMissingForeignKeys, "ExplorerMissingForeignKeys");
                 Add("Find _Unindexed Foreign Keys…", FindUnindexedForeignKeys, "ExplorerUnindexedForeignKeys");
                 Footer(true, ObjectProperties, "ExplorerObjectProperties", ServerReportService.DatabaseReports);
@@ -294,6 +295,7 @@ public partial class MainWindow
                 }
                 if (entry.CanManagePartitions) Add("Partitions…", PartitionsFromExplorer, "ExplorerPartitions");
                 Add("Pending Index Operation…", PendingIndexFromExplorer, "ExplorerPendingIndex");
+                menu.Items.Add(MaintenanceMenu(entry));
                 Footer(true, TableProperties, "ExplorerTableProperties");
                 break;
             case CatalogKind.Relation when entry.RelationType == "S":
@@ -302,11 +304,18 @@ public partial class MainWindow
                 Separator(); Add("Sequence Operations…", SequenceOperations, "ExplorerSequenceOperations");
                 Footer();
                 break;
+            // PGMS-063 (M1099): foreign tables, foreign servers, publications and subscriptions only read; Properties is the default.
+            case CatalogKind.Relation when entry.RelationType == "f":
+            case CatalogKind.ForeignServer or CatalogKind.Publication or CatalogKind.Subscription:
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Footer(true, ObjectProperties, "ExplorerObjectProperties");
+                break;
             case CatalogKind.Relation when entry.CanInspectObjectProperties: // Views and materialized views.
                 if (entry.RelationType == "v") { Add("New _View…", NewViewFromExplorer, "ExplorerNewView"); Add("De_sign", DesignViewFromExplorer, "ExplorerDesignView"); }
                 RowCommands(edit: entry.RelationType == "v");
                 Script();
                 Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                if (entry.RelationType == "m") { Separator(); menu.Items.Add(MaintenanceMenu(entry)); }
                 Footer(true, ObjectProperties, "ExplorerObjectProperties");
                 break;
             case CatalogKind.Routine:
@@ -327,16 +336,62 @@ public partial class MainWindow
                 Separator(); Add("Re_build All", RebuildAllFromExplorer, "ExplorerRebuildAll");
                 Footer();
                 break;
+            // SSMS 22.11 key menu (M1054): New Foreign Key…, Script Key as, Modify (bold); Rename and Delete follow (PGMS-053, M1086).
             case CatalogKind.Key or CatalogKind.Constraint or CatalogKind.Trigger:
+                if (entry.Kind == CatalogKind.Key) Add("New _Foreign Key…", ForeignKeyOperations, "ExplorerNewForeignKey");
+                if (entry.Kind == CatalogKind.Constraint) Add("New _Constraint…", CheckConstraintOperations, "ExplorerNewConstraint");
+                if (entry.Kind == CatalogKind.Trigger) Add("New _Trigger…", NewTriggerFromExplorer, "ExplorerNewTrigger");
                 Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
                 Script();
+                Add("_Modify", ModifyTableChildFromExplorer, "ExplorerModifyTableChild", isDefault: true);
+                if (entry.Kind == CatalogKind.Trigger) { Add("_Enable", EnableTriggerFromExplorer, "ExplorerEnableTrigger"); Add("Di_sable", DisableTriggerFromExplorer, "ExplorerDisableTrigger"); }
+                Separator(); Add("Rena_me", RenameTableChildFromExplorer, "ExplorerRenameTableChild"); Add("_Delete", DeleteTableChildFromExplorer, "ExplorerDeleteTableChild");
+                Footer();
+                break;
+            case CatalogKind.Keys:
+                Add("New _Foreign Key…", ForeignKeyOperations, "ExplorerNewForeignKey");
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Footer();
+                break;
+            case CatalogKind.Constraints:
+                Add("New _Constraint…", CheckConstraintOperations, "ExplorerNewConstraint");
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Footer();
+                break;
+            // SSMS opens a template in a query for New Function / Stored Procedure / Trigger (PGMS-061, M1088).
+            case CatalogKind.Triggers:
+                Add("New _Trigger…", NewTriggerFromExplorer, "ExplorerNewTrigger");
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Footer();
+                break;
+            case CatalogKind.Functions:
+                Add("New _Function…", NewFunctionFromExplorer, "ExplorerNewFunction");
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Footer();
+                break;
+            case CatalogKind.Procedures:
+                Add("New Stored _Procedure…", NewProcedureFromExplorer, "ExplorerNewProcedure");
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Footer();
+                break;
+            // PGMS-060 (M1090): no SSMS counterpart; New and Delete follow the other object menus, Update is ALTER EXTENSION … UPDATE.
+            case CatalogKind.Extensions:
+                Add("New _Extension…", NewExtensionFromExplorer, "ExplorerNewExtension");
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Footer();
+                break;
+            case CatalogKind.Extension:
+                Add("New _Extension…", NewExtensionFromExplorer, "ExplorerNewExtension");
+                Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");
+                Separator(); Add("_Update Extension…", UpdateExtensionFromExplorer, "ExplorerUpdateExtension", isDefault: true);
+                Separator(); Add("_Delete", DeleteExtensionFromExplorer, "ExplorerDeleteExtension");
                 Footer();
                 break;
             case CatalogKind.DataType:
                 Script();
                 if (entry.CanManageEnum) Add("Enum Values…", EnumFromExplorer, "ExplorerEnumValues");
                 if (entry.CanManageDomain) Add("Domain Constraints…", DomainFromExplorer, "ExplorerDomainConstraints");
-                Footer();
+                Footer(entry.CanInspectObjectProperties, ObjectProperties, "ExplorerObjectProperties"); // composite types (PGMS-063)
                 break;
             default: // Remaining folders, columns, indexes and foreign tables.
                 Add("New _Query", QueryFromExplorer, "ExplorerNewQuery");

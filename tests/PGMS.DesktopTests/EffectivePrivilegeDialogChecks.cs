@@ -40,9 +40,10 @@ internal static class EffectivePrivilegeDialogChecks
                 check(dialog.AccessSnapshot is null && Find<DataGrid>("AccessRows").ItemsSource is null,"Changing inspected object clears prior permission rows");
                 check(Find<DataGrid>("AclRows").ItemsSource is null && Find<TextBlock>("AclNotice").Text.Contains("Target changed"),"Changing target clears ACL entries and their context");
                 await dialog.InspectAsync();
-                check(dialog.AccessSnapshot?.Privileges.Count==16 && Find<DataGrid>("AccessRows").Items.Count==16,"Table inspection displays eight whole-table and eight column privilege rows");
+                int tablePrivileges=await ServerVersionNumber.GetAsync(connection)>=ServerVersionNumber.Maintain?8:7; // MAINTAIN exists from PostgreSQL 17
+                check(dialog.AccessSnapshot?.Privileges.Count==tablePrivileges+8 && Find<DataGrid>("AccessRows").Items.Count==tablePrivileges+8,"Table inspection displays the server whole-table privileges (8 from PostgreSQL 17, 7 before) and eight column privilege rows");
                 check(dialog.AccessSnapshot!.Privileges.All(p=>!p.Allowed),"Inspect does not give a limited role table data access");
-                check(Find<DataGrid>("AclRows").IsReadOnly && Find<DataGrid>("AclRows").Items.Count==8 && dialog.AccessSnapshot.AclEntries.All(e=>e.Source==PrivilegeAclSource.BuiltInDefault),"Table ACL grid shows read-only built-in defaults without implying data authority");
+                check(Find<DataGrid>("AclRows").IsReadOnly && Find<DataGrid>("AclRows").Items.Count==tablePrivileges && dialog.AccessSnapshot.AclEntries.All(e=>e.Source==PrivilegeAclSource.BuiltInDefault),"Table ACL grid shows read-only built-in defaults without implying data authority");
                 Find<TabControl>("AccessLists").SelectedItem=Find<TabItem>("AclTab");
                 await Sql($"GRANT SELECT ON {qSchema}.items TO {qRole};");
                 await dialog.InspectAsync();

@@ -28,7 +28,8 @@ internal static class PrivilegeAclChecks
             var schemaStored=await limited.InspectAsync(PrivilegeTarget.Schema,schema);
             check(schemaStored.AclEntries.Single(e=>e.Grantee==role && e.Privilege=="USAGE") is {Source:PrivilegeAclSource.Stored,GrantOption:false,RoleAvailable:true},"Schema stored ACL preserves exact special-name connected role");
             var tableDefault=await limited.InspectAsync(PrivilegeTarget.Table,"item'\"",schema);
-            check(tableDefault.AclEntries.Count==8 && tableDefault.AclEntries.All(e=>e.Source==PrivilegeAclSource.BuiltInDefault && e.Grantee=="pgms_test"),"Table NULL ACL exposes PG17 built-in owner entries");
+            int ownerDefaults=await ServerVersionNumber.GetAsync(connection)>=ServerVersionNumber.Maintain?8:7; // MAINTAIN joins the owner defaults in PostgreSQL 17
+            check(tableDefault.AclEntries.Count==ownerDefaults && tableDefault.AclEntries.All(e=>e.Source==PrivilegeAclSource.BuiltInDefault && e.Grantee=="pgms_test"),"Table NULL ACL exposes the server built-in owner entries (8 from PostgreSQL 17, 7 before)");
             check(!tableDefault.Privileges.Single(p=>p.Scope=="Table" && p.Privilege=="SELECT").Allowed && tableDefault.AclEntries.Count>0,"Visible ACL metadata does not grant data authority to limited reader");
             await Sql($"GRANT SELECT ON {table} TO {qr} WITH GRANT OPTION;");
             var direct=await limited.InspectAsync(PrivilegeTarget.Table,"item'\"",schema);
@@ -66,9 +67,11 @@ internal static class PrivilegeAclChecks
             await Sql($"CREATE TABLE {cap}({string.Join(",",Enumerable.Range(0,128).Select(i=>$"c{i} integer"))});");
             string columns=string.Join(",",Enumerable.Range(0,126).Select(i=>$"c{i}"));
             await Sql($"GRANT SELECT({columns}),INSERT({columns}),UPDATE({columns}),REFERENCES({columns}) ON {cap} TO {qr};");
+            // 504 column rows plus the owner defaults make 512 on PostgreSQL 17; before 17 one owner default fewer, so one more column row.
+            if(ownerDefaults==7)await Sql($"GRANT SELECT(c126) ON {cap} TO {qr};");
             var boundary=await limited.InspectAsync(PrivilegeTarget.Table,"cap",schema);
             check(boundary.AclEntries.Count==512 && !boundary.AclIncomplete,"Exactly512 ACL rows remain complete at the real quota");
-            await Sql($"GRANT SELECT(c126) ON {cap} TO {qr};");
+            await Sql(ownerDefaults==7?$"GRANT INSERT(c126) ON {cap} TO {qr};":$"GRANT SELECT(c126) ON {cap} TO {qr};");
             var over=await limited.InspectAsync(PrivilegeTarget.Table,"cap",schema);
             check(over.AclEntries.Count==512 && over.AclTruncated && over.AclIncomplete && !over.ColumnsTruncated,"ACL row513 is detected without exceeding512 retained rows");
             var repeated=await limited.InspectAsync(PrivilegeTarget.Table,"cap",schema);

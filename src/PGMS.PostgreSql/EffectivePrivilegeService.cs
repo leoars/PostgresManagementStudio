@@ -42,7 +42,7 @@ public sealed class EffectivePrivilegeService(string connectionString)
         }
         string function = target switch { PrivilegeTarget.Routine => "has_function_privilege", PrivilegeTarget.Database => "has_database_privilege", PrivilegeTarget.Schema => "has_schema_privilege", PrivilegeTarget.Table => "has_table_privilege", PrivilegeTarget.Sequence => "has_sequence_privilege", _ => throw new ArgumentException("Unsupported target.") };
         var privileges = new List<EffectivePrivilege>();
-        await using (var command = new NpgsqlCommand($"SELECT p,pg_catalog.{function}(@oid,p),pg_catalog.{function}(@oid,p || ' WITH GRANT OPTION') FROM pg_catalog.unnest(@privileges::text[]) AS p",connection,transaction) { CommandTimeout=15 })
+        await using (var command = new NpgsqlCommand($"SELECT p,pg_catalog.{function}(@oid,p),pg_catalog.{function}(@oid,p || ' WITH GRANT OPTION') FROM pg_catalog.unnest(@privileges::text[]) AS p WHERE p<>'MAINTAIN' OR pg_catalog.current_setting('server_version_num')::integer>=170000",connection,transaction) { CommandTimeout=15 })
         {
             command.Parameters.AddWithValue("oid",NpgsqlTypes.NpgsqlDbType.Oid,oid);
             command.Parameters.AddWithValue("privileges",PrivilegeRequest.Allowed(target));

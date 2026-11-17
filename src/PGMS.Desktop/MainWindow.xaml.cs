@@ -35,10 +35,16 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        var fontsDocument = EnvironmentSettings.Load();
+        FontsAndColorsSettings.EditorAppearance = fontsDocument.EditorAppearanceChoice;
+        FontsAndColorsSettings.Current = EffectiveFontsAndColors(fontsDocument);
         InitializeComponent();
+        PickInsertFile = PickInsertFileWithDialog;
+        InitializeTabCommands();
         InitializeExplorerToolbar();
         _ = QueryHistory; // startup cleanup of Query History
         WindowWorkArea.Attach(this);
+        ConfigureTitleBar();
         // Keep the caption and status reachable on scaled or small work areas.
         var workArea = SystemParameters.WorkArea;
         if (!workArea.IsEmpty && workArea.Width > 0 && workArea.Height > 0)
@@ -84,10 +90,29 @@ public partial class MainWindow : Window
         InputBindings.Add(new KeyBinding(QueryView.GoToLineCommand,Key.G,ModifierKeys.Control));
         CommandBindings.Add(new CommandBinding(SqlEditorCommands.Comment,(_,_)=>ActiveQuery?.CommentSelection(false),(_,e)=>e.CanExecute=ActiveQuery is not null && !closingWindow && !closeRequested));
         CommandBindings.Add(new CommandBinding(SqlEditorCommands.Uncomment,(_,_)=>ActiveQuery?.CommentSelection(true),(_,e)=>e.CanExecute=ActiveQuery is not null && !closingWindow && !closeRequested));
+        foreach(var (command,run) in SqlEditorCommands.TextEdits)
+            CommandBindings.Add(new CommandBinding(command,(_,_)=>ActiveQuery?.RunTextEdit(run),(_,e)=>e.CanExecute=ActiveQuery is not null && !closingWindow && !closeRequested));
+        ConfigureEncodingCommands();
+        ConfigureBookmarkCommands();
+        ConfigureHelpCommands();
+        ConfigureTemplateCommands();
+        ConfigureFindInFilesCommands();
+        ConfigurePaneCommands();
+        ConfigurePropertiesWindow();
+        ConfigureObjectDetails();
+        ConfigureEditorConveniences();
+        ConfigureCustomization();
+        ApplyTheme();
+        Closed += (_, _) => StopFollowingSystemTheme();
+        HookOutput();
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Save, async (_, _) => { if (ActiveQuery is { } query) await SaveAsync(query); else if (ActiveDesigner is { } designer) await designer.SaveAsync(); else if (ActiveDiagram is { } diagram) await diagram.SaveAsync(); else if (ActiveViewDesigner is { } viewDesigner) await viewDesigner.SaveAsync(); }, (_, e) => e.CanExecute = ActiveDesigner is { CanEdit: true, IsDirty: true } || ActiveDiagram is { IsBusy: false, IsDirty: true } || ActiveViewDesigner is { IsBusy: false, IsDirty: true } || ActiveQuery is { } active && !IsSaving(active) && !closingWindow && !closingQueries.Contains(active)));
         PreviewKeyDown += async (_, e) =>
         {
+            if (HandleWindowChord(e)) return;
+            if (HandleAssignedShortcut(e)) return;
+            if (HandleToolWindowShortcut(e)) return;
             if (HandleQueryMenuShortcut(e)) return;
+            if (await HandleQueryShortcutAsync(e)) return;
             if (e.Key == Key.F5)
             {
                 e.Handled = true;
@@ -102,15 +127,20 @@ public partial class MainWindow : Window
                 loading.CancelLoad(); e.Handled = true;
             }
             if (e.Key == Key.F8) { ShowExplorer(this, e); e.Handled = true; }
+            if (HandlePropertiesShortcut(e)) return;
+            if (e.Key == Key.F7 && Keyboard.Modifiers == ModifierKeys.None) { ShowObjectExplorerDetails(); e.Handled = true; }
             if (HandleResultsShortcut(e)) return;
             // SSMS shortcut for Activity Monitor; with Alt held WPF reports the letter in SystemKey.
             if ((e.Key == Key.System ? e.SystemKey : e.Key) == Key.A && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt)) { ShowActivity(this, e); e.Handled = true; }
             if ((e.Key == Key.System ? e.SystemKey : e.Key) == Key.G && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt)) { ShowRegisteredServers(); e.Handled = true; }
-            if ((e.Key == Key.System ? e.SystemKey : e.Key) == Key.H && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt)) { ShowQueryHistory(); e.Handled = true; }
+            if ((e.Key == Key.System ? e.SystemKey : e.Key) == Key.H && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt)) { ShowQueryHistory(); e.Handled = true; } if ((e.Key == Key.System ? e.SystemKey : e.Key) == Key.T && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt)) { ShowTemplateExplorer(); e.Handled = true; }
         };
     }
 
     internal Action<string, double>? UiPhaseMeasured { get; set; }
+
+    /// <summary>A new, unconnected query tab with the text (tests and callers outside the window).</summary>
+    internal QueryView NewQueryTab(string? text = null) => NewQuery(text);
 
     /// <param name="origin">Query History origin of text given here without a file (scripts, generated SQL); recovered drafts pass Typed.</param>
     private QueryView NewQuery(string? text = null, string? path = null, Guid? recoveryId = null, bool activate = true, PreparedQueryDocument? prepared = null, QueryHistoryOrigin origin = QueryHistoryOrigin.Other)
@@ -134,14 +164,17 @@ public partial class MainWindow : Window
         var environment = EnvironmentSettings.Load();
         view.ResultsDestination = environment.DefaultResults;
         view.ApplyQueryOptions(environment.QueryOptionDefaults);
+        if (!ReferenceEquals(view.Appearance, FontsAndColorsSettings.Current)) view.ApplyAppearance(FontsAndColorsSettings.Current); // a spare made before Options changed
         view.JsonLinkRequested += OpenJsonDocument;
         view.PlanTabRequested += statements => OpenPlanDocument(statements, "Execution plan", PlanOrigin(view));
         view.MissingIndexDetailsRequested += OpenMissingIndexDetails;
+        view.ExecutionNoted += (_, _) => NoteExecutionForToolWindows(view);
         var document = new LayoutDocument { Title = path is null ? $"SQLQuery{++sequence}.sql" : Path.GetFileName(path), ContentId = Guid.NewGuid().ToString(), Content = view };
         documents.Add(view, document);
         view.StateChanged += (_, _) =>
         {
             document.Title = document.Title.TrimEnd('*') + (view.IsDirty ? "*" : "");
+            UpdateConnectionTexts();
             RefreshCommands();
         };
         document.Closing += (_, e) =>
@@ -150,7 +183,7 @@ public partial class MainWindow : Window
             e.Cancel = true;
             _ = CloseQueryAsync(view);
         };
-        document.Closed += async (_, _) => { documents.Remove(view); await view.DisposeAsync(); RefreshCommands(); };
+        document.Closed += async (_, _) => { documents.Remove(view); RefreshPropertiesWindow(); UpdateConnectionTexts(); await view.DisposeAsync(); RefreshCommands(); };
         AddDocument(document);
         if (activate) document.IsActive = true;
         // The editor is not yet in the visual tree when the document is inserted.
@@ -174,20 +207,6 @@ public partial class MainWindow : Window
             DockManager.Layout.RootPanel.Children.Add(pane);
         }
         pane.Children.Add(document);
-    }
-
-    private async void Open(object sender, ExecutedRoutedEventArgs e)
-    {
-        var dialog = new OpenFileDialog { Filter = "SQL files (*.sql)|*.sql|All files (*.*)|*.*", Multiselect = true };
-        if (dialog.ShowDialog(this) != true) return;
-        foreach (var file in dialog.FileNames)
-        {
-            if (closeRequested || shuttingDown) break;
-            try { await OpenQueryFileAsync(file); }
-            catch (OperationCanceledException) { break; }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-            { ShowError(ex); }
-        }
     }
 
     public bool TryOpenQueryFile(string path, out Exception? error)
@@ -298,6 +317,7 @@ public partial class MainWindow : Window
             if (token.IsCancellationRequested || explorerConnection != connection) return; // Disconnected while loading.
             ExplorerTree.Items.Clear();
             ExplorerTree.Items.Add(root);
+            _ = LabelServerNodeAsync(root, connection, token);
             Status.Text = "Object Explorer refreshed. Expand a database to load its objects.";
             NewDatabaseMenu.IsEnabled = NewSchemaMenu.IsEnabled = NewRoleMenu.IsEnabled = BackupMenu.IsEnabled = RestoreMenu.IsEnabled = true;
             BackupGlobalsMenu.IsEnabled=RestoreGlobalsMenu.IsEnabled=true;
@@ -588,7 +608,18 @@ public partial class MainWindow : Window
     public static readonly RoutedUICommand DesignQueryInEditor = new("Design Query in Editor", nameof(DesignQueryInEditor), typeof(MainWindow));
     public static readonly RoutedUICommand ShowQueryOptions = new("Query Options", nameof(ShowQueryOptions), typeof(MainWindow));
     // Opens the assistant for the active query tab; the generated SQL only reaches the editor through Insert.
-    internal void OpenAiQuery(string? settingsPath = null)
+    internal void OpenAiQuery(string? settingsPath = null) => OpenAiQuery(null, settingsPath);
+
+    /// <summary>Tests: receives the AI window instead of showing it modally.</summary>
+    internal Action<AiQueryDialog>? AiQueryShown { get; set; }
+
+    private void ExplainSqlWithAi(object sender, RoutedEventArgs e) => OpenAiQuery(AiSqlAction.Explain);
+    private void FixSqlWithAi(object sender, RoutedEventArgs e) => OpenAiQuery(AiSqlAction.Fix);
+    private void OptimizeSqlWithAi(object sender, RoutedEventArgs e) => OpenAiQuery(AiSqlAction.Optimize);
+
+    /// <param name="action">Explain, Fix or Optimize (M1115): the window opens with the selected SQL (or the whole document when nothing is
+    /// selected) and a request written for it, which the user can change before Generate.</param>
+    internal void OpenAiQuery(AiSqlAction? action, string? settingsPath = null)
     {
         if (ActiveQuery is not { } query) return;
         if (!query.IsConnected || query.ConnectionString is not { } connection) { Status.Text = "Connect this query window before generating SQL with AI."; return; }
@@ -610,7 +641,12 @@ public partial class MainWindow : Window
             }
         }
         if (provider is null) { Status.Text = "The AI assistant is not configured."; return; }
-        var dialog = new AiQueryDialog(provider, connection, query.SelectedSql, query.InsertGeneratedSql) { Owner = this };
+        string? sql = query.SelectedSql;
+        if (action is not null && string.IsNullOrWhiteSpace(sql)) sql = query.Editor.Text;
+        if (action is not null && string.IsNullOrWhiteSpace(sql)) { Status.Text = "Write or select the SQL to " + action.Value.ToString().ToLowerInvariant() + " first."; return; }
+        var dialog = new AiQueryDialog(provider, connection, sql, query.InsertGeneratedSql) { Owner = this };
+        if (action is { } chosen) dialog.Prefill(AiQueryGenerator.ActionRequest(chosen, chosen == AiSqlAction.Fix ? query.LastError?.Code : null, chosen == AiSqlAction.Fix ? query.LastError?.Message : null));
+        if (AiQueryShown is { } shown) { shown(dialog); return; }
         if (dialog.ShowDialog() == true && dialog.WasInserted) Status.Text = "AI-generated SQL inserted into the editor. Review it before running.";
     }
     private void ConfigureServerTls(object sender, RoutedEventArgs e)
@@ -907,8 +943,24 @@ public partial class MainWindow : Window
     }
     private async void SaveAs(object sender, RoutedEventArgs e) { if (ActiveQuery is { } query) await SaveAsync(query, true); }
     private void ViewMenuOpened(object sender,RoutedEventArgs e){WordWrapMenu.IsEnabled=ActiveQuery is not null;WordWrapMenu.IsChecked=ActiveQuery?.WordWrap==true;WhiteSpaceMenu.IsEnabled=ActiveQuery is not null;WhiteSpaceMenu.IsChecked=ActiveQuery?.ShowWhiteSpace==true;}
-    private void ToggleWordWrap(object sender,RoutedEventArgs e){if(ActiveQuery is { } query)query.WordWrap=WordWrapMenu.IsChecked;}
-    private void ToggleWhiteSpace(object sender,RoutedEventArgs e){if(ActiveQuery is { } query)query.ShowWhiteSpace=WhiteSpaceMenu.IsChecked;}
+    private void AdvancedMenuOpened(object sender,RoutedEventArgs e){SpellCheckerMenu.IsEnabled=ActiveQuery is not null;SpellCheckerMenu.IsChecked=ActiveQuery?.SpellCheck==true;AdvancedWordWrapMenu.IsEnabled=ActiveQuery is not null;AdvancedWordWrapMenu.IsChecked=ActiveQuery?.WordWrap==true;AdvancedWhiteSpaceMenu.IsEnabled=ActiveQuery is not null;AdvancedWhiteSpaceMenu.IsChecked=ActiveQuery?.ShowWhiteSpace==true;}
+    private void EditMenuOpened(object sender,RoutedEventArgs e){if(ReferenceEquals(e.OriginalSource,sender))InsertFileAsTextMenu.IsEnabled=ActiveQuery is not null && !closingWindow && !closeRequested;}
+    private void ToggleWordWrap(object sender,RoutedEventArgs e){if(ActiveQuery is { } query)query.WordWrap=((MenuItem)sender).IsChecked;}
+    private void ToggleWhiteSpace(object sender,RoutedEventArgs e){if(ActiveQuery is { } query)query.ShowWhiteSpace=((MenuItem)sender).IsChecked;}
+    /// <summary>Picks the file to insert; tests replace it to avoid the modal dialog.</summary>
+    internal Func<string?> PickInsertFile { get; set; }
+    private async void InsertFileAsText(object sender,RoutedEventArgs e)
+    {
+        if(ActiveQuery is not { } query)return;
+        if(PickInsertFile() is not { } path)return;
+        try{await query.InsertFileAsTextAsync(path);}
+        catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or InvalidDataException){ShowError(ex);}
+    }
+    private string? PickInsertFileWithDialog()
+    {
+        var dialog=new OpenFileDialog{Title="Insert File",Filter="SQL files (*.sql)|*.sql|All files (*.*)|*.*"};
+        return dialog.ShowDialog(this)==true?dialog.FileName:null;
+    }
     private void Find(object sender, RoutedEventArgs e) => ActiveQuery?.Find();
     private void Exit(object sender, RoutedEventArgs e) => Close();
     private void About(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
@@ -988,10 +1040,24 @@ public partial class MainWindow : Window
         EnvironmentSettings.Update(d => d with { Window = new(Math.Round(bounds.Left), Math.Round(bounds.Top), Math.Round(bounds.Width), Math.Round(bounds.Height), maximized) });
     }
 
-    private void ShowOptions(object sender, RoutedEventArgs e)
+    private void ShowOptions(object sender, RoutedEventArgs e) => ShowOptions();
+
+    /// <summary>Tools ▸ Options, on <paramref name="page"/> when given ("Keyboard" from Customize).</summary>
+    internal void ShowOptions(string? page = null)
     {
-        var dialog = new OptionsDialog(EnvironmentSettings, () => QueryHistory.ClearAsync()) { Owner = this };
-        dialog.ShowDialog();
+        var dialog = new OptionsDialog(EnvironmentSettings, () => QueryHistory.ClearAsync(), KeyboardCommands()) { Owner = this };
+        if (page is not null && !dialog.SelectPagePath(page)) dialog.SelectPage(page);
+        if (OptionsShown is { } shown) { shown(dialog); return; }
+        if (dialog.ShowDialog() == true) { ApplyFontsAndColors(); ApplyCustomization(); }
+    }
+
+    /// <summary>Fonts and Colors applies at once to every open query window, as in SSMS.</summary>
+    internal void ApplyFontsAndColors()
+    {
+        var fontsDocument = EnvironmentSettings.Load();
+        FontsAndColorsSettings.EditorAppearance = fontsDocument.EditorAppearanceChoice;
+        FontsAndColorsSettings.Current = EffectiveFontsAndColors(fontsDocument);
+        foreach (var query in OpenQueries()) query.ApplyAppearance(FontsAndColorsSettings.Current);
     }
 
     private void RestoreSavedLayout()
@@ -1004,6 +1070,10 @@ public partial class MainWindow : Window
             {
                 if (args.Model.ContentId == "explorer") args.Content = ExplorerContent;
                 else if (args.Model.ContentId == RegisteredServersId) args.Content = RegisteredServers;
+                else if (args.Model.ContentId == TemplateExplorerId) args.Content = TemplateExplorer;
+                else if (args.Model.ContentId == FindResultsId) args.Content = FindResults;
+                else if (args.Model.ContentId == PropertiesWindowId) args.Content = PropertiesContent;
+                else if (ToolContentFor(args.Model.ContentId) is { } tool) args.Content = tool;
                 else args.Cancel = true; // Never restore an empty tab pretending its text was saved.
             };
             serializer.Deserialize(layoutFile);

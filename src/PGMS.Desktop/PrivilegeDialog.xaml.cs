@@ -54,6 +54,20 @@ public partial class PrivilegeDialog : Window
         }
         RestorePendingCommit();
         Loaded += (_,_) => {if(HasUnconfirmedCommit)InspectButton.Focus();else ObjectType.Focus();};
+        serverVersion=ServerVersionNumber.Cached(connection);
+        if(serverVersion is null)Loaded += async (_,_) => await LoadServerVersionAsync();
+    }
+    private int? serverVersion;
+    internal Task ServerVersionLoaded { get; private set; } = Task.CompletedTask;
+    // The list starts complete; once the version is known, what that server does not have (MAINTAIN before 17) leaves it.
+    private Task LoadServerVersionAsync()
+    {
+        async Task Load()
+        {
+            try { serverVersion=await ServerVersionNumber.GetAsync(connection); } catch (Exception ex) when (ex is NpgsqlException or TimeoutException or System.Net.Sockets.SocketException or InvalidOperationException) { return; }
+            if(serverVersion is < ServerVersionNumber.Maintain && IsLoaded) ConfigureColumnScope();
+        }
+        return ServerVersionLoaded=Load();
     }
     /// <summary>The target of an Object Explorer selection: its database, a schema, a table, view or materialized view, or a sequence.</summary>
     internal static (PrivilegeTarget Target, string? Schema, string Name)? Preselection(CatalogEntry entry) => entry switch
@@ -154,7 +168,7 @@ public partial class PrivilegeDialog : Window
     private void ConfigureColumnScope()
     {
         string? selected=Privilege.SelectedItem as string;
-        var choices=ColumnScopeActive ? PrivilegeRequest.AllowedForColumn : PrivilegeRequest.Allowed((PrivilegeTarget)ObjectType.SelectedItem);
+        var choices=ColumnScopeActive ? PrivilegeRequest.AllowedForColumn : PrivilegeRequest.Allowed((PrivilegeTarget)ObjectType.SelectedItem,serverVersion);
         Privilege.ItemsSource=choices;
         Privilege.SelectedItem=selected is not null && choices.Contains(selected) ? selected : choices[0];
         TableColumnScope.Visibility=ObjectType.SelectedItem is PrivilegeTarget.Table ? Visibility.Visible : Visibility.Collapsed;

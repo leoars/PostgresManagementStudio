@@ -18,6 +18,12 @@ internal static class FilterSettingsChecks
         var excluding = new CatalogFilter("ord", CatalogFilterOperator.DoesNotContain);
         check(!excluding.Matches("orders", null) && excluding.Matches("items", null), "Does not contain excludes matching names");
         check(new CatalogFilter("ORDERS", CatalogFilterOperator.Equals).Matches("orders", null) && !new CatalogFilter("order", CatalogFilterOperator.Equals).Matches("orders", null), "Equals compares the whole name and ignores case");
+        check(FilterCriterion.Operators.Select(o => o.Label).SequenceEqual(["Contains", "Equals", "Does not contain", "Does not equal"]), "Filter Settings offers the four SSMS text operators (Does not equal added in M1087)");
+        var notEqual = new CatalogFilter("ORDERS", CatalogFilterOperator.DoesNotEqual);
+        check(!notEqual.Matches("orders", null) && notEqual.Matches("orders_2024", null) && notEqual.Matches("items", null), "Does not equal excludes only the whole name, ignoring case");
+        var notOwned = new CatalogFilter(Owner: "ana", OwnerOperator: CatalogFilterOperator.DoesNotEqual);
+        check(!notOwned.Matches("t", "ANA") && notOwned.Matches("t", "anabel") && notOwned.Matches("t", null), "Owner also takes Does not equal; objects without an owner pass");
+        check(new CatalogFilter("x", CatalogFilterOperator.DoesNotEqual).IsActive && !new CatalogFilter("", CatalogFilterOperator.DoesNotEqual).IsActive, "An empty value does not filter, whatever the operator");
         var owned = new CatalogFilter(Owner: "ana");
         check(owned.Matches("t", "ana") && !owned.Matches("t", "bob") && !owned.Matches("t", "anabel"), "Owner criterion defaults to Equals");
 

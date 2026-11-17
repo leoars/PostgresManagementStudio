@@ -39,6 +39,7 @@ public partial class MainWindow
         EstimatedPlanButton.IsEnabled = EstimatedPlanMenu.IsEnabled = ParseMenu.IsEnabled = query is { IsConnected: true, IsBusy: false };
         ClientStatisticsMenu.IsEnabled = ResetClientStatisticsMenu.IsEnabled = OpenServerMenu.IsEnabled = query is not null;
         ClientStatisticsMenu.IsChecked = query?.IncludeClientStatistics == true;
+        LiveStatisticsMenu.IsEnabled = query is not null; LiveStatisticsMenu.IsChecked = query?.IncludeLiveStatistics == true;
         IntelliSenseMenu.IsEnabled = ListMembersMenu.IsEnabled = CompleteWordMenu.IsEnabled = RefreshCacheMenu.IsEnabled = query is not null;
         IntelliSenseMenu.IsChecked = query?.IntelliSenseEnabled == true;
         ActualPlanButton.IsEnabled = ActualPlanMenu.IsEnabled = query is not null;

@@ -1,5 +1,5 @@
 <Window x:Class="PGMS.Desktop.SequenceDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="Sequence Operations" Width="780" Height="820" MinWidth="600" MinHeight="480" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+ Title="Sequence Operations" Width="780" Height="820" MinWidth="600" MinHeight="480" Background="{DynamicResource Pgms.DialogBackground}" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
  <Window.Resources>
   <DataTemplate x:Key="WrappingAccessText"><AccessText Text="{Binding}" TextWrapping="Wrap"/></DataTemplate>
   <Style TargetType="Label"><Setter Property="ContentTemplate" Value="{StaticResource WrappingAccessText}"/></Style>
@@ -10,7 +10,7 @@
   <ScrollViewer x:Name="ContentScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalContentAlignment="Stretch" Focusable="False">
   <Grid>
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*" MinHeight="100"/><RowDefinition x:Name="PreviewRow" Height="*" MinHeight="80"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <Border Background="{DynamicResource Pgms.PaneBackground}" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
   <StackPanel x:Name="Fields" AutomationProperties.HelpText="{Binding Text, ElementName=Feedback}" Grid.Row="1">
    <Label Content="_Operation:" Target="{Binding ElementName=Operation}"/><ComboBox x:Name="Operation" AutomationProperties.Name="Operation" Padding="4" SelectionChanged="Changed"/>
    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>

@@ -27,6 +27,21 @@ internal static class MaintainPrivilegeChecks
             catch(PostgresException ex)when(ex.SqlState=="42501"){return false;}
             finally{await tx.RollbackAsync();}
         }
+        if(await ServerVersionNumber.GetAsync(connection)<ServerVersionNumber.Maintain)
+        {
+            // MAINTAIN does not exist before PostgreSQL 17: the lists leave it out and the server refuses it.
+            check(!PrivilegeRequest.Allowed(PrivilegeTarget.Table,160000).Contains("MAINTAIN") && !DefaultPrivilegeRequest.Allowed(DefaultPrivilegeTarget.Tables,160000).Contains("MAINTAIN"),"Before PostgreSQL 17 the table privilege lists leave MAINTAIN out");
+            try
+            {
+                await Sql($"CREATE ROLE {qw};CREATE SCHEMA {qs};CREATE TABLE {table}(id int)");
+                var old=await new EffectivePrivilegeService(connection).InspectAsync(request.Target,request.Name,schema);
+                check(old.Privileges.Count>0 && old.Privileges.All(p=>p.Privilege!="MAINTAIN"),"Before PostgreSQL 17 table inspection works and does not ask for MAINTAIN");
+                bool refused=false;try{await Sql(request.ToSql());}catch(PostgresException){refused=true;}
+                check(refused,"Before PostgreSQL 17 the server refuses GRANT MAINTAIN");
+            }
+            finally{await Sql($"DROP SCHEMA IF EXISTS {qs} CASCADE;DROP ROLE IF EXISTS {qw}");}
+            return;
+        }
         try
         {
             await Sql($"CREATE ROLE {qo} LOGIN;CREATE ROLE {qw} LOGIN;CREATE ROLE {qd} LOGIN;CREATE SCHEMA {qs} AUTHORIZATION {qo};CREATE TABLE {table}(id int);INSERT INTO {table} VALUES(77);ALTER TABLE {table} OWNER TO {qo};GRANT USAGE ON SCHEMA {qs} TO {qw},{qd}");

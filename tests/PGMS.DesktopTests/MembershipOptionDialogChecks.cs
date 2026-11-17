@@ -67,6 +67,12 @@ internal static class MembershipOptionDialogChecks
             check(Find<TextBlock>("Feedback").Text.Contains("notice") && !Find<TextBlock>("Feedback").Text.Contains("completed"),"No-op membership Notice remains visible without false success");
             Find<CheckBox>("OptionEnabled").IsChecked=true;await dialog.ApplyAsync();await dialog.InspectAsync();
             check(Find<TextBox>("Inspection").Text.Contains("ADMIN=True INHERIT=False SET=False"),"Corrected option proposal recovers and preserves other flags");
+            // PGMS-013: the effective list shows the same membership with the server's answers.
+            check(Find<TextBox>("EffectiveInspection").Text.Contains($"{group} | via {member} → {group} | privileges: not inherited | SET ROLE: no",StringComparison.Ordinal),"Inspect also fills the effective memberships with path, privileges and SET ROLE");
+            check(UIElementAutomationPeer.CreatePeerForElement(Find<TextBox>("EffectiveInspection"))?.GetName()=="Effective memberships","Effective memberships list has an automation name");
+            Find<TextBox>("GrantedRole").Text=group+" ";Find<TextBox>("GrantedRole").Text=group;
+            check(Find<TextBox>("EffectiveInspection").Text=="","Editing the proposal clears the effective memberships snapshot");
+            await dialog.InspectAsync();
             Find<ScrollViewer>("ContentScroller").ScrollToTop();await dialog.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);dialog.Activate();
             check(UIElementAutomationPeer.CreatePeerForElement(Find<ComboBox>("OptionChoice"))?.GetName()=="Membership option" && UIElementAutomationPeer.CreatePeerForElement(Find<CheckBox>("OptionEnabled"))?.GetName()=="Membership option enabled","Membership option controls expose stable automation names");
             AccessKeyManager.ProcessKey(PresentationSource.FromVisual(dialog),"o",false);
@@ -78,7 +84,7 @@ internal static class MembershipOptionDialogChecks
             check(!Find<Button>("ApplyButton").IsDefault,"Membership option Apply is never implicit Enter action");
             foreach(bool small in new[]{false,true})
             {
-                dialog.Width=small?dialog.MinWidth:760;dialog.Height=small?dialog.MinHeight:580;
+                dialog.Width=small?dialog.MinWidth:760;dialog.Height=small?dialog.MinHeight:760;
                 Find<CheckBox>("Revoke").IsChecked=false;Find<CheckBox>("OptionEnabled").IsChecked=true;await dialog.InspectAsync();
                 Find<ScrollViewer>("ContentScroller").ScrollToEnd();await dialog.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
                 foreach(string name in new[]{"ScriptButton","ApplyButton","CloseButton"})

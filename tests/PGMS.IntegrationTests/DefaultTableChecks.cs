@@ -6,11 +6,12 @@ internal static class DefaultTableChecks
     internal static async Task RunAsync(string connection,Action<bool,string> check)
     {
         await using var f=await FutureDefaultFixture.CreateAsync(connection);
+        int serverVersion=await ServerVersionNumber.GetAsync(connection);
         await f.Owner($"CREATE TABLE {f.QS}.old(id integer PRIMARY KEY)");
-        foreach(string privilege in DefaultPrivilegeRequest.Allowed(DefaultPrivilegeTarget.Tables))
+        foreach(string privilege in DefaultPrivilegeRequest.Allowed(DefaultPrivilegeTarget.Tables,serverVersion))
             check(await f.Apply(DefaultPrivilegeTarget.Tables,privilege),"Guarded table default accepts future privilege: "+privilege);
         await f.Owner($"CREATE TABLE {f.QS}.future(id integer PRIMARY KEY);CREATE VIEW {f.QS}.future_view AS SELECT 7 AS id");
-        foreach(string privilege in DefaultPrivilegeRequest.Allowed(DefaultPrivilegeTarget.Tables))
+        foreach(string privilege in DefaultPrivilegeRequest.Allowed(DefaultPrivilegeTarget.Tables,serverVersion))
             check(!await f.Has("has_table_privilege",f.QS+".old",privilege) && await f.Has("has_table_privilege",f.QS+".future",privilege),"Creation-time table ACL receives default without rewriting old table: "+privilege);
         check(await f.Denied($"SELECT * FROM {f.QS}.future"),"Table default SELECT does not bypass missing schema USAGE");
         await f.Admin($"GRANT USAGE,CREATE ON SCHEMA {f.QS} TO {f.QR}");
@@ -22,7 +23,7 @@ internal static class DefaultTableChecks
         await f.Reader($"CREATE TABLE {f.QS}.reader_child(parent_id integer REFERENCES {f.QS}.future(id))");check(true,"Future REFERENCES default authorizes a real foreign key");
         await f.Owner($"CREATE FUNCTION {f.QS}.trigger_fn() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'");
         await f.Reader($"CREATE TRIGGER reader_trigger BEFORE INSERT ON {f.QS}.future FOR EACH ROW EXECUTE FUNCTION {f.QS}.trigger_fn()");check(true,"Future TRIGGER default authorizes actual trigger creation");
-        await f.Reader($"VACUUM {f.QS}.future");check(true,"Future MAINTAIN default authorizes VACUUM by recipient");
+        if(serverVersion>=ServerVersionNumber.Maintain){await f.Reader($"VACUUM {f.QS}.future");check(true,"Future MAINTAIN default authorizes VACUUM by recipient");}
         await f.Reader($"TRUNCATE {f.QS}.future,{f.QS}.reader_child");check(await f.ReaderCount($"SELECT count(*) FROM {f.QS}.future")==0,"Future TRUNCATE default authorizes actual table truncation");
         bool rejected=false;try{await f.Owner($"ALTER DEFAULT PRIVILEGES FOR ROLE {f.QO} IN SCHEMA {f.QS} GRANT SELECT(id) ON TABLES TO {f.QR}");}catch(PostgresException e)when(e.SqlState=="0LP01"){rejected=true;}
         check(rejected,"PostgreSQL refuses column-specific default privileges; table policy is explicit");

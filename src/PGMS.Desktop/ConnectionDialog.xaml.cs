@@ -55,7 +55,9 @@ public partial class ConnectionDialog : Window
         if (saved.Width is { } width && saved.Height is { } height) { Width = Math.Max(width, MinWidth); Height = Math.Max(height, MinHeight); }
         SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WatchUserResize);
         Loaded += (_, _) => { if (Profiles.SelectedItem is not null && Password.Password.Length == 0) Password.Focus(); else Host.Focus(); };
-        try { ReloadProfiles(profileId ?? (newProfileGroup is null ? saved.LastProfile : null)); }
+        // Tools ▸ Options ▸ Connection Dialog ▸ Automatically select the most recent connection (PGMS-073, on by default as in SSMS 22.11).
+        bool selectRecent = new EnvironmentOptions(EnvironmentOptions.DefaultPath).Load().AutoSelectRecentConnection;
+        try { ReloadProfiles(profileId ?? (newProfileGroup is null && selectRecent ? saved.LastProfile : null)); }
         catch (Exception ex) when (IsProfileError(ex)) { Error.Text = "Profiles could not be loaded. The existing file was preserved. " + ex.Message; }
         rememberChoice = profileId is null && newProfileGroup is null;
         if (newProfileGroup is not null && profileId is null) Error.Text = $"New registration in group \"{newProfileGroup}\". Enter settings and choose Save Profile.";
@@ -67,7 +69,7 @@ public partial class ConnectionDialog : Window
         NewProfile(this, new RoutedEventArgs());
         ProfileName.Text = $"{c.Host}:{c.Port}"; Host.Text = c.Host; Port.Text = c.Port.ToString(System.Globalization.CultureInfo.InvariantCulture); Database.Text = c.Database; Username.Text = c.Username;
         Ssl.SelectedItem = Ssl.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Content == c.SslMode.ToString()) ?? Ssl.SelectedItem;
-        RootCertificate.Text = c.RootCertificate ?? "";
+        RootCertificate.Text = c.RootCertificate ?? ""; ClientCertificate.Text = c.SslCertificate ?? ""; ClientKey.Text = c.SslKey ?? "";
         Error.Text = "New server registration from Object Explorer. Enter the password to save it, then choose Save Profile.";
     }
     // Only a resize by the user counts: WindowWorkArea also shrinks the window on small screens, and that must not become the saved size.
@@ -90,7 +92,7 @@ public partial class ConnectionDialog : Window
     }
     private void NewProfile(object sender, RoutedEventArgs e)
     {
-        Profiles.SelectedItem = null; selectedId = null; ProfileName.Clear(); Password.Clear(); RememberPassword.IsChecked = false; DisableHistory.IsChecked = false; DeleteProfileButton.IsEnabled = false; Error.Text = "New profile. Enter settings and choose Save Profile.";
+        Profiles.SelectedItem = null; selectedId = null; ProfileName.Clear(); Password.Clear(); KeyPassword.Clear(); RememberPassword.IsChecked = false; DisableHistory.IsChecked = false; DeleteProfileButton.IsEnabled = false; Error.Text = "New profile. Enter settings and choose Save Profile.";
     }
     private void SelectProfile(object sender, SelectionChangedEventArgs e)
     {
@@ -98,10 +100,13 @@ public partial class ConnectionDialog : Window
         if (rememberChoice) preferences.Update(d => d with { LastProfile = p.Id });
         selectedId = p.Id; ProfileName.Text = p.Name; Host.Text = p.Host; Port.Text = p.Port.ToString(); Database.Text = p.Database; Username.Text = p.Username;
         Ssl.SelectedItem = Ssl.Items.OfType<ComboBoxItem>().First(i => (string)i.Content == p.SslMode); RootCertificate.Text = p.RootCertificate ?? "";
+        ClientCertificate.Text = p.ClientCertificate ?? ""; ClientKey.Text = p.ClientKey ?? "";
         DisableHistory.IsChecked = p.DisableQueryHistory;
-        Password.Clear(); RememberPassword.IsChecked = false; DeleteProfileButton.IsEnabled = true; Error.Text = "";
+        Password.Clear(); KeyPassword.Clear(); RememberPassword.IsChecked = false; DeleteProfileButton.IsEnabled = true; Error.Text = "";
         try { Password.Password = p.RevealPassword(); RememberPassword.IsChecked = p.ProtectedPassword is not null; }
         catch (Exception ex) when (IsProfileError(ex)) { Error.Text = "Saved password is unavailable. Re-enter it and save the profile to replace it."; }
+        try { KeyPassword.Password = p.RevealKeyPassword(); if (p.ProtectedKeyPassword is not null) RememberPassword.IsChecked = true; }
+        catch (Exception ex) when (IsProfileError(ex)) { Error.Text = "Saved key password is unavailable. Re-enter it and save the profile to replace it."; }
     }
     private void SaveProfile(object sender, RoutedEventArgs e)
     {
@@ -109,11 +114,12 @@ public partial class ConnectionDialog : Window
         try
         {
             string? group = selectedId is { } existing ? store.Load().FirstOrDefault(p => p.Id == existing)?.Group : newProfileGroup;
-            var profile = new ConnectionProfile(selectedId ?? Guid.NewGuid(), ProfileName.Text.Trim(), settings.Host!, settings.Port, settings.Database!, settings.Username!, settings.SslMode.ToString(), RootCertificate: string.IsNullOrEmpty(settings.RootCertificate) ? null : settings.RootCertificate, Group: group, DisableQueryHistory: DisableHistory.IsChecked == true);
+            var profile = new ConnectionProfile(selectedId ?? Guid.NewGuid(), ProfileName.Text.Trim(), settings.Host!, settings.Port, settings.Database!, settings.Username!, settings.SslMode.ToString(), RootCertificate: string.IsNullOrEmpty(settings.RootCertificate) ? null : settings.RootCertificate, Group: group, DisableQueryHistory: DisableHistory.IsChecked == true,
+                ClientCertificate: string.IsNullOrEmpty(settings.SslCertificate) ? null : settings.SslCertificate, ClientKey: string.IsNullOrEmpty(settings.SslKey) ? null : settings.SslKey);
             profile.Validate();
-            profile = profile.WithPassword(Password.Password, RememberPassword.IsChecked == true);
-            string sessionPassword = Password.Password;
-            store.Save(profile); SavedProfileId = profile.Id; ReloadProfiles(profile.Id); Password.Password = sessionPassword; Error.Text = "Profile saved.";
+            profile = profile.WithPassword(Password.Password, RememberPassword.IsChecked == true).WithKeyPassword(KeyPassword.Password, RememberPassword.IsChecked == true);
+            string sessionPassword = Password.Password, sessionKeyPassword = KeyPassword.Password;
+            store.Save(profile); SavedProfileId = profile.Id; ReloadProfiles(profile.Id); Password.Password = sessionPassword; KeyPassword.Password = sessionKeyPassword; Error.Text = "Profile saved.";
         }
         catch (Exception ex) when (IsProfileError(ex)) { Error.Text = "Profile was not saved. " + ex.Message; }
     }
@@ -159,7 +165,7 @@ public partial class ConnectionDialog : Window
     }
     private void SetTesting(bool testing)
     {
-        foreach (var control in new Control[] { Profiles, ProfileName, NewProfileButton, Host, Port, Database, Username, Password, Ssl, RootCertificate, BrowseRootButton, RememberPassword, DisableHistory, SaveProfileButton, TestButton, ConnectButton })
+        foreach (var control in new Control[] { Profiles, ProfileName, NewProfileButton, Host, Port, Database, Username, Password, Ssl, RootCertificate, BrowseRootButton, ClientCertificate, BrowseClientCertificateButton, ClientKey, BrowseClientKeyButton, KeyPassword, RememberPassword, DisableHistory, SaveProfileButton, TestButton, ConnectButton })
             control.IsEnabled = !testing;
         DeleteProfileButton.IsEnabled = !testing && selectedId is not null;
         CancelTestButton.Visibility = testing ? Visibility.Visible : Visibility.Collapsed;
@@ -193,6 +199,16 @@ public partial class ConnectionDialog : Window
         if (string.IsNullOrWhiteSpace(Username.Text)) return Invalid(Username, "Enter a user name.");
         string root = RootCertificate.Text.Trim();
         if (root.Length > 0 && !File.Exists(root)) return Invalid(RootCertificate, "The root certificate file was not found.");
+        string clientCert = ClientCertificate.Text.Trim(), clientKey = ClientKey.Text.Trim();
+        if (clientCert.Length > 0 && !File.Exists(clientCert)) return Invalid(ClientCertificate, "The client certificate file was not found.");
+        if (clientKey.Length > 0 && !File.Exists(clientKey)) return Invalid(ClientKey, "The client key file was not found.");
+        if (clientCert.Length > 0 && clientKey.Length == 0) return Invalid(ClientKey, "Enter the key of the client certificate.");
+        if (clientKey.Length > 0 && clientCert.Length == 0) return Invalid(ClientCertificate, "Enter the client certificate of this key.");
+        // An encrypted key without its password would only fail later with a TLS error; say what is missing now.
+        if (clientKey.Length > 0 && KeyPassword.Password.Length == 0 && ClientKeyIsEncrypted(clientKey))
+        {
+            Error.Foreground = System.Windows.Media.Brushes.Firebrick; Error.Text = "The client key is encrypted. Enter its password in Key password."; KeyPassword.Focus(); return false;
+        }
         settings = new NpgsqlConnectionStringBuilder
         {
             Host = Host.Text.Trim(), Port = port, Database = Database.Text.Trim(), Username = Username.Text.Trim(),
@@ -200,7 +216,30 @@ public partial class ConnectionDialog : Window
             Timeout = 10, ApplicationName = "PGMS", Pooling = false, IncludeErrorDetail = false
         };
         if (root.Length > 0) settings.RootCertificate = root;
+        if (clientCert.Length > 0) { settings.SslCertificate = clientCert; settings.SslKey = clientKey; }
+        if (clientKey.Length > 0 && KeyPassword.Password.Length > 0) settings.SslPassword = KeyPassword.Password;
         return true;
+    }
+    /// <summary>True for a PEM key written with a passphrase (PKCS#8 "ENCRYPTED PRIVATE KEY" or the legacy "Proc-Type: 4,ENCRYPTED" header).</summary>
+    internal static bool ClientKeyIsEncrypted(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path); if (info.Length > 1024 * 1024) return false;
+            string pem = File.ReadAllText(path);
+            return pem.Contains("-----BEGIN ENCRYPTED PRIVATE KEY-----", StringComparison.Ordinal) || pem.Contains("Proc-Type: 4,ENCRYPTED", StringComparison.Ordinal);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+    }
+    private void BrowseClientCertificate(object sender, RoutedEventArgs e)
+    {
+        var picker = new Microsoft.Win32.OpenFileDialog { Title = "Client certificate", Filter = "PEM certificates (*.crt;*.pem;*.cer)|*.crt;*.pem;*.cer|All files (*.*)|*.*" };
+        if (picker.ShowDialog(this) == true) ClientCertificate.Text = picker.FileName;
+    }
+    private void BrowseClientKey(object sender, RoutedEventArgs e)
+    {
+        var picker = new Microsoft.Win32.OpenFileDialog { Title = "Client key", Filter = "PEM keys (*.key;*.pem)|*.key;*.pem|All files (*.*)|*.*" };
+        if (picker.ShowDialog(this) == true) ClientKey.Text = picker.FileName;
     }
     private void BrowseRootCertificate(object sender, RoutedEventArgs e)
     {

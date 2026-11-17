@@ -47,7 +47,7 @@ public partial class AboutWindow : Window
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or FileNotFoundException) { LinkStatus.Text = "Could not open it: " + ex.Message; }
     }
 
-    private static void Launch(string target)
+    internal static void Launch(string target)
     {
         var start = File.Exists(target) ? new ProcessStartInfo("notepad.exe") { ArgumentList = { target } } : new ProcessStartInfo(target) { UseShellExecute = true };
         Process.Start(start)?.Dispose();

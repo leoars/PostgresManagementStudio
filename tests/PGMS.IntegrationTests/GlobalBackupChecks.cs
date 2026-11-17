@@ -12,8 +12,10 @@ internal static class GlobalBackupChecks
         string suffix=Guid.NewGuid().ToString("N")[..12],role="global_ação_"+suffix,member="global_member_"+suffix,space="global_space_"+suffix;
         string root=Path.GetFullPath(Path.Combine("artifacts/global-backup",suffix));Directory.CreateDirectory(root);
         string data=Path.Combine(root,"target"),location=Path.Combine(root,"tablespace"),archive=Path.Combine(root,"globais_漢字.sql");Directory.CreateDirectory(location);
-        const int port=55440;
-        using(var probe=new TcpListener(IPAddress.Loopback,port)){probe.Start();probe.Stop();}
+        // Another program on the machine can hold the preferred port; take the first free one of the next twenty.
+        int port=0;
+        for(int candidate=55440;candidate<55460 && port==0;candidate++){try{using var probe=new TcpListener(IPAddress.Loopback,candidate);probe.Start();probe.Stop();port=candidate;}catch(SocketException){}}
+        if(port==0)throw new Exception("No free loopback port between 55440 and 55459 for the second isolated cluster");
         bool started=false,roles=false,tablespace=false;
         async Task Tool(string tool,params string[] args)
         {

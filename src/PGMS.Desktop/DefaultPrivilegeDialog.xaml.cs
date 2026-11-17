@@ -27,15 +27,30 @@ public partial class DefaultPrivilegeDialog : Window
         var settings=new NpgsqlConnectionStringBuilder(connection);
         Target.Text=$"{settings.Host}:{settings.Port} / {settings.Database} \u2014 {settings.Username}";
         Creator.Text=settings.Username;ObjectClass.ItemsSource=Enum.GetValues<DefaultPrivilegeTarget>();ObjectClass.SelectedItem=DefaultPrivilegeTarget.Tables;
-        Privilege.ItemsSource=DefaultPrivilegeRequest.Allowed(DefaultPrivilegeTarget.Tables);Privilege.SelectedIndex=0;
+        serverVersion=ServerVersionNumber.Cached(connection);Privilege.ItemsSource=DefaultPrivilegeRequest.Allowed(DefaultPrivilegeTarget.Tables,serverVersion);Privilege.SelectedIndex=0;
         if(schema is not null){GlobalScope.IsChecked=false;SchemaName.Text=schema;}
         ready=true;RestorePending();Refresh();
+        if(serverVersion is null)Loaded += async (_,_) => await LoadServerVersionAsync();
+    }
+    private int? serverVersion;
+    internal Task ServerVersionLoaded { get; private set; } = Task.CompletedTask;
+    // The list starts complete; once the version is known, what that server does not have (MAINTAIN before 17) leaves it.
+    private Task LoadServerVersionAsync()
+    {
+        async Task Load()
+        {
+            try { serverVersion=await ServerVersionNumber.GetAsync(connection); } catch (Exception ex) when (ex is NpgsqlException or TimeoutException or System.Net.Sockets.SocketException or InvalidOperationException) { return; }
+            if(serverVersion is not < ServerVersionNumber.Maintain || !IsLoaded || HasUnconfirmedCommit) return;
+            string? selected=Privilege.SelectedItem as string; var choices=DefaultPrivilegeRequest.Allowed((DefaultPrivilegeTarget)ObjectClass.SelectedItem,serverVersion);
+            Privilege.ItemsSource=choices; Privilege.SelectedItem=selected is not null && choices.Contains(selected) ? selected : choices[0];
+        }
+        return ServerVersionLoaded=Load();
     }
     private DefaultPrivilegeRequest Request => new((DefaultPrivilegeTarget)ObjectClass.SelectedItem,Creator.Text,RoleName.Text,(string?)Privilege.SelectedItem??"",GlobalScope.IsChecked==true?null:SchemaName.Text,Revoke.IsChecked==true,PublicRecipient.IsChecked==true,GrantOption.IsChecked==true);
     private void ClassChanged(object sender,SelectionChangedEventArgs e)
     {
         if(!ready || restoring)return;
-        Privilege.ItemsSource=DefaultPrivilegeRequest.Allowed((DefaultPrivilegeTarget)ObjectClass.SelectedItem);Privilege.SelectedIndex=0;
+        Privilege.ItemsSource=DefaultPrivilegeRequest.Allowed((DefaultPrivilegeTarget)ObjectClass.SelectedItem,serverVersion);Privilege.SelectedIndex=0;
         if(ObjectClass.SelectedItem is DefaultPrivilegeTarget.Schemas)GlobalScope.IsChecked=true;
         ScopeChanged(sender,e);
     }

@@ -1,5 +1,5 @@
 <Window x:Class="PGMS.Desktop.ChangeScriptDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-  Title="Save Change Script" Width="720" Height="480" MinWidth="520" MinHeight="320" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip" Background="#F0F0F0">
+  Title="Save Change Script" Width="720" Height="480" MinWidth="520" MinHeight="320" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip" Background="{DynamicResource Pgms.ControlBackground}">
  <DockPanel Margin="12">
   <TextBlock x:Name="Intro" DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8"/>
   <TextBlock x:Name="Warnings" DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#A1260D" Visibility="Collapsed"/>

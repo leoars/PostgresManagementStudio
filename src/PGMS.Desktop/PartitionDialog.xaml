@@ -1,6 +1,6 @@
-<Window x:Class="PGMS.Desktop.PartitionDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop" Title="Partitions" Width="900" Height="800" MinWidth="760" MinHeight="650" Background="#F5F5F5" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnKey">
+<Window x:Class="PGMS.Desktop.PartitionDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PGMS.Desktop" Title="Partitions" Width="900" Height="800" MinWidth="760" MinHeight="650" Background="{DynamicResource Pgms.DialogBackground}" WindowStartupLocation="CenterOwner" Closing="OnClosing" PreviewKeyDown="OnKey">
  <Grid Margin="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="2*" MinHeight="180"/><RowDefinition MinHeight="95"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <Border Background="#E4EFF6" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
+  <Border Background="{DynamicResource Pgms.PaneBackground}" Padding="10" Margin="0,0,0,10"><TextBlock x:Name="Target" TextWrapping="Wrap"/></Border>
   <ScrollViewer Grid.Row="1" x:Name="FormScroller" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="Fields">
    <TextBox x:Name="Observation" IsReadOnly="True" TextWrapping="Wrap" Padding="5" AutomationProperties.Name="Partition parent definition"/>
    <Label Content="_Operation:" Target="{Binding ElementName=Operation}"/><ComboBox x:Name="Operation" SelectionChanged="Changed" AutomationProperties.Name="Partition operation"/>

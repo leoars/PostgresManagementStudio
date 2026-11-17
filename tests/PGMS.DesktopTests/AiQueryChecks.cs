@@ -41,6 +41,16 @@ internal static class AiQueryChecks
             var ollama = AiSettings.Default.For(AiProvider.Ollama) with { Endpoint = fake.Url + "/ollama", Model = "sqlcoder:7b" };
             var ollamaResult = await AiQueryGenerator.GenerateAsync(ollama, "<request>count rows</request>");
             check(ollamaResult.Sql == "SELECT 7;" && fake.LastBody!.RootElement.GetProperty("stream").GetBoolean() == false && fake.LastAuthorization.Length == 0, "Ollama chat request asks for one answer and sends no key");
+            // M1071: Ollama opens models with 4,096 tokens and silently drops the start of a longer prompt.
+            int numCtx = fake.LastBody!.RootElement.GetProperty("options").GetProperty("num_ctx").GetInt32();
+            check(numCtx == AiQueryGenerator.OllamaWindow(AiQueryGenerator.Instructions.Length + "<request>count rows</request>".Length, null) && numCtx == 6_144, "Ollama requests carry a window that holds the prompt and the answer");
+            check(AiQueryGenerator.OllamaWindow(0, null) == 4_096 && AiQueryGenerator.OllamaWindow(300_000, 32_768) == 32_768 && AiQueryGenerator.OllamaWindow(30_000, null) == 14_336
+                && AiQueryGenerator.OllamaStructureCharacters(32_768, 1_000) == 85_016, "The window rounds up, never passes the model's maximum, and leaves room for the answer");
+            fake.ShowContextLength = 32_768;
+            int? known = await AiQueryGenerator.OllamaContextLengthAsync(ollama);
+            fake.ShowContextLength = null;
+            int? unknown = await AiQueryGenerator.OllamaContextLengthAsync(ollama);
+            check(known == 32_768 && unknown is null, "The model's largest window comes from /api/show, and an unknown one is not guessed");
             string? noModel = null;
             try { await AiQueryGenerator.GenerateAsync(ollama with { Model = "" }, "x"); } catch (AiProviderException ex) { noModel = ex.Message; }
             check(noModel is not null && noModel.Contains("Choose a model", StringComparison.Ordinal), "Generation without a model explains what to configure");
@@ -76,6 +86,45 @@ internal static class AiQueryChecks
             finally { await Sql($"DROP SCHEMA {schema} CASCADE"); }
             check(fake.SelectionPrompts.Count == 0, "A database that fits is sent whole, without a request to choose relations");
 
+            // M1115: follow-up requests carry the earlier ones; Explain/Fix/Optimize prefill the request; nothing runs.
+            {
+                var talk = new AiQueryDialog(ollama, connection, "SELECT 1 AS one", _ => { }) { ShowInTaskbar = false, Opacity = 0 };
+                T Find<T>(string name) where T : FrameworkElement => (T)talk.FindName(name);
+                talk.Show();
+                try
+                {
+                    check(!Find<Button>("NewConversationButton").IsEnabled, "A new window has no conversation to clear");
+                    Find<TextBox>("Request").Text = "count the roles";
+                    await talk.GenerateAsync();
+                    check(talk.Turns.Count == 1 && talk.Turns[0] == new AiTurn("count the roles", "SELECT 7;") && Find<TextBox>("Request").Text.Length == 0 && Find<Button>("NewConversationButton").IsEnabled
+                        && Find<TextBlock>("ConversationInfo").Text.Contains("1 earlier request", StringComparison.Ordinal), "After an answer the request box is ready for a follow-up and the window says what will be sent");
+                    Find<TextBox>("Request").Text = "now only superusers";
+                    await talk.GenerateAsync();
+                    string followUp = fake.LastBody!.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!;
+                    check(followUp.Contains("<previous_turns>\n<turn>\n<request>\ncount the roles\n</request>\n<sql>\nSELECT 7;\n</sql>\n</turn>\n</previous_turns>", StringComparison.Ordinal)
+                        && followUp.IndexOf("<previous_turns>", StringComparison.Ordinal) < followUp.IndexOf("<request>\nnow only superusers", StringComparison.Ordinal) && talk.Turns.Count == 2,
+                        "A follow-up sends the earlier request and its SQL before the new request");
+                    talk.StartNewConversation();
+                    Find<TextBox>("Request").Text = "list schemas";
+                    await talk.GenerateAsync();
+                    string fresh = fake.LastBody!.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!;
+                    check(!fresh.Contains("<previous_turns>", StringComparison.Ordinal) && talk.Turns.Count == 1, "New Conversation sends the next request alone");
+                    talk.Prefill(AiQueryGenerator.ActionRequest(AiSqlAction.Fix, "42P01", "relation \"missing\" does not exist"));
+                    check(Find<TextBox>("Request").Text.Contains("42P01: relation \"missing\" does not exist", StringComparison.Ordinal) && Find<CheckBox>("IncludeSelection").IsChecked == true,
+                        "Fix SQL with AI writes the request with the SQLSTATE and message of the last error, with the SQL attached, for the user to review");
+                }
+                finally { if (talk.IsVisible) talk.Close(); }
+                check(AiQueryGenerator.ActionRequest(AiSqlAction.Explain).StartsWith("Explain what this SQL does", StringComparison.Ordinal)
+                    && AiQueryGenerator.ActionRequest(AiSqlAction.Optimize).Contains("without changing its results", StringComparison.Ordinal)
+                    && !AiQueryGenerator.ActionRequest(AiSqlAction.Fix, "", "connection lost").Contains("reported", StringComparison.Ordinal),
+                    "Explain and Optimize have their own requests; Fix adds an error only when the server gave a SQLSTATE");
+                var shell = new MainWindow { ShowInTaskbar = false };
+                check(shell.FindName("ExplainSqlAiMenu") is MenuItem && shell.FindName("FixSqlAiMenu") is MenuItem && shell.FindName("OptimizeSqlAiMenu") is MenuItem
+                    && ((ItemsControl)((MenuItem)shell.FindName("GenerateSqlMenu")).Parent).Items.IndexOf(shell.FindName("ExplainSqlAiMenu")) == ((ItemsControl)((MenuItem)shell.FindName("GenerateSqlMenu")).Parent).Items.IndexOf(shell.FindName("GenerateSqlMenu")) + 1,
+                    "Query ▸ Explain, Fix and Optimize SQL with AI follow Generate SQL with AI");
+                shell.Close();
+            }
+
             // A database over the context limit: the provider picks from the names first, then gets those relations in detail.
             check(AiQueryGenerator.ParseSelection("```\n- `public.a`\n2. public.b -- why\n* \"S\".\"T\",\n\n</relations>\n```").SequenceEqual(["public.a", "public.b", "\"S\".\"T\""]), "Chosen names are read without list markers, backticks, comments or fences");
             string large = "ai_large_" + Guid.NewGuid().ToString("N")[..8];
@@ -104,6 +153,23 @@ internal static class AiQueryChecks
                         && ((TextBlock)dialog.FindName("ContextInfo")).Text.Contains("Ollama chose 1 of them", StringComparison.Ordinal), "View Sent Context shows both requests and the dialog says the provider chose");
                 }
                 finally { if (dialog.IsVisible) dialog.Close(); }
+
+                // With the default limit and a small model window, the structure is cut to the window instead of being dropped by Ollama.
+                fake.ShowContextLength = 6_144;
+                var fitted = new AiQueryDialog(ollama, connection, null, _ => { }) { ShowInTaskbar = false, Opacity = 0 };
+                fitted.Show();
+                try
+                {
+                    ((TextBox)fitted.FindName("Request")).Text = "contar clientes";
+                    await fitted.GenerateAsync();
+                    var last = fake.LastBody!.RootElement;
+                    string sent = last.GetProperty("messages")[1].GetProperty("content").GetString()!;
+                    string info = ((TextBlock)fitted.FindName("ContextInfo")).Text;
+                    check(info.Contains($"to fit the model's window of {6_144:N0} tokens", StringComparison.Ordinal) && last.GetProperty("options").GetProperty("num_ctx").GetInt32() == 6_144
+                        && AiQueryGenerator.EstimateTokens(AiQueryGenerator.Instructions.Length + sent.Length) + AiQueryGenerator.OllamaReplyTokens <= 6_144 && ((TextBox)fitted.FindName("Result")).Text == "SELECT 7;",
+                        "A local model gets only what fits its window, the window never passes its maximum, and the dialog says the structure was limited");
+                }
+                finally { fake.ShowContextLength = null; if (fitted.IsVisible) fitted.Close(); }
             }
             finally { await Sql($"DROP SCHEMA {large} CASCADE"); }
 
@@ -158,6 +224,8 @@ internal static class AiQueryChecks
         public string LastBeta { get; private set; } = "";
         public string LastAuthorization { get; private set; } = "";
         public List<string> SelectionPrompts { get; } = [];
+        public int? ShowContextLength { get; set; }
+        public int ShowRequests { get; private set; }
         public FakeChat()
         {
             var probe = new TcpListener(IPAddress.Loopback, 0); probe.Start(); int port = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
@@ -178,7 +246,18 @@ internal static class AiQueryChecks
                 HttpListenerContext context;
                 try { context = await listener.GetContextAsync(); } catch (Exception) { return; }
                 string path = context.Request.Url!.AbsolutePath;
-                using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8)) LastBody = JsonDocument.Parse(await reader.ReadToEndAsync());
+                string raw;
+                using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8)) raw = await reader.ReadToEndAsync();
+                if (path == "/ollama/api/show")
+                {
+                    // The model's largest window, or 404 when the test leaves it unknown.
+                    ShowRequests++;
+                    byte[] show = Encoding.UTF8.GetBytes(ShowContextLength is int length ? JsonSerializer.Serialize(new { model_info = new Dictionary<string, object> { ["general.architecture"] = "qwen2", ["qwen2.context_length"] = length } }) : "{}");
+                    context.Response.StatusCode = ShowContextLength is null ? 404 : 200; context.Response.ContentType = "application/json";
+                    await context.Response.OutputStream.WriteAsync(show); context.Response.Close();
+                    continue;
+                }
+                LastBody = JsonDocument.Parse(raw);
                 LastBeta = context.Request.Headers["anthropic-beta"] ?? ""; LastAuthorization = context.Request.Headers["Authorization"] ?? "";
                 var messages = LastBody.RootElement.GetProperty("messages");
                 string request = messages[messages.GetArrayLength() - 1].GetProperty("content").GetString() ?? "";
