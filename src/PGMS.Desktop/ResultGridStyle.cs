@@ -6,23 +6,6 @@ using System.Windows.Media;
 
 namespace PGMS.Desktop;
 
-/// <summary>True for the cell at the grid's current column and item: the SSMS results grid outlines it with a dotted rectangle, focused or not.</summary>
-public sealed class IsCurrentCellConverter : IMultiValueConverter
-{
-    public static readonly IsCurrentCellConverter Instance = new();
-    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture) =>
-        values.Length == 4 && values[0] is DataGridColumn column && ReferenceEquals(column, values[2]) && values[1] is not null && ReferenceEquals(values[1], values[3]);
-    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
-}
-
-/// <summary>True for a null database value.</summary>
-public sealed class IsDbNullConverter : IValueConverter
-{
-    public static readonly IsDbNullConverter Instance = new();
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value is null or DBNull;
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
-}
-
 /// <summary>True for a cell value that is a JSON object or array.</summary>
 public sealed class IsJsonLinkConverter : IValueConverter
 {
@@ -41,15 +24,32 @@ internal static class ResultGridStyle
     {
         if (Application.Current?.TryFindResource("SsmsResultGrid") is Style style) grid.Style = style;
         grid.LoadingRow += (_, e) => e.Row.Header = (e.Row.GetIndex() + 1).ToString(CultureInfo.CurrentCulture);
+        // The dotted rectangle follows the current cell; a cell generated later is marked by ResultTextColumn.
+        object? lastItem = null; DataGridColumn? lastColumn = null;
+        grid.CurrentCellChanged += (_, _) =>
+        {
+            if (CellContainer(grid, lastItem, lastColumn) is { } previous) ResultCellChrome.SetIsCurrentCell(previous, false);
+            lastItem = grid.CurrentItem; lastColumn = grid.CurrentColumn;
+            if (CellContainer(grid, lastItem, lastColumn) is { } current) ResultCellChrome.SetIsCurrentCell(current, true);
+        };
     }
 
-    /// <summary>Cell style of a column bound to <paramref name="path"/>: the SSMS cell, yellow when the value is NULL.</summary>
-    internal static Style NullAwareCell(string path)
+    private static DataGridCell? CellContainer(DataGrid grid, object? item, DataGridColumn? column)
     {
-        var style = new Style(typeof(DataGridCell), Application.Current?.TryFindResource("SsmsResultCell") as Style);
-        style.Triggers.Add(new DataTrigger { Binding = new Binding(path) { Converter = IsDbNullConverter.Instance }, Value = true, Setters = { new Setter(Control.BackgroundProperty, NullBackground) } });
-        return style;
+        if (column is null || item is null || !grid.Columns.Contains(column)) return null;
+        if (grid.ItemContainerGenerator.ContainerFromItem(item) is not DataGridRow row) return null;
+        for (DependencyObject? node = column.GetCellContent(row); node is not null; node = VisualTreeHelper.GetParent(node))
+            if (node is DataGridCell cell) return cell;
+        return null;
     }
+
+    /// <summary>A results column bound to <paramref name="columnName"/> of a <see cref="System.Data.DataView"/>: the SSMS cell, yellow when the value is NULL.</summary>
+    internal static ResultTextColumn TextColumn(string header, string columnName) => new()
+    {
+        Header = header, SortMemberPath = columnName, NullColumn = columnName,
+        CellStyle = Application.Current?.TryFindResource("SsmsResultCell") as Style,
+        Binding = new Binding($"[{columnName}]") { Converter = new DatabaseValueConverter() }
+    };
 
     /// <summary>Text of a column that may hold JSON: a value that is a JSON document looks like a link and a click on it opens it. A press that started on
     /// another cell (a drag selection) does not count, nor does a click extending the selection.</summary>

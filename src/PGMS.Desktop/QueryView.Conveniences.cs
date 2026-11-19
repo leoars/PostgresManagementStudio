@@ -68,14 +68,37 @@ public partial class QueryView
         Editor.LostKeyboardFocus += (_, _) => { if (incrementalActive && !Editor.IsKeyboardFocusWithin) EndIncrementalSearch(); };
         TrackDocument();
         Editor.DocumentChanged += (_, _) => TrackDocument();
+        Editor.TextArea.Caret.PositionChanged += (_, _) => NoticeCaretMove();
+    }
+
+    /// <summary>Lines the caret must move in one step, without an edit, for View ▸ Navigate Backward to remember the place (PGMS-082, M1121).</summary>
+    internal const int NavigationJumpLines = 10;
+    private int caretBefore;
+    private object? versionBefore;
+    /// <summary>A large caret jump (Go To Line, Find, a click far away, Ctrl+End…): the offset left and the offset reached.</summary>
+    public event Action<QueryView, int, int>? CaretJumped;
+
+    private void NoticeCaretMove()
+    {
+        var document = Editor.Document;
+        int now = Editor.CaretOffset;
+        var version = document.Version;
+        int from = Math.Min(caretBefore, document.TextLength);
+        bool edited = !ReferenceEquals(version, versionBefore);
+        caretBefore = now; versionBefore = version;
+        if (edited || from == now) return;
+        if (Math.Abs(document.GetLineByOffset(now).LineNumber - document.GetLineByOffset(from).LineNumber) >= NavigationJumpLines) CaretJumped?.Invoke(this, from, now);
     }
 
     private void TrackDocument()
     {
-        if (trackedDocument is not null) trackedDocument.Changed -= DocumentChangedForLastEdit;
+        if (trackedDocument is not null) { trackedDocument.Changed -= DocumentChangedForLastEdit; trackedDocument.UpdateFinished -= DocumentUpdateFinished; }
         trackedDocument = Editor.Document;
-        if (trackedDocument is not null) trackedDocument.Changed += DocumentChangedForLastEdit;
+        if (trackedDocument is not null) { trackedDocument.Changed += DocumentChangedForLastEdit; trackedDocument.UpdateFinished += DocumentUpdateFinished; }
     }
+
+    /// <summary>After an edit the caret is where the edit left it; the next move is measured from there.</summary>
+    private void DocumentUpdateFinished(object? sender, EventArgs e) { caretBefore = Editor.CaretOffset; versionBefore = Editor.Document.Version; }
 
     private void DocumentChangedForLastEdit(object? sender, DocumentChangeEventArgs e)
     {

@@ -39,7 +39,7 @@ public partial class MainWindow
         if (query.FilePath is not { } path) return false;
         var (accepted, format) = (PickEncoding ?? ShowEncodingDialog)(query, true);
         if (!accepted) return false;
-        if (query.IsDirty && !(ConfirmReopenDiscard ?? (q => MessageBox.Show(this, $"Discard the unsaved changes in {Path.GetFileName(path)} and reopen it?", "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes))(query)) return false;
+        if (query.IsDirty && !(ConfirmReopenDiscard ?? (q => LocalizedMessageBox.Show(this, $"Discard the unsaved changes in {Path.GetFileName(path)} and reopen it?", "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes))(query)) return false;
         try
         {
             var file = await SqlFileStore.ReadAsync(path, format);

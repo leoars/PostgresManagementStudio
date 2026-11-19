@@ -53,7 +53,7 @@ public partial class MainWindow
         {
             var installed = await ExtensionEdits.InspectAsync(connection, node.Entry.Oid, node.Entry.Name);
             string question = $"Delete extension {installed.Name}? This runs:\n\n{ExtensionEdits.DropSql(installed.Name)}\n\nObjects of other extensions or of your own that depend on it make the server refuse. It cannot be undone.";
-            bool yes = DeleteObjectConfirm?.Invoke(question) ?? MessageBox.Show(this, question, "Delete Object", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+            bool yes = DeleteObjectConfirm?.Invoke(question) ?? LocalizedMessageBox.Show(this, question, "Delete Object", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
             if (!yes) { Status.Text = "Nothing was deleted."; return false; }
             await ExtensionEdits.DropAsync(connection, node.Entry.Oid, node.Entry.Name);
         }

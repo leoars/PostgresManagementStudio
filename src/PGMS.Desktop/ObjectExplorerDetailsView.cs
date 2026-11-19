@@ -111,6 +111,23 @@ public sealed partial class ObjectExplorerDetailsView : UserControl
         await ShowAsync(folder);
     }
 
+    private static readonly double[] DefaultStarWidths = [2.0, 1.0, 1.0, 1.0];
+
+    /// <summary>Window ▸ Reset Current Object Explorer Details View (PGMS-082, M1121): column order and widths as created, no sorting, no search text.</summary>
+    public void ResetView()
+    {
+        for (int i = 0; i < grid.Columns.Count; i++)
+        {
+            var column = grid.Columns[i];
+            column.DisplayIndex = i;
+            column.Width = new DataGridLength(DefaultStarWidths[Math.Min(i, DefaultStarWidths.Length - 1)], DataGridLengthUnitType.Star);
+            column.SortDirection = null;
+        }
+        grid.Items.SortDescriptions.Clear();
+        search.Text = "";
+        ApplySearch();
+    }
+
     private void ApplySearch()
     {
         string text = search.Text.Trim();

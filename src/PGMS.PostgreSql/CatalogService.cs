@@ -41,6 +41,9 @@ public sealed class CatalogService(string connectionString)
     }
     public string ConnectionFor(string? database) => new NpgsqlConnectionStringBuilder(connectionString) { Database = database ?? DefaultDatabase }.ConnectionString;
 
+    /// <summary>Lists template databases and the pg_catalog and information_schema schemas (Object Explorer ▸ General, Hide system objects off; M1143).</summary>
+    public bool ShowSystemObjects { get; set; }
+
     public async Task<IReadOnlyList<CatalogEntry>> ChildrenAsync(CatalogEntry parent, CancellationToken token = default)
     {
         CatalogEntry Folder(CatalogKind kind, string name) => new(kind, name, parent.Database, parent.Schema, parent.Oid);
@@ -63,12 +66,15 @@ public sealed class CatalogService(string connectionString)
         if (!parent.CanExpand) return [];
         string sql = parent.Kind switch
         {
-            CatalogKind.Databases => "SELECT oid, datname || CASE WHEN datallowconn THEN '' ELSE ' (Offline)' END, datname, NOT datallowconn FROM pg_catalog.pg_database WHERE NOT datistemplate ORDER BY datname",
+            // Object Explorer ▸ General ▸ Hide system objects (M1143): template databases and the pg_catalog and information_schema schemas.
+            CatalogKind.Databases => "SELECT oid, datname || CASE WHEN datallowconn THEN '' ELSE ' (Offline)' END, datname, NOT datallowconn FROM pg_catalog.pg_database" + (ShowSystemObjects ? "" : " WHERE NOT datistemplate") + " ORDER BY datname",
             CatalogKind.Keys => "SELECT oid, conname FROM pg_catalog.pg_constraint WHERE conrelid=@oid AND contype IN ('p','u','f') ORDER BY CASE contype WHEN 'p' THEN 0 WHEN 'u' THEN 1 ELSE 2 END, conname",
             CatalogKind.Constraints => "SELECT oid, conname FROM pg_catalog.pg_constraint WHERE conrelid=@oid AND contype IN ('c','x') ORDER BY conname",
             CatalogKind.Triggers => "SELECT oid, tgname FROM pg_catalog.pg_trigger WHERE tgrelid=@oid AND NOT tgisinternal ORDER BY tgname",
             CatalogKind.Extensions => "SELECT oid, extname FROM pg_catalog.pg_extension ORDER BY extname",
-            CatalogKind.Schemas => "SELECT oid, nspname FROM pg_catalog.pg_namespace WHERE nspname <> 'information_schema' AND nspname !~ '^pg_' ORDER BY nspname",
+            CatalogKind.Schemas => ShowSystemObjects
+                ? "SELECT oid, nspname FROM pg_catalog.pg_namespace WHERE nspname !~ '^pg_(toast|temp_)' ORDER BY nspname IN ('pg_catalog','information_schema'), nspname"
+                : "SELECT oid, nspname FROM pg_catalog.pg_namespace WHERE nspname <> 'information_schema' AND nspname !~ '^pg_' ORDER BY nspname",
             CatalogKind.Roles => "SELECT oid, rolname || CASE WHEN rolcanlogin THEN ' (login)' ELSE '' END, rolname FROM pg_catalog.pg_roles ORDER BY rolname",
             // Only standalone composite types (CREATE TYPE ... AS): every table also has a composite row type.
             CatalogKind.CompositeTypes => "SELECT t.oid, t.typname, 'c' FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace JOIN pg_catalog.pg_class c ON c.oid=t.typrelid WHERE n.nspname=@schema AND t.typtype='c' AND c.relkind='c' ORDER BY t.typname, t.oid",

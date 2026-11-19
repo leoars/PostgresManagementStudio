@@ -16,7 +16,11 @@ public partial class MainWindow
     public static readonly RoutedUICommand RestoreClosedTabCommand = new("Restore Closed Tab", nameof(RestoreClosedTabCommand), typeof(MainWindow));
 
     /// <summary>A closed query tab: a file reopens from disk; a query without file comes back with its text (memory only, this session).</summary>
-    internal sealed record ClosedTab(string? FilePath, string? Text, string Title);
+    internal sealed record ClosedTab(string? FilePath, string? Text, string Title)
+    {
+        /// <summary>The tab was pinned when it closed; Restore Closed Tab pins it again (B1 review, M1137).</summary>
+        public bool Pinned { get; init; }
+    }
     internal const int MaximumClosedTabs = 20;
     private readonly List<ClosedTab> closedTabs = [];
     internal IReadOnlyList<ClosedTab> ClosedTabs => closedTabs;
@@ -27,7 +31,7 @@ public partial class MainWindow
 
     private void InitializeTabCommands()
     {
-        CommandBindings.Add(new CommandBinding(SaveAllCommand, async (_, _) => await SaveAllAsync(), (_, e) => e.CanExecute = documents.Keys.Any(q => q.IsDirty) && !closingWindow && !closeRequested));
+        CommandBindings.Add(new CommandBinding(SaveAllCommand, async (_, _) => await SaveAllAsync(), (_, e) => e.CanExecute = HasChangedQueries() && !closingWindow && !closeRequested));
         InputBindings.Add(new KeyBinding(SaveAllCommand, Key.S, ModifierKeys.Control | ModifierKeys.Shift));
         CommandBindings.Add(new CommandBinding(RestoreClosedTabCommand, async (_, _) => await RestoreClosedTabAsync(), (_, e) => e.CanExecute = !closingWindow && !closeRequested));
         DockManager.ActiveContentChanged += (_, _) =>
@@ -44,7 +48,8 @@ public partial class MainWindow
     internal void RememberRecentFile(string path)
     {
         path = Path.GetFullPath(path);
-        EnvironmentSettings.Update(d => d with { RecentFiles = RecentFileList.Add(d.RecentFiles, path, d.RecentCount) });
+        // Off the UI thread: the first JSON write of a process costs tens of milliseconds (M1132); the File menu reads it back after the write.
+        EnvironmentSettings.UpdateInBackground(d => d with { RecentFiles = RecentFileList.Add(d.RecentFiles, path, d.RecentCount) });
     }
 
     private void FileMenuOpened(object sender, RoutedEventArgs e)
@@ -65,7 +70,7 @@ public partial class MainWindow
         }
         RecentFilesMenu.IsEnabled = recent.Count > 0;
         if (recent.Count == 0) RecentFilesMenu.Items.Add(new MenuItem { Header = "(empty)", IsEnabled = false });
-        SaveAllMenu.IsEnabled = documents.Keys.Any(q => q.IsDirty) && !closingWindow && !closeRequested;
+        SaveAllMenu.IsEnabled = HasChangedQueries() && !closingWindow && !closeRequested;
     }
 
     internal async Task OpenRecentFileAsync(string path)
@@ -118,6 +123,7 @@ public partial class MainWindow
     /// <summary>Saves every changed query tab in tab order; a query without a file asks for a name, and cancelling stops the rest, as in SSMS.</summary>
     internal async Task<bool> SaveAllAsync()
     {
+        MountDeferredQueries();
         foreach (var query in OpenDocuments().Select(d => d.Content).OfType<QueryView>().Where(q => q.IsDirty && documents.ContainsKey(q)).ToList())
         {
             if (!await SaveAsync(query) || query.IsDirty) { Status.Text = "Save All stopped; the remaining queries were not saved."; return false; }
@@ -137,12 +143,13 @@ public partial class MainWindow
     /// (busy queries, open transactions and changed designers still ask on their own).</summary>
     internal async Task<bool> CloseAllTabsAsync()
     {
-        var all = OpenDocuments().ToList();
+        var all = OpenDocuments().Where(d => !pinnedTabs.Contains(d)).ToList(); // pinned tabs stay (Window ▸ Pin Tab, M1121)
+        MountDeferredQueries(all);
         var changed = all.Select(d => d.Content).OfType<QueryView>().Where(q => q.IsDirty).ToList();
         if (changed.Count > 0)
         {
             var names = changed.Select(q => documents[q].Title).ToList();
-            var answer = CloseAllPrompt?.Invoke(names) ?? MessageBox.Show(this, "Save changes to the following items?\n\n" + string.Join("\n", names), "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+            var answer = CloseAllPrompt?.Invoke(names) ?? LocalizedMessageBox.Show(this, "Save changes to the following items?\n\n" + string.Join("\n", names), "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (answer == MessageBoxResult.Cancel || answer == MessageBoxResult.None) return false;
             if (answer == MessageBoxResult.Yes)
                 foreach (var query in changed) if (!await SaveAsync(query) || query.IsDirty) return false;
@@ -171,7 +178,7 @@ public partial class MainWindow
         string? text = query.FilePath is null ? query.Editor.Text : null;
         if (query.FilePath is null && string.IsNullOrWhiteSpace(text)) return;
         if (text is { Length: > SqlFileStore.MaximumBytes }) return; // like a file, too large to keep
-        closedTabs.Insert(0, new ClosedTab(query.FilePath, text, title.TrimEnd('*')));
+        closedTabs.Insert(0, new ClosedTab(query.FilePath, text, title.TrimEnd('*')) { Pinned = documents.TryGetValue(query, out var document) && pinnedTabs.Contains(document) });
         if (closedTabs.Count > MaximumClosedTabs) closedTabs.RemoveAt(closedTabs.Count - 1);
     }
 
@@ -185,12 +192,18 @@ public partial class MainWindow
             var closed = closedTabs[0]; closedTabs.RemoveAt(0);
             if (closed.FilePath is { } path)
             {
-                try { var query = await OpenQueryFileAsync(path); Status.Text = "Closed tab restored from " + Path.GetFileName(path) + ". Not connected."; return query; }
+                try
+                {
+                    var query = await OpenQueryFileAsync(path);
+                    if (closed.Pinned && documents.TryGetValue(query, out var opened) && !pinnedTabs.Contains(opened)) SetTabPinned(opened, true);
+                    Status.Text = "Closed tab restored from " + Path.GetFileName(path) + ". Not connected."; return query;
+                }
                 catch (OperationCanceledException) { return null; }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { ShowError(ex); return null; }
             }
             var restored = NewQuery(closed.Text, origin: QueryHistoryOrigin.Typed);
             restored.IsDirty = true;
+            if (closed.Pinned) SetTabPinned(documents[restored], true);
             Status.Text = "Closed query restored with its text. Not connected; nothing was executed.";
             return restored;
         }
@@ -209,6 +222,7 @@ public partial class MainWindow
         {
             bool valid = now <= windowChordDeadline; windowChordDeadline = 0;
             if (valid && key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = true; _ = RestoreClosedTabAsync(); return true; }
+            if (valid && key == Key.B && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = true; ShowCodeSnippetsManager(); return true; }
         }
         if (key == Key.K && Keyboard.Modifiers == ModifierKeys.Control && Keyboard.FocusedElement is not TextBox) { windowChordDeadline = now + 2000; e.Handled = true; return true; }
         return false;
@@ -222,6 +236,7 @@ public partial class MainWindow
     {
         if (!ReferenceEquals(e.OriginalSource, sender)) return;
         WindowMenuPanesOpened();
+        NavigationMenusOpened();
         RestoreClosedTabMenu.IsEnabled = closedTabs.Count > 0 && !closingWindow && !closeRequested;
         var open = TabsInUseOrder();
         CloseAllTabsMenu.IsEnabled = open.Count > 0 && !closingWindow && !closeRequested;
@@ -251,10 +266,10 @@ public partial class MainWindow
 
     private void ShowWindowsDialog(object sender, RoutedEventArgs e)
     {
-        var dialog = new WindowsDialog(TabsInUseOrder().Select(d => new WindowsDialog.Entry(d.Title?.TrimEnd('*') ?? "", (d.Content as QueryView)?.FilePath ?? "", d, d.Content is QueryView)).ToList(),
+        var dialog = new WindowsDialog(TabsInUseOrder().Select(d => new WindowsDialog.Entry(d.Title?.TrimEnd('*') ?? "", (d.Content as QueryView)?.FilePath ?? "", d, d.Content is QueryView || IsDeferredQuery(d))).ToList(),
             ActivateDocument,
-            async selected => { foreach (var query in selected.Select(d => d.Content).OfType<QueryView>().Where(q => documents.ContainsKey(q))) if (!await SaveAsync(query)) return; },
-            async selected => { foreach (var document in selected) { if (document.Content is QueryView query) await CloseQueryAsync(query); else document.Close(); } })
+            async selected => { MountDeferredQueries(selected); foreach (var query in selected.Select(d => d.Content).OfType<QueryView>().Where(q => documents.ContainsKey(q))) if (!await SaveAsync(query)) return; },
+            async selected => { MountDeferredQueries(selected); foreach (var document in selected) { if (document.Content is QueryView query) await CloseQueryAsync(query); else document.Close(); } })
         { Owner = this };
         dialog.ShowDialog();
     }

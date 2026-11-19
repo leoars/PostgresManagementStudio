@@ -20,7 +20,7 @@ internal static class HelpChecks
             shell.OpenExternal=_=>throw new System.ComponentModel.Win32Exception("no handler");var errors=new List<string>();shell.ShowErrorOverride=ex=>errors.Add(ex.Message);
             check(!shell.ViewHelp() && errors.Count==1 && errors[0].StartsWith("Could not open it"),"A file association failure is reported, not thrown");
             var help=(MenuItem)shell.FindName("HelpMenu");
-            check(help.Items.OfType<MenuItem>().Select(i=>(string)i.Header).SequenceEqual(["View _Help","_Release Notes","_About PGMS"]) && ((MenuItem)shell.FindName("ViewHelpMenu")).InputGestureText=="Ctrl+F1","Help lists View Help (Ctrl+F1), Release Notes and About");
+            check(help.Items.OfType<MenuItem>().Select(i=>(string)i.Header).SequenceEqual(["View _Help","_Release Notes","Check for _Updates","_About PGMS"]) && ((MenuItem)shell.FindName("ViewHelpMenu")).InputGestureText=="Ctrl+F1","Help lists View Help (Ctrl+F1), Release Notes, Check for Updates and About");
             check(MainWindow.ViewHelpCommand.InputGestures.OfType<System.Windows.Input.KeyGesture>().Any(g=>g.Key==System.Windows.Input.Key.F1 && g.Modifiers==System.Windows.Input.ModifierKeys.Control),"Ctrl+F1 is the View Help shortcut");
         }
         finally{shell.Close();await shell.CloseCompletion;}

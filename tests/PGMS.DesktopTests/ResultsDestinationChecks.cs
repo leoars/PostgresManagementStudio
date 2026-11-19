@@ -110,6 +110,24 @@ internal static class ResultsDestinationChecks
             check(resultsTab.Visibility == Visibility.Visible && messagesTab.Visibility == Visibility.Visible && !text.IsVisible && ((TabControl)query.FindName("ResultSets")).Items.Count == 1,
                 "Results to Grid shows the grid and Messages again");
 
+            // PGMS-082 (M1122): Results to Grid ▸ Show multiple result sets stacked in one tab.
+            var stacked = await window.OpenQueryTextAsync(connection, "SELECT 1 AS a; SELECT 2 AS b; SELECT 3 AS c;"); await Idle();
+            stacked.ApplyQueryOptions(stacked.QueryOptions with { GridStackResults = true });
+            await stacked.ExecuteAsync(); await Idle(); await Task.Delay(200); await Idle();
+            var stackedSets = (TabControl)stacked.FindName("ResultSets");
+            var stackedItems = stackedSets.Items.OfType<TabItem>().ToList();
+            check(stacked.AreResultSetsStacked && stackedItems.Count == 3 && stackedItems.All(t => t.IsVisible && t.ActualHeight >= StackedResultsPanel.MinimumRowHeight - 1)
+                && stackedItems[1].TranslatePoint(new Point(), stackedItems[0]).Y >= stackedItems[0].ActualHeight - 1 && stackedItems[2].TranslatePoint(new Point(), stackedItems[0]).Y > stackedItems[1].TranslatePoint(new Point(), stackedItems[0]).Y,
+                "With the option on, the three result grids are shown one under the other, all visible: " + string.Join(", ", stackedItems.Select(t => $"{t.IsVisible}/{t.ActualHeight:N0}")));
+            ((DataGrid)stackedItems[2].Content).Focus(); await Idle();
+            check(stackedSets.SelectedItem == stackedItems[2], "Focusing a stacked grid makes it the selected result (export and copy act on it)");
+            stacked.ApplyQueryOptions(stacked.QueryOptions with { GridStackResults = false });
+            await stacked.ExecuteAsync(); await Idle();
+            check(!stacked.AreResultSetsStacked && stackedSets.Items.Count == 3 && stackedSets.Items.OfType<TabItem>().Count(t => t.IsVisible) == 3 && ((TabItem)stackedSets.Items[0]).Header as string == "Result 1",
+                "With the option off, the next execution shows them in Result 1, Result 2… tabs again");
+            await window.CloseQueryAsync(stacked); await Idle();
+            AvalonDock.Layout.Extensions.Descendents(((AvalonDock.DockingManager)window.FindName("DockManager")).Layout).OfType<AvalonDock.Layout.LayoutDocument>().Single(d => d.Content == query).IsActive = true; await Idle();
+
             // SSMS look of the results grid (user's captures, 08/11/2026), checked on the rendered pixels.
             var resultGrid = (DataGrid)((TabItem)((TabControl)query.FindName("ResultSets")).Items[0]).Content;
             var dock = (AvalonDock.DockingManager)window.FindName("DockManager");

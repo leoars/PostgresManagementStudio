@@ -53,7 +53,7 @@ internal static class EditorAppearanceChecks
             window.SetEditorAppearance(EditorAppearanceChoice.MatchTheme);
             await Idle();
             check(options.Load().EditorAppearance is null && Back() == "#FF1E1E1E", "Match Theme follows the dark theme again and is stored as the default");
-            window.SetTheme(ThemeChoice.Light);
+            window.SetTheme(ThemeChoice.CoolBreeze);
             await Idle();
             check(Back() == "#FFFFFFFF", "and the light one");
 

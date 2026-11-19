@@ -102,7 +102,17 @@ internal static class ThemeChecks
             var theme = (MenuItem)window.FindName("ThemeMenu");
             var tools = (ItemsControl)theme.Parent;
             check(tools.Items.IndexOf(theme) == tools.Items.IndexOf(window.FindName("ExternalToolsMenu")) + 1 && tools.Items.IndexOf(theme) == tools.Items.IndexOf(window.FindName("ImportExportSettingsMenu")) - 2
-                && theme.Items.OfType<MenuItem>().Select(i => (string)i.Tag).SequenceEqual(["Light", "Dark", "System"]), "Tools ▸ Theme sits between External Tools… and Import and Export Settings…, with Light, Dark and Use system setting");
+                && theme.Items.OfType<MenuItem>().Select(i => (string)i.Tag).SequenceEqual(["Light", "Dark", "Bubblegum", "CoolBreeze", "CoolSlate", "IcyMint", "JuicyPlum", "MangoParadise", "MoonlightGlow",
+                    "MysticalForest", "SilkyPink", "SpicyRed", "SunnyDay", "System"]), "Tools ▸ Theme sits between External Tools… and Import and Export Settings…, with the SSMS 22.11 themes in its order and Use system setting");
+            check(theme.Items.OfType<MenuItem>().Where(i => (string)i.Tag != "System").All(i => i.Header is string header && header.Replace("_", "") == Theme.SpecOf(Enum.Parse<ThemeChoice>((string)i.Tag)).Header.Replace("_", "")),
+                "Every theme item names its theme");
+            check(options.Load().ThemeChoice == ThemeChoice.CoolBreeze && (options.Load() with { Theme = "3" }).ThemeChoice == ThemeChoice.CoolBreeze && (options.Load() with { Theme = "nonsense" }).ThemeChoice == ThemeChoice.CoolBreeze
+                && (options.Load() with { Theme = "juicyplum" }).ThemeChoice == ThemeChoice.JuicyPlum, "No theme saved, a number or an unknown name is Cool Breeze; names are read without case");
+            check(Theme.Palette(ThemeChoice.CoolBreeze).Count == 0 && Theme.Specs.Where(s => s.Choice != ThemeChoice.CoolBreeze).All(s => Theme.Palette(s.Choice)["ShellBrush"] == s.Frame && Theme.Palette(s.Choice)["Pgms.StatusBarBackground"] == s.Status),
+                "Cool Breeze changes nothing; every other theme brings its measured frame and status bar");
+            var coolBreeze = Theme.SpecOf(ThemeChoice.CoolBreeze);
+            check(Theme.Tint(Color.FromRgb(0xE4, 0xEF, 0xF6), coolBreeze.Frame) == Color.FromRgb(0xE4, 0xEF, 0xF6) && Theme.Tint(Colors.White, Theme.SpecOf(ThemeChoice.Bubblegum).Frame) == Colors.White,
+                "A Cool Breeze tint on its own frame is unchanged, and white stays white");
             var query = window.NewQueryTab("SELECT 1; -- note");
             await Idle();
             var dock = (FrameworkElement)window.FindName("DockManager");
@@ -112,17 +122,24 @@ internal static class ThemeChecks
             window.SetTheme(ThemeChoice.Dark);
             await Idle();
             check(options.Load().Theme == "Dark" && Theme.IsDark && ColorOf(Application.Current.TryFindResource("Pgms.DialogBackground")) == Theme.Dark["Pgms.DialogBackground"].ToString(), "Dark is saved and replaces the theme colors");
-            check(DockBackground() == "#FF2D2D30" && ColorOf(query.Editor.Background) == "#FF1E1E1E" && ColorOf(query.Editor.Foreground) == "#FFDCDCDC", "Docking and the editor turn dark at once (editor defaults match the theme)");
+            check(DockBackground() == "#FF1C1C1C" && ColorOf(query.Editor.Background) == "#FF1E1E1E" && ColorOf(query.Editor.Foreground) == "#FFDCDCDC", "Docking and the editor turn dark at once (editor defaults match the theme)");
+            check(ColorOf(Application.Current.TryFindResource("ShellBrush")) == "#FF1C1C1C" && ColorOf(Application.Current.TryFindResource("Pgms.StatusBarBackground")) == "#FF141414",
+                "Dark takes the frame and status bar measured on SSMS 22.11 Dark");
             check(ColorOf(window.Foreground) == Theme.Dark["Pgms.PrimaryText"].ToString(), "Window text turns light");
+            check(ColorOf(dock.Resources[AvalonDock.Themes.VS.Themes.ResourceKeys.DocumentWellTabUnselectedBackground]) == "#FF1C1C1C"
+                && ColorOf(dock.Resources[AvalonDock.Themes.VS.Themes.ResourceKeys.ToolWindowTabUnselectedText]) == Theme.Dark["Pgms.PrimaryText"].ToString(),
+                "Dark: unselected document and tool window tabs are dark with light text (they stayed light blue under light text, B5 M1134)");
+            check(ColorOf(window.ErrorListContent.Background) == "#FF1E1E1E", "Dark: the Error List is dark (it stayed white with the count unreadable)");
             var darkOptions = new OptionsDialog(options) { ShowInTaskbar = false }; darkOptions.Show(); await Idle();
-            check(ColorOf(darkOptions.Background) == "#FF2D2D30" && ColorOf(darkOptions.Foreground) == Theme.Dark["Pgms.PrimaryText"].ToString(), "A dialog opened in the dark theme is dark too");
+            check(ColorOf(darkOptions.Background) == "#FF282828" &&ColorOf(darkOptions.Foreground) == Theme.Dark["Pgms.PrimaryText"].ToString(), "A dialog opened in the dark theme is dark too");
             darkOptions.Close();
             theme.RaiseEvent(new RoutedEventArgs(MenuItem.SubmenuOpenedEvent, theme));
             check(theme.Items.OfType<MenuItem>().Single(i => i.IsChecked).Tag as string == "Dark", "The menu checks the theme in use");
 
             Theme.SystemUsesDark = () => false;
             window.SetTheme(ThemeChoice.System);
-            check(options.Load().Theme == "System" && !Theme.IsDark && DockBackground() == "#FFA8C7D9", "Use system setting follows a light Windows");
+            check(options.Load().Theme == "System" && !Theme.IsDark && Theme.Current == ThemeChoice.CoolBreeze && DockBackground() == "#FFA8C7D9", "Use system setting follows a light Windows with Cool Breeze");
+            check(ColorOf(dock.Resources[AvalonDock.Themes.VS.Themes.ResourceKeys.DocumentWellTabUnselectedBackground]) is not "#FF1C1C1C" and not "?", "Back in Cool Breeze the docking theme draws its own tabs again");
             Theme.SystemUsesDark = () => true;
             window.ApplyTheme();
             check(Theme.IsDark && ColorOf(query.Editor.Background) == "#FF1E1E1E", "and a dark one");
@@ -141,6 +158,10 @@ internal static class ThemeChecks
                 var app = Application.Current;
                 var button = (Button)sample["button"];
                 check(button.Template.FindName("Bd", button) is Border, "Dark theme: buttons use the dark template");
+                var editable = (ComboBox)sample["editable combo box"];
+                System.Windows.Automation.AutomationProperties.SetName(editable, "Model");
+                check(editable.Template.FindName("PART_EditableTextBox", editable) is TextBox editBox && System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(editBox).GetName() == "Model",
+                    "Dark theme: the edit box of an editable combo box carries the combo's name for the Narrator (B4, M1134)");
                 var menu = (Menu)sample["menu"];
                 var top = (MenuItem)menu.Items[0];
                 check(top.Template == app.FindResource("Pgms.Dark.TopLevelMenuItem") && ((MenuItem)top.Items[0]).Template == app.FindResource("Pgms.Dark.SubmenuItem"),
@@ -154,11 +175,46 @@ internal static class ThemeChecks
             }
             finally { controls.Close(); }
 
+            // M1123: the colour themes of SSMS 22.11.
+            string Resource(string key) => ColorOf(Application.Current.TryFindResource(key));
+            string DockKey(object key) => ColorOf(dock.Resources[key]);
             window.SetTheme(ThemeChoice.Light);
+            await Idle();
+            check(options.Load().Theme == "Light" && !Theme.IsDark && Resource("ShellBrush") == "#FFEEEEEE" && DockBackground() == "#FFEEEEEE" && Resource("PanelBrush") == "#FFF9F9F9"
+                && Resource("Pgms.StatusBarBackground") == "#FF6C6C6C" && ColorOf(query.Editor.Background) == "#FFFFFFFF" && Resource("Pgms.ContentBackground") == "#FFFFFFFF",
+                "Light is the grey SSMS Light: measured frame, tool windows and status bar, a white editor");
+            check(DockKey(AvalonDock.Themes.VS.Themes.ResourceKeys.ToolWindowCaptionActiveBackground) == "#FFF9F9F9" && DockKey(AvalonDock.Themes.VS.Themes.ResourceKeys.ToolWindowCaptionActiveText) == "#FF1E1E1E",
+                "Light: tool window captions take the tool window colour, with dark text");
+            window.SetTheme(ThemeChoice.Bubblegum);
+            await Idle();
+            check(options.Load().Theme == "Bubblegum" && !Theme.IsDark && Resource("ShellBrush") == "#FFF9BCD3" && Resource("Pgms.ToolBarBackground") == "#FFFBD5E4" && DockBackground() == "#FFF9BCD3"
+                && Resource("Pgms.LabelText") == "#FF715660" && Resource("Pgms.PaneBackground") == Theme.Tint(Color.FromRgb(0xE4, 0xEF, 0xF6), Theme.SpecOf(ThemeChoice.Bubblegum).Frame).ToString()
+                && Resource("Pgms.GridSelection") == "#FFA5CFF1" && Application.Current.TryFindResource("Pgms.Dark.TopLevelMenuItem") is null && !FontsAndColorsSettings.DarkDefaults,
+                "Bubblegum: pink frame and toolbar, tints moved to pink, labels in the status colour; selection and standard controls as in the light themes");
+            theme.RaiseEvent(new RoutedEventArgs(MenuItem.SubmenuOpenedEvent, theme));
+            check(theme.Items.OfType<MenuItem>().Single(i => i.IsChecked).Tag as string == "Bubblegum", "The menu checks a colour theme");
+            window.SetTheme(ThemeChoice.JuicyPlum);
+            await Idle();
+            check(options.Load().Theme == "JuicyPlum" && Theme.IsDark && Resource("ShellBrush") == "#FF452372" && DockBackground() == "#FF452372" && Resource("PanelBrush") == "#FF27242B"
+                && Resource("Pgms.PrimaryText") == Theme.Dark["Pgms.PrimaryText"].ToString() && ColorOf(query.Editor.Background) == "#FF1E1E1E" && ColorOf(window.Foreground) == Theme.Dark["Pgms.PrimaryText"].ToString()
+                && Application.Current.TryFindResource("Pgms.Dark.TopLevelMenuItem") is not null,
+                "Juicy Plum is dark-based: purple frame, dark tool windows, light text, the dark editor and the dark control templates");
+            window.SetTheme(ThemeChoice.SunnyDay);
+            await Idle();
+            check(!Theme.IsDark && Resource("ShellBrush") == "#FFEDE1BA" && Application.Current.TryFindResource("Pgms.Dark.TopLevelMenuItem") is null && Resource("Pgms.PrimaryText") == "#FF1E1E1E"
+                && ColorOf(query.Editor.Background) == "#FFFFFFFF", "From a dark-based theme to a light one, the dark templates and text go away");
+            foreach (var spec in Theme.Specs)
+            {
+                window.SetTheme(spec.Choice);
+                check(Resource("ShellBrush") == spec.Frame.ToString() && DockBackground() == spec.Frame.ToString() && Theme.IsDark == spec.IsDark && Resource("Pgms.StatusBarText") == "#FFFFFFFF",
+                    $"{spec.Header.Replace("_", "")} applies its frame (and white status bar text)");
+            }
+
+            window.SetTheme(ThemeChoice.CoolBreeze);
             await Idle();
             var back = Light.Where(p => ColorOf(Application.Current.TryFindResource(p.Key)) != p.Value).Select(p => p.Key).ToList();
             check(options.Load().Theme is null && back.Count == 0 && DockBackground() == "#FFA8C7D9" && ColorOf(query.Editor.Background) == "#FFFFFFFF" && !FontsAndColorsSettings.DarkDefaults,
-                "Light brings back exactly the colors PGMS had" + (back.Count > 0 ? ": " + string.Join(", ", back) : ""));
+                "Cool Breeze brings back exactly the colors PGMS had, stored as the default" + (back.Count > 0 ? ": " + string.Join(", ", back) : ""));
             var (lightControls, lightSample) = StandardControls();
             lightControls.Show();
             try
@@ -167,7 +223,7 @@ internal static class ThemeChecks
                 var lightButton = (Button)lightSample["button"];
                 check(lightButton.Template.FindName("Bd", lightButton) is null && Application.Current.TryFindResource("Pgms.Dark.TopLevelMenuItem") is null
                     && Luminance(lightSample["text box"]) > 200 && Luminance(lightSample["list"]) > 200 && Luminance(lightSample["property grid"]) > 200,
-                    "Light: the standard controls are back to the Windows look");
+                    "Cool Breeze: the standard controls are back to the Windows look");
             }
             finally { lightControls.Close(); }
         }

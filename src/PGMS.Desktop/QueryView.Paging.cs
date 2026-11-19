@@ -46,16 +46,28 @@ public partial class QueryView
         internal GridResultLoader(QueryView view, int pageRows)
         {
             this.view = view; this.pageRows = pageRows;
-            idleDrain = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => { if (!queue.IsEmpty) Drain(); }, view.Dispatcher);
+            idleDrain = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => { if (!queue.IsEmpty) { RaiseTarget(Received); Drain(); } }, view.Dispatcher);
         }
 
-        private readonly record struct Pending(QueryBatch Batch, ResultPages? Pages, IReadOnlyList<object[]> Rows);
+        /// <param name="Upto">Rows received when the batch was queued: a drain shows the batch once its target reaches this count.</param>
+        private readonly record struct Pending(QueryBatch Batch, ResultPages? Pages, IReadOnlyList<object[]> Rows, long Upto);
         private const int SliceMilliseconds = 30;
         private readonly ConcurrentQueue<Pending> queue = new();
         private ResultPages? current;
         private int scheduled;
         private bool finished;
         private long received, nextMilestone = 30;
+        // Rows the screen should show: the count at the last milestone (or idle tick). Rows that arrive after it wait for the next one, as in SSMS,
+        // instead of a drain that keeps taking them while the reader runs (M1132): that kept the window busy from row 100 to the end.
+        private long target;
+
+        private void RaiseTarget(long rows)
+        {
+            for (long seen = Interlocked.Read(ref target); rows > seen; seen = Interlocked.Read(ref target))
+                if (Interlocked.CompareExchange(ref target, rows, seen) == seen) return;
+        }
+
+        private bool NextIsDue(bool everything) => queue.TryPeek(out var next) && (everything || next.Upto <= Interlocked.Read(ref target));
 
         internal List<DataTable> Tables { get; } = [];
         internal long Received => Interlocked.Read(ref received);
@@ -70,12 +82,13 @@ public partial class QueryView
                 firstPage = batch.Rows.Where(current!.Add).ToArray();
                 Interlocked.Add(ref received, batch.Rows.Count);
             }
-            if (started is not null || firstPage.Count > 0 || batch.DisplayLimited) queue.Enqueue(new(batch, started, firstPage));
-            // Observed in SSMS: rows 30 and 100, then every 10,000, and the end.
             long total = Received;
+            if (started is not null || firstPage.Count > 0 || batch.DisplayLimited) queue.Enqueue(new(batch, started, firstPage, total));
+            // Observed in SSMS: rows 30 and 100, then every 10,000, and the end.
             bool first = total > 0 && total == batch.Rows.Count;
             if (started is null && !first && !batch.DisplayLimited && total < nextMilestone) return;
             if (total >= nextMilestone) nextMilestone = total < 100 ? 100 : (total / 10000 + 1) * 10000;
+            RaiseTarget(total);
             Schedule();
         }
 
@@ -93,8 +106,8 @@ public partial class QueryView
             if (everything) idleDrain.Stop();
             Volatile.Write(ref scheduled, 0);
             var slice = Stopwatch.StartNew();
-            while ((everything || slice.ElapsedMilliseconds < SliceMilliseconds) && queue.TryDequeue(out var item)) Apply(item);
-            if (!queue.IsEmpty) Schedule();
+            while ((everything || slice.ElapsedMilliseconds < SliceMilliseconds) && NextIsDue(everything) && queue.TryDequeue(out var item)) Apply(item);
+            if (NextIsDue(false)) Schedule();
             view.QueryStatus.Text = $"Executing query | {view.Database} | {Received:N0} displayed row(s)" + (view.displayLimited ? " | Display limited; reading remaining results" : "");
             view.UpdatePager();
         }

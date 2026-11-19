@@ -135,7 +135,7 @@ public partial class DatabaseDiagramView : UserControl
     private static string Percent(double level) => Math.Round(level * 100).ToString(System.Globalization.CultureInfo.InvariantCulture) + "%";
     private static string Message(Exception ex) => ex is PostgresException pg ? $"{pg.SqlState}: {pg.MessageText}" : ex.Message;
     private Window? OwnerWindow => Window.GetWindow(this);
-    private bool Confirm(string text) => ConfirmPrompt?.Invoke(text) ?? MessageBox.Show(OwnerWindow!, text, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+    private bool Confirm(string text) => ConfirmPrompt?.Invoke(text) ?? LocalizedMessageBox.Show(OwnerWindow!, text, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     private void Say(string text, bool cancellable = false)
     {

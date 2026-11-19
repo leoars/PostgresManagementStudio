@@ -86,7 +86,9 @@ public partial class MainWindow
         var sources = new List<(string, string, string, QueryView?)>();
         if (request.Scope != FileSearchScope.Folder)
         {
-            var queries = request.Scope == FileSearchScope.CurrentDocument ? (ActiveQuery is { } a ? [a] : []) : documents.Keys.ToList();
+            // Restored tabs not shown yet are mounted so their text is searched and Replace All changes their editor (M1133).
+            if (request.Scope == FileSearchScope.AllOpenDocuments) MountDeferredQueries();
+            var queries = request.Scope == FileSearchScope.CurrentDocument ? (ActiveQuery is { } a ? [a] : []) : QueriesInCreationOrder();
             foreach (var q in queries) sources.Add((q.FilePath ?? "", DisplayName(q), q.Editor.Text, q));
             return (sources, 0);
         }
@@ -146,7 +148,7 @@ public partial class MainWindow
         string question = $"Replace {total} occurrence(s) of \"{request.Options.Pattern}\" in {counted.Count} file(s)?"
             + (closed > 0 ? $"\n\n{closed} file(s) not open in a tab are changed on disk; that cannot be undone." : "")
             + (counted.Count > closed ? "\nOpen documents change in their editor (Ctrl+Z undoes it) and stay unsaved." : "");
-        bool yes = ReplaceAllConfirm?.Invoke(question) ?? MessageBox.Show(this, question, "Replace All", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+        bool yes = ReplaceAllConfirm?.Invoke(question) ?? LocalizedMessageBox.Show(this, question, "Replace All", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
         if (!yes) { Status.Text = "Nothing was replaced."; return 0; }
         var done = new List<(string, string, int)>();
         var failures = new List<string>();

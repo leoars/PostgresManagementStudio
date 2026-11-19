@@ -99,6 +99,12 @@ public partial class QueryView
         foreach(var (command,run) in SqlEditorCommands.SelectionMoves)
             CommandBindings.Add(new CommandBinding(command,(_,e)=>{RunTextEdit(run);e.Handled=true;},(_,e)=>{e.CanExecute=true;e.Handled=true;}));
         ConfigureConveniences();
+        // AvalonEdit binds Ctrl+I to its own Indent Selection, which swallowed the key before Generate SQL with AI (window binding) saw it.
+        var editing=Editor.TextArea.DefaultInputHandler.Editing;
+        // The gesture also lives on the routed command itself, and WPF matches a command binding's gestures too, so the command binding goes as well.
+        foreach(var binding in editing.InputBindings.OfType<KeyBinding>().Where(b=>b.Command==ICSharpCode.AvalonEdit.AvalonEditCommands.IndentSelection).ToList()) editing.InputBindings.Remove(binding);
+        foreach(var binding in editing.CommandBindings.Where(b=>b.Command==ICSharpCode.AvalonEdit.AvalonEditCommands.IndentSelection).ToList()) editing.CommandBindings.Remove(binding);
+        foreach(var binding in Editor.TextArea.CommandBindings.OfType<CommandBinding>().Where(b=>b.Command==ICSharpCode.AvalonEdit.AvalonEditCommands.IndentSelection).ToList()) Editor.TextArea.CommandBindings.Remove(binding);
         Editor.PreviewKeyDown+=(_,e)=>{if(ProcessIncrementalSearchKey(e.Key==Key.System?e.SystemKey:e.Key,Keyboard.Modifiers))e.Handled=true;else if(ProcessCommentKey(e.Key,Keyboard.Modifiers,Environment.TickCount64) || ProcessEditKey(e.Key==Key.System?e.SystemKey:e.Key,Keyboard.Modifiers,Environment.TickCount64))e.Handled=true;};
         Editor.LostKeyboardFocus+=(_,_)=>{commentChordDeadline=0;lineChordDeadline=0;};
     }
@@ -114,6 +120,7 @@ public partial class QueryView
             if(valid && modifiers==ModifierKeys.Control && key is Key.C or Key.U){CommentSelection(key==Key.U);return true;}
             if(valid && modifiers==ModifierKeys.Control && IsBackslash(key)){RunTextEdit(SqlTextCommands.DeleteHorizontalWhiteSpace);return true;}
             if(valid && modifiers==ModifierKeys.Control && key==Key.Z){MainWindow.RestoreClosedTabCommand.Execute(null,this);return true;}
+            if(valid && modifiers==ModifierKeys.Control && key==Key.B){MainWindow.CodeSnippetsManagerCommand.Execute(null,this);return true;}
             if(valid && modifiers==ModifierKeys.Control && key==Key.Q){RunTextEdit(SqlTextCommands.FormatSql);return true;}
             if(valid && modifiers==ModifierKeys.Control && key==Key.I){_=ShowQuickInfoAsync();return true;}
             if(valid && modifiers==ModifierKeys.Control && key is Key.X or Key.S){ShowSnippetPicker(key==Key.S);return true;}

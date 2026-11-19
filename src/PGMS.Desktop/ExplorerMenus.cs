@@ -18,7 +18,7 @@ public partial class MainWindow
     private async void ReloadConfiguration(object sender, RoutedEventArgs e)
     {
         if (SelectedConnection is not { } connection) return;
-        if (MessageBox.Show(this, "Reload the server configuration (pg_reload_conf)?\nChanges from postgresql.conf and ALTER SYSTEM that do not need a restart take effect for all sessions. Nothing is restarted.", "Reload Configuration", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (LocalizedMessageBox.Show(this, "Reload the server configuration (pg_reload_conf)?\nChanges from postgresql.conf and ALTER SYSTEM that do not need a restart take effect for all sessions. Nothing is restarted.", "Reload Configuration", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         await ReloadConfigurationAsync(connection);
     }
     internal async Task ReloadConfigurationAsync(string connection)
@@ -38,7 +38,7 @@ public partial class MainWindow
     internal Func<string, LocalServiceAction, Task<LocalServiceState>> LocalServiceController { get; set; } = (name, action) => LocalServerServices.ControlAsync(name, action);
     internal Func<string, bool>? ConfirmServiceAction { get; set; }
     private bool ConfirmService(string message) => ConfirmServiceAction?.Invoke(message)
-        ?? MessageBox.Show(this, message, "PostgreSQL Service", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+        ?? LocalizedMessageBox.Show(this, message, "PostgreSQL Service", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     private (LocalPostgresService? Service, LocalServiceState State) ResolveLocalService(string connection)
     {
@@ -109,7 +109,7 @@ public partial class MainWindow
     private void ExplorerMenuOpening(object sender, ContextMenuEventArgs e) { FillExplorerMenu(ExplorerMenu, ExplorerTree.SelectedItem as CatalogNode); explorerMenuPrepared = true; }
     private void ExplorerMenuOpened(object sender, RoutedEventArgs e)
     {
-        if (!explorerMenuPrepared) FillExplorerMenu((ContextMenu)sender, ExplorerTree.SelectedItem as CatalogNode);
+        if (!explorerMenuPrepared) { FillExplorerMenu((ContextMenu)sender, ExplorerTree.SelectedItem as CatalogNode); Localization.Translate((ContextMenu)sender); } // Filled after the translation of Opened (M1127).
         explorerMenuPrepared = false;
     }
 

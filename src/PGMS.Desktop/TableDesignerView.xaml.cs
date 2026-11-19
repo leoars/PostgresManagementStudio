@@ -105,6 +105,12 @@ public partial class TableDesignerView : UserControl
             string name = ObjectSql.Relation(type.Schema, type.Name);
             if (!TypeChoices.Contains(name)) TypeChoices.Add(name);
         }
+        // Base types of extensions (PostGIS geometry and geography, M1124), unqualified when their schema is public, as format_type writes them.
+        foreach (var (schema, typeName) in await new DataTypeCatalog(connection).ExtensionBaseTypesAsync(token))
+        {
+            string name = schema == "public" ? SqlIdentifier.Quote(typeName) : ObjectSql.Relation(schema, typeName);
+            if (!TypeChoices.Contains(name)) TypeChoices.Add(name);
+        }
     }
 
     private void Fill(TableDesign? design)
@@ -381,14 +387,18 @@ public partial class TableDesignerView : UserControl
         bool Undone() { RenameTable(unnamed); Touch(); return false; }
         if (BuildChange() is not { } change) return Undone();
         if (change.Statements.Count == 0) { Touch(); return true; }
+        var before = original; var designed = Current();
+        // Designers ▸ Table Options (M1143): Warn on null primary keys.
+        if (DesignerSettings.WarnNoPrimaryKey && !designed.Indexes.Any(i => i.Kind == DesignIndexKind.PrimaryKey)
+            && !(NoPrimaryKeyPrompt?.Invoke(designed.Name) ?? LocalizedMessageBox.Show(OwnerWindow ?? Window.GetWindow(this), $"The table {designed.Name} has no primary key. Save it anyway?",
+                "Table Designer", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes)) return Undone();
         if (!(ReviewPrompt ?? Review)(change)) return Undone();
 
-        var before = original; var designed = Current();
         using var cancellation = operation = new CancellationTokenSource();
         Say("Saving…", cancellable: true); RefreshState();
         try
         {
-            await new AdministrativeEditService(connection).ApplyAsync(new TableDesignEdit(before, designed), cancellation.Token);
+            await new AdministrativeEditService(connection).ApplyAsync(new TableDesignEdit(before, designed, DesignerSettings.SaveTimeout), cancellation.Token);
             var saved = await new TableDesignService(connection).InspectAsync(designed.Schema, designed.Name, CancellationToken.None);
             existing = true; Fill(saved);
             Say("Table saved.");
@@ -401,6 +411,10 @@ public partial class TableDesignerView : UserControl
     }
     private bool Review(TableDesignChange change) => new ChangeScriptDialog(change, true) { Owner = OwnerWindow }.ShowDialog() == true;
 
+    /// <summary>Designers ▸ Table and Database Designers ▸ Table Options in effect (M1143), set at startup and by Tools ▸ Options.</summary>
+    internal static DesignerOptions DesignerSettings { get; set; } = new();
+    /// <summary>Answers "save a table without primary key?"; null asks. Tests replace it.</summary>
+    internal static Func<string, bool>? NoPrimaryKeyPrompt { get; set; }
     private string? PromptName(string suggested)
     {
         var name = new TextBox { Text = suggested, Margin = new Thickness(0, 6, 0, 12) };

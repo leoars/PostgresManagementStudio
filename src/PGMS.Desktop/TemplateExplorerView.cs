@@ -16,6 +16,10 @@ public sealed class TemplateExplorerView : UserControl
     /// <summary>Opens the user's template folder outside PGMS.</summary>
     public Action<string>? OpenFolder { get; set; }
     public TreeView Tree => tree;
+    /// <summary>B4 (M1134): the node that takes the focus when the window is shown (the selected one, else the first folder). Reload rebuilds the
+    /// nodes, so focusing the TreeView itself left the focus on a tree with no node, and the Narrator read only "Template Explorer, tree".
+    /// Tab stays inside the window, as in every AvalonDock tool pane (and the Visual Studio shell); Ctrl+Tab and Ctrl+F6 leave it.</summary>
+    public UIElement FocusTarget => tree.SelectedItem as TreeViewItem ?? (tree.Items.Count > 0 ? tree.Items[0] as TreeViewItem : null) ?? (UIElement)tree;
 
     public TemplateExplorerView(string? userDirectory = null)
     {

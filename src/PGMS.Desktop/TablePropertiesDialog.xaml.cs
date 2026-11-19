@@ -318,7 +318,7 @@ public partial class TablePropertiesDialog : Window
         // The operations work on the table as it is in the database: a column renamed here and not applied is found by its old name.
         EditSelection = new(Snapshot, column.OriginalName); DialogResult = true;
     }
-    private bool Confirm(string text) => ConfirmPrompt?.Invoke(text) ?? MessageBox.Show(this, text, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+    private bool Confirm(string text) => ConfirmPrompt?.Invoke(text) ?? LocalizedMessageBox.Show(this, text, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
     private void CancelInspection(object sender, RoutedEventArgs e) => RequestCancellation();
     private void RequestCancellation()
     {

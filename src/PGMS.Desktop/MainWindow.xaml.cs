@@ -35,12 +35,23 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        // One-time costs paid on a worker while the window loads (M1132): the link expressions of the editor (about 40 ms) and the JSON
+        // metadata of the settings file, which the UI thread would otherwise build on the first editor or the first write.
+        _ = Task.Run(() =>
+        {
+            System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(SqlLinkPatterns).TypeHandle);
+            _ = System.Text.Json.JsonSerializer.Serialize(new EnvironmentOptions.Document());
+        });
         var fontsDocument = EnvironmentSettings.Load();
         FontsAndColorsSettings.EditorAppearance = fontsDocument.EditorAppearanceChoice;
         FontsAndColorsSettings.Current = EffectiveFontsAndColors(fontsDocument);
         InitializeComponent();
+        DockTitleTranslation.Watch(DockManager); // tab and tool window titles in the interface language (M1139); nothing in English
+        ApplyTabsAndDocuments(EnvironmentSettings.Load()); // Tabs, Documents and SQL Formatter options (M1141, M1142)
         PickInsertFile = PickInsertFileWithDialog;
         InitializeTabCommands();
+        ConfigureNavigation();
+        ConfigureCodeSnippets();
         InitializeExplorerToolbar();
         _ = QueryHistory; // startup cleanup of Query History
         WindowWorkArea.Attach(this);
@@ -95,6 +106,7 @@ public partial class MainWindow : Window
         ConfigureEncodingCommands();
         ConfigureBookmarkCommands();
         ConfigureHelpCommands();
+        ConfigureEditorSpecials();
         ConfigureTemplateCommands();
         ConfigureFindInFilesCommands();
         ConfigurePaneCommands();
@@ -143,7 +155,10 @@ public partial class MainWindow : Window
     internal QueryView NewQueryTab(string? text = null) => NewQuery(text);
 
     /// <param name="origin">Query History origin of text given here without a file (scripts, generated SQL); recovered drafts pass Typed.</param>
-    private QueryView NewQuery(string? text = null, string? path = null, Guid? recoveryId = null, bool activate = true, PreparedQueryDocument? prepared = null, QueryHistoryOrigin origin = QueryHistoryOrigin.Other)
+    /// <param name="deferredTab">A restored tab kept as text until shown (M1133): the editor goes into it, keeping its title and place.</param>
+    /// <param name="newTabSettings">Options as they were when that tab was restored, so its new-window settings do not change by mounting later.</param>
+    private QueryView NewQuery(string? text = null, string? path = null, Guid? recoveryId = null, bool activate = true, PreparedQueryDocument? prepared = null, QueryHistoryOrigin origin = QueryHistoryOrigin.Other,
+        LayoutDocument? deferredTab = null, EnvironmentOptions.Document? newTabSettings = null)
     {
         QueryView view;
         using (UiPhaseScope.Start(UiPhaseMeasured, "view-total"))
@@ -161,15 +176,21 @@ public partial class MainWindow : Window
         AttachQueryHistory(view);
         if (prepared is null && path is null && !string.IsNullOrWhiteSpace(text)) view.MarkOrigin(text, origin);
         // Tools ▸ Options ▸ Query Results ▸ General ▸ Default destination for results.
-        var environment = EnvironmentSettings.Load();
+        var environment = newTabSettings ?? EnvironmentSettings.Load();
         view.ResultsDestination = environment.DefaultResults;
         view.ApplyQueryOptions(environment.QueryOptionDefaults);
+        view.ApplyTextEditorSettings(environment.EditorSettings, newTab: true);
+        // Settings that reach open tabs at once (line numbers, tabs) follow the current Options in a tab mounted later.
+        if (newTabSettings is not null) view.ApplyTextEditorSettings(EnvironmentSettings.Load().EditorSettings, newTab: false);
         if (!ReferenceEquals(view.Appearance, FontsAndColorsSettings.Current)) view.ApplyAppearance(FontsAndColorsSettings.Current); // a spare made before Options changed
         view.JsonLinkRequested += OpenJsonDocument;
         view.PlanTabRequested += statements => OpenPlanDocument(statements, "Execution plan", PlanOrigin(view));
         view.MissingIndexDetailsRequested += OpenMissingIndexDetails;
+        AttachPlanCommands(view.PlanDiagram, () => documents.TryGetValue(view, out var tab) ? tab.Title : "Query");
         view.ExecutionNoted += (_, _) => NoteExecutionForToolWindows(view);
-        var document = new LayoutDocument { Title = path is null ? $"SQLQuery{++sequence}.sql" : Path.GetFileName(path), ContentId = Guid.NewGuid().ToString(), Content = view };
+        view.CaretJumped += QueryCaretJumped;
+        var document = deferredTab ?? new LayoutDocument { Title = path is null ? $"SQLQuery{++sequence}.sql" : Path.GetFileName(path), ContentId = Guid.NewGuid().ToString(), Content = view };
+        if (deferredTab is null) NoteQueryTabCreated(document); else deferredTab.Content = view;
         documents.Add(view, document);
         view.StateChanged += (_, _) =>
         {
@@ -183,8 +204,8 @@ public partial class MainWindow : Window
             e.Cancel = true;
             _ = CloseQueryAsync(view);
         };
-        document.Closed += async (_, _) => { documents.Remove(view); RefreshPropertiesWindow(); UpdateConnectionTexts(); await view.DisposeAsync(); RefreshCommands(); };
-        AddDocument(document);
+        document.Closed += async (_, _) => { documents.Remove(view); queryTabOrder.Remove(document); RefreshPropertiesWindow(); UpdateConnectionTexts(); await view.DisposeAsync(); RefreshCommands(); };
+        if (deferredTab is null) AddDocument(document);
         if (activate) document.IsActive = true;
         // The editor is not yet in the visual tree when the document is inserted.
         // Defer focus until layout has created it, so Ctrl+N accepts typing immediately.
@@ -206,8 +227,31 @@ public partial class MainWindow : Window
             pane = new LayoutDocumentPane();
             DockManager.Layout.RootPanel.Children.Add(pane);
         }
-        pane.Children.Add(document);
+        // Environment ▸ Tabs and Windows (M1141): first after the pinned ones (the default since M1143, as in SSMS), or after the existing tabs.
+        // Recovered drafts always go after the open tabs, so they come back in the order they were saved (M1143).
+        if (insertTabsToRight || appendRestoredTabs) pane.Children.Add(document);
+        else pane.Children.Insert(pane.Children.Count(c => c is LayoutDocument d && pinnedTabs.Contains(d)), document);
     }
+
+    private bool insertTabsToRight = new EnvironmentOptions(EnvironmentOptions.DefaultPath).Load().TabsSettings.InsertTabsToRight;
+    private bool appendRestoredTabs;
+    private DocumentSettings documentSettings = new EnvironmentOptions(EnvironmentOptions.DefaultPath).Load().DocumentOptions;
+    /// <summary>Applies Environment ▸ Tabs and Windows and Documents after Options (and at startup).</summary>
+    internal void ApplyTabsAndDocuments(EnvironmentOptions.Document settings)
+    {
+        insertTabsToRight = settings.TabsSettings.InsertTabsToRight;
+        documentSettings = settings.DocumentOptions;
+        SqlFormatter.Settings = settings.FormatterSettings;
+        // M1143: Designers ▸ Table Options, Object Explorer ▸ General and Commands, Live Query Statistics.
+        TableDesignerView.DesignerSettings = settings.DesignerSettings;
+        explorerSettings = settings.ExplorerSettings;
+        if (catalogService is not null) catalogService.ShowSystemObjects = !explorerSettings.HideSystemObjects; // seen at the next expand or refresh
+        QueryView.DefaultLiveIntervalMilliseconds = settings.LiveStatistics.PollingMilliseconds;
+    }
+
+    private ObjectExplorerSettings explorerSettings = new();
+    /// <summary>Answers "rename this key, constraint or trigger?"; null asks. The test runner answers yes.</summary>
+    internal static Func<string, string, bool>? RenameConfirmPrompt { get; set; }
 
     public bool TryOpenQueryFile(string path, out Exception? error)
     {
@@ -311,7 +355,7 @@ public partial class MainWindow : Window
             catalogCancellation.Cancel(); catalogCancellation.Dispose();
             catalogCancellation = new CancellationTokenSource();
             var token = catalogCancellation.Token;
-            catalogService = new CatalogService(connection);
+            catalogService = new CatalogService(connection) { ShowSystemObjects = !explorerSettings.HideSystemObjects };
             var root = new CatalogNode(new(CatalogKind.Server, catalogService.DisplayName), catalogService);
             await root.LoadAsync(token);
             if (token.IsCancellationRequested || explorerConnection != connection) return; // Disconnected while loading.
@@ -619,7 +663,8 @@ public partial class MainWindow : Window
 
     /// <param name="action">Explain, Fix or Optimize (M1115): the window opens with the selected SQL (or the whole document when nothing is
     /// selected) and a request written for it, which the user can change before Generate.</param>
-    internal void OpenAiQuery(AiSqlAction? action, string? settingsPath = null)
+    /// <param name="clipboardSql">For Paste with AI: the clipboard text, sent as the SQL to adapt.</param>
+    internal void OpenAiQuery(AiSqlAction? action, string? settingsPath = null, string? clipboardSql = null)
     {
         if (ActiveQuery is not { } query) return;
         if (!query.IsConnected || query.ConnectionString is not { } connection) { Status.Text = "Connect this query window before generating SQL with AI."; return; }
@@ -636,14 +681,14 @@ public partial class MainWindow : Window
             { Status.Text = "AI settings could not be read: " + ex.Message; return; }
             if (provider is null && attempt == 0)
             {
-                if (MessageBox.Show(this, "The AI assistant needs a provider, a model and, for Anthropic or OpenAI, an API key.\nOpen AI Assistant Settings now?", "Generate SQL with AI", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) != MessageBoxResult.Yes) return;
+                if (LocalizedMessageBox.Show(this, "The AI assistant needs a provider, a model and, for Anthropic or OpenAI, an API key.\nOpen AI Assistant Settings now?", "Generate SQL with AI", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) != MessageBoxResult.Yes) return;
                 new AiSettingsDialog(store.FilePath) { Owner = this }.ShowDialog();
             }
         }
         if (provider is null) { Status.Text = "The AI assistant is not configured."; return; }
-        string? sql = query.SelectedSql;
-        if (action is not null && string.IsNullOrWhiteSpace(sql)) sql = query.Editor.Text;
-        if (action is not null && string.IsNullOrWhiteSpace(sql)) { Status.Text = "Write or select the SQL to " + action.Value.ToString().ToLowerInvariant() + " first."; return; }
+        string? sql = action == AiSqlAction.Paste ? clipboardSql : query.SelectedSql;
+        if (action is not null && string.IsNullOrWhiteSpace(sql)) sql = action == AiSqlAction.Paste ? null : query.Editor.Text;
+        if (action is not null && string.IsNullOrWhiteSpace(sql)) { Status.Text = action == AiSqlAction.Paste ? "The clipboard has no text to paste." : "Write or select the SQL to " + action.Value.ToString().ToLowerInvariant() + " first."; return; }
         var dialog = new AiQueryDialog(provider, connection, sql, query.InsertGeneratedSql) { Owner = this };
         if (action is { } chosen) dialog.Prefill(AiQueryGenerator.ActionRequest(chosen, chosen == AiSqlAction.Fix ? query.LastError?.Code : null, chosen == AiSqlAction.Fix ? query.LastError?.Message : null));
         if (AiQueryShown is { } shown) { shown(dialog); return; }
@@ -775,9 +820,9 @@ public partial class MainWindow : Window
     }
     private async Task<bool> ConfirmDesignerCloseAsync(TableDesignerView view)
     {
-        if (view.IsBusy) { MessageBox.Show(this, "Cancel the running operation before closing this table.", "PGMS"); return false; }
+        if (view.IsBusy) { LocalizedMessageBox.Show(this, "Cancel the running operation before closing this table.", "PGMS"); return false; }
         if (!view.IsDirty) return true;
-        var answer = DesignerClosePrompt?.Invoke(view) ?? MessageBox.Show(this, "Save changes to the following items?\n\n" + view.Title.TrimEnd('*'), "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        var answer = DesignerClosePrompt?.Invoke(view) ?? LocalizedMessageBox.Show(this, "Save changes to the following items?\n\n" + view.Title.TrimEnd('*'), "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
         return answer == MessageBoxResult.No || (answer == MessageBoxResult.Yes && await view.SaveAsync() && !view.IsDirty);
     }
     private void DesignFromExplorer(object sender, RoutedEventArgs e)
@@ -966,12 +1011,12 @@ public partial class MainWindow : Window
     private void About(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
     /// <summary>Replaces the error box in tests, which would block the run.</summary>
     internal Action<Exception>? ShowErrorOverride { get; set; }
-    private void ShowError(Exception error) { Status.Text = "Operation failed"; if (ShowErrorOverride is { } shown) { shown(error); return; } MessageBox.Show(this, error.Message, "PGMS", MessageBoxButton.OK, MessageBoxImage.Error); }
+    private void ShowError(Exception error) { Status.Text = "Operation failed"; if (ShowErrorOverride is { } shown) { shown(error); return; } LocalizedMessageBox.Show(this, error.Message, "PGMS", MessageBoxButton.OK, MessageBoxImage.Error); }
 
     private void ShowExplorer(object sender, RoutedEventArgs e)
     {
         var explorer = DockManager.Layout.Descendents().OfType<LayoutAnchorable>().FirstOrDefault(a => a.ContentId == "explorer");
-        if (explorer is not null) { explorer.Show(); explorer.IsActive = true; }
+        if (explorer is not null) { explorer.Show(); explorer.IsActive = true; FocusToolContent(ExplorerContent, () => ExplorerTree); }
     }
 
     private void ResetLayout(object sender, RoutedEventArgs e)
@@ -985,7 +1030,7 @@ public partial class MainWindow : Window
         if (DockManager.Layout.Descendents().OfType<LayoutAnchorable>().FirstOrDefault(a => a.ContentId == RegisteredServersId) is { } registered) registered.Content = null;
         tools.Children.Add(new LayoutAnchorable { Title = "Object Explorer", ContentId = "explorer", Content = ExplorerContent, CanClose = false });
         var pane = new LayoutDocumentPane();
-        foreach (var document in documents.Values.Concat(monitors.Values).Concat(reports.Values)) pane.Children.Add(document);
+        foreach (var document in QueryTabsInCreationOrder().Concat(monitors.Values).Concat(reports.Values)) pane.Children.Add(document);
         panel.Children.Add(tools); panel.Children.Add(pane); root.RootPanel = panel; DockManager.Layout = root;
     }
 
@@ -993,6 +1038,7 @@ public partial class MainWindow : Window
     {
         RestoreSavedLayout();
         StartRecovery();
+        ScheduleUpdateCheck();
         // As SSMS does, the Connect dialog opens at startup and connects Object Explorer (pedido do usuário, 08/11/2026). Only for the real
         // application: test hosts use a plain Application and must not get a modal dialog.
         if (Application.Current is App)
@@ -1048,7 +1094,16 @@ public partial class MainWindow : Window
         var dialog = new OptionsDialog(EnvironmentSettings, () => QueryHistory.ClearAsync(), KeyboardCommands()) { Owner = this };
         if (page is not null && !dialog.SelectPagePath(page)) dialog.SelectPage(page);
         if (OptionsShown is { } shown) { shown(dialog); return; }
-        if (dialog.ShowDialog() == true) { ApplyFontsAndColors(); ApplyCustomization(); }
+        if (dialog.ShowDialog() == true) ApplyOptions();
+    }
+
+    /// <summary>What OK in Tools ▸ Options changes at once (tests call it after their own dialog).</summary>
+    internal void ApplyOptions()
+    {
+        ApplyFontsAndColors(); ApplyCustomization();
+        var document = EnvironmentSettings.Load();
+        ApplyTabsAndDocuments(document);
+        ApplyAutoRecover(document.Recovery);
     }
 
     /// <summary>Fonts and Colors applies at once to every open query window, as in SSMS.</summary>
@@ -1058,6 +1113,8 @@ public partial class MainWindow : Window
         FontsAndColorsSettings.EditorAppearance = fontsDocument.EditorAppearanceChoice;
         FontsAndColorsSettings.Current = EffectiveFontsAndColors(fontsDocument);
         foreach (var query in OpenQueries()) query.ApplyAppearance(FontsAndColorsSettings.Current);
+        var editor = fontsDocument.EditorSettings; // Text Editor ▸ Transact-SQL (M1122): line numbers and tabs reach every open window
+        foreach (var query in OpenQueries()) query.ApplyTextEditorSettings(editor, newTab: false);
     }
 
     private void RestoreSavedLayout()
@@ -1115,6 +1172,8 @@ public partial class MainWindow : Window
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException)
         { Status.Text = "Save failed; window remains open: " + ex.Message; return; }
         await TabCloseCompletion;
+        // Restored tabs never shown are mounted first, so each asks to save exactly as before (M1133).
+        MountDeferredQueries();
         var accepted = new Dictionary<QueryView, long>();
         foreach (var query in documents.Keys.ToArray())
         {

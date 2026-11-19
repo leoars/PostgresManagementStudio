@@ -447,7 +447,7 @@ public sealed class QueryDesignerControl : UserControl
         Regenerate(); DrawTables(); ShowRows();
     }
 
-    private void Notice(string text) { if (NoticePrompt is { } prompt) prompt(text); else MessageBox.Show(Window.GetWindow(this)!, text, "PGMS"); }
+    private void Notice(string text) { if (NoticePrompt is { } prompt) prompt(text); else LocalizedMessageBox.Show(Window.GetWindow(this)!, text, "PGMS"); }
     private void RowsChanged(object? sender, NotifyCollectionChangedEventArgs e) { if (!syncing) ScheduleGridRead(); }
 
     private void ScheduleGridRead()
@@ -929,7 +929,7 @@ public sealed class QueryDesignerControl : UserControl
             rows = result.Table.Rows.Count;
             results.Columns.Clear();
             foreach (System.Data.DataColumn column in result.Table.Columns)
-                results.Columns.Add(new DataGridTextColumn { Header = column.Caption, CellStyle = ResultGridStyle.NullAwareCell($"[{column.ColumnName}]"), Binding = new Binding($"[{column.ColumnName}]") { Converter = new DatabaseValueConverter() } });
+                results.Columns.Add(ResultGridStyle.TextColumn(column.Caption, column.ColumnName));
             results.ItemsSource = result.Table.DefaultView;
             resultStatus.Text = $"{result.Table.Rows.Count} row(s)" + (result.Truncated ? $"; only the first {QueryDesignService.MaxRows} are shown." : "");
             changedMark.Visibility = Visibility.Collapsed;

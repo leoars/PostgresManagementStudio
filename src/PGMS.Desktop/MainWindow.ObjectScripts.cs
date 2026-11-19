@@ -77,7 +77,7 @@ public partial class MainWindow
         if (!online)
         {
             string message = $"Take the database \"{database}\" offline?\n\nNew connections are refused, for every user. Sessions already connected keep running: end them in Activity Monitor if they must stop. Nothing is deleted, and Bring Online reverses this.";
-            if (!(ConfirmDatabaseOffline?.Invoke(message) ?? MessageBox.Show(this, message, "Take Offline", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes)) return;
+            if (!(ConfirmDatabaseOffline?.Invoke(message) ?? LocalizedMessageBox.Show(this, message, "Take Offline", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes)) return;
         }
         try
         {

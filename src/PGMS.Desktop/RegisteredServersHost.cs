@@ -23,7 +23,7 @@ public partial class MainWindow
         ResolveService = (host, port) => LocalServiceResolver(host, port),
         EditProfile = EditRegisteredProfile,
         PromptGroupName = parent => new ServerGroupDialog(parent) { Owner = this } is var dialog && dialog.ShowDialog() == true ? dialog.GroupNameValue : null,
-        Confirm = message => MessageBox.Show(this, message, "Registered Servers", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes
+        Confirm = message => LocalizedMessageBox.Show(this, message, "Registered Servers", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes
     };
 
     private void ShowRegisteredServers(object sender, RoutedEventArgs e) => ShowRegisteredServers();

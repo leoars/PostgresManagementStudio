@@ -93,6 +93,7 @@ public partial class QueryView
     {
         if (foldingManager is null) return;
         if (Editor.Document.TextLength > MaximumOutliningCharacters) { foldingManager.Clear(); return; }
+        if (SqlFolding.TakePrepared(Editor.Document) is { } ready) { foldingManager.UpdateFoldings(ready, -1); return; }
         try { foldingManager.UpdateFoldings(SqlFolding.Create(Editor.Document), -1); }
         catch (FormatException) { } // An unclosed string or comment keeps the previous outline until the text reads again.
     }
@@ -177,6 +178,23 @@ public partial class QueryView
 /// <summary>Regions of the SQL outline: each statement of more than one line (up to its semicolon) and each multi-line block comment.</summary>
 internal static class SqlFolding
 {
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TextDocument, Tuple<ITextSourceVersion, List<NewFolding>>> prepared = [];
+
+    /// <summary>Reads the outline of a document being prepared on a worker thread; <see cref="TakePrepared"/> returns it once, if the text did not change.</summary>
+    internal static void Prepare(TextDocument document)
+    {
+        if (document.TextLength > QueryView.MaximumOutliningCharacters) return;
+        try { prepared.AddOrUpdate(document, Tuple.Create(document.Version, Create(document).ToList())); }
+        catch (FormatException) { }
+    }
+
+    internal static List<NewFolding>? TakePrepared(TextDocument document)
+    {
+        if (!prepared.TryGetValue(document, out var entry)) return null;
+        prepared.Remove(document);
+        return entry.Item1.BelongsToSameDocumentAs(document.Version) && entry.Item1.CompareAge(document.Version) == 0 ? entry.Item2 : null;
+    }
+
     internal static IEnumerable<NewFolding> Create(TextDocument document)
     {
         string text = document.Text;

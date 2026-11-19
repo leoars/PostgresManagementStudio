@@ -28,8 +28,8 @@ internal static class SchemaCompareUiChecks
             var menu = (MenuItem)window.FindName("SchemaCompareMenu");
             var tools = (ItemsControl)menu.Parent;
             int at = tools.Items.IndexOf(menu);
-            check((string)menu.Header == "S_chema Compare" && tools.Items[at - 1] is Separator && tools.Items[at + 1] is Separator && tools.Items.IndexOf(window.FindName("RestoreGlobalsMenu")) == at - 2,
-                "Tools ▸ Schema Compare is on its own after the backup commands");
+            check((string)menu.Header == "S_chema Compare" && tools.Items[at - 1] is Separator && tools.Items[at + 1] == window.FindName("CodeSnippetsManagerMenu") && tools.Items[at + 2] is Separator && tools.Items.IndexOf(window.FindName("RestoreGlobalsMenu")) == at - 2,
+                "Tools ▸ Schema Compare comes after the backup commands, followed by Code Snippets Manager as in SSMS (M1122)");
             var view = window.ShowSchemaCompare();
             await Idle();
             check(view.Title == "Schema Compare" && !view.CanCompare && !view.CanGenerateScript && view.SourceText == "" && view.TargetText == "", "A new Schema Compare opens empty, Compare and Generate Script unavailable");

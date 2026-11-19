@@ -141,7 +141,7 @@ public sealed class DiagramExportDialog : Window
             string? path = SavePathOverride is { } choose ? choose() : Choose(diagramName);
             if (path is null) return;
             try { File.WriteAllText(path, markdown, new UTF8Encoding(false)); SavedTo = path; }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { MessageBox.Show(this, ex.Message, "PGMS", MessageBoxButton.OK, MessageBoxImage.Error); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { LocalizedMessageBox.Show(this, ex.Message, "PGMS", MessageBoxButton.OK, MessageBoxImage.Error); }
         };
     }
 
@@ -202,7 +202,7 @@ public sealed class MarkdownFunctionDialog : Window
             var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "SQL files (*.sql)|*.sql|All files (*.*)|*.*", DefaultExt = ".sql", FileName = "pgms.diagram_markdown.sql" };
             if (dialog.ShowDialog(this) != true) return;
             try { File.WriteAllText(dialog.FileName, Script.Text, new UTF8Encoding(false)); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { MessageBox.Show(this, ex.Message, "PGMS", MessageBoxButton.OK, MessageBoxImage.Error); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { LocalizedMessageBox.Show(this, ex.Message, "PGMS", MessageBoxButton.OK, MessageBoxImage.Error); }
         };
     }
 }

@@ -16,6 +16,8 @@ public sealed record QueryExecutionOptions
     public bool DiscardResults { get; init; }
     /// <summary>Lifts the row, cell and total text limits: the grid divides the result into pages (M1053). The limits per cell, per row and on columns stay.</summary>
     public bool PagedDisplay { get; init; }
+    /// <summary>PostGIS geometry and geography values are shown as EWKT ("SRID=4326;POINT(1 2)") instead of hexadecimal EWKB (M1124).</summary>
+    public bool SpatialAsText { get; init; } = true;
     /// <summary>When set, the display budget is not applied: every row is delivered and each value keeps only its first characters, up to this
     /// limit (Results to File writes all rows; text output never shows more than this per column).</summary>
     public int? TextCellLimit

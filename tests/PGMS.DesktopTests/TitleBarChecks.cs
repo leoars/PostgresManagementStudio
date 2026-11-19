@@ -28,7 +28,7 @@ internal static class TitleBarChecks
                 "The window draws its own 30 px title band and keeps the Windows frame (resize, snap, system menu)");
             check(shell.MainMenu.Parent == shell.TitleBand && shell.TitleBand.ActualHeight == 30 && WindowChrome.GetIsHitTestVisibleInChrome(shell.MainMenu) && WindowChrome.GetIsHitTestVisibleInChrome(shell.TitleIcon)
                 && new[] { shell.MinimizeButton, shell.MaximizeButton, shell.CloseButton }.All(WindowChrome.GetIsHitTestVisibleInChrome), "Icon, menu and caption buttons sit in the band and take the clicks");
-            var top = shell.MainMenu.Items.OfType<MenuItem>().ToList();
+            var top = shell.MainMenu.Items.OfType<MenuItem>().Where(i => i.Visibility == System.Windows.Visibility.Visible).ToList(); // Update available (M1118) is hidden until a newer release exists
             check(top[^1] == shell.FeatureSearchMenu && top[^2] == shell.HelpMenu && !shell.FeatureSearchMenu.HasItems, "Search is the last item of the band, after Help, as in SSMS 22.11");
             check(!shell.KeyboardCommands().Any(c => c.Name.StartsWith("Search", StringComparison.Ordinal)), "Search itself is not a command of Environment ▸ Keyboard");
 
@@ -67,14 +67,15 @@ internal static class TitleBarChecks
             // Themes (M1108): the band is the window background and the glyphs take the window text color.
             Theme.Apply(ThemeChoice.Dark); await Idle();
             check(ThemeChecks.ColorOf(shell.MinimizeButton.Foreground) == Theme.Dark["Pgms.PrimaryText"].ToString() && ThemeChecks.ColorOf(shell.Background) == Theme.Dark["ShellBrush"].ToString(), "Dark: dark band, light caption glyphs");
-            Theme.Apply(ThemeChoice.Light); await Idle();
-            check(ThemeChecks.ColorOf(shell.Background) == "#FFA8C7D9" && ThemeChecks.ColorOf(shell.MinimizeButton.Foreground) == ThemeChecks.ColorOf(SystemColors.ControlTextBrush), "Light: the SSMS blue band with dark glyphs");
+            Theme.Apply(ThemeChoice.CoolBreeze); await Idle();
+            check(ThemeChecks.ColorOf(shell.Background) == "#FFA8C7D9" && ThemeChecks.ColorOf(shell.MinimizeButton.Foreground) == ThemeChecks.ColorOf(SystemColors.ControlTextBrush), "Cool Breeze: the SSMS blue band with dark glyphs");
 
             // Search.
             check(FeatureSearch.Text("Display E_stimated Plan") == "Display Estimated Plan" && FeatureSearch.Text("a__b") == "a_b", "Search shows headers without access-key markers");
             var commands = FeatureSearch.Commands(shell.MainMenu);
             var format = FeatureSearch.Find(commands, "format sql");
-            check(format.Count > 0 && format[0] is { Title: "Format SQL", Path: "Edit > Advanced > Format SQL", Shortcut: "Ctrl+K, Ctrl+Q" }, "Searching \"format sql\" finds Edit > Advanced > Format SQL with its shortcut");
+            // Edit ▸ Paste Special ▸ Format SQL (M1120) matches as well.
+            check(format.Count > 0 && format.Take(2).Any(f => f is { Title: "Format SQL", Path: "Edit > Advanced > Format SQL", Shortcut: "Ctrl+K, Ctrl+Q" }),"Searching \"format sql\" finds Edit > Advanced > Format SQL with its shortcut");
             check(FeatureSearch.Find(commands, "  ").Count == 0 && FeatureSearch.Find(commands, "zzqqxx").Count == 0, "Empty or unknown text finds nothing");
             var advanced = FeatureSearch.Find(commands, "advanced");
             check(advanced.Count > 3 && advanced.All(c => c.Path.Contains("Advanced", StringComparison.Ordinal)), "A word of the menu path finds the commands under it");
@@ -100,7 +101,7 @@ internal static class TitleBarChecks
         }
         finally
         {
-            Theme.Apply(ThemeChoice.Light);
+            Theme.Apply(ThemeChoice.CoolBreeze);
             foreach (var q in shell.QueryDocuments.ToArray()) q.IsDirty = false;
             shell.Close(); await shell.CloseCompletion;
         }

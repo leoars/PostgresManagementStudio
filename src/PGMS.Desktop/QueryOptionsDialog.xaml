@@ -2,7 +2,7 @@
  <Grid Margin="10">
   <Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition/></Grid.ColumnDefinitions>
-  <TreeView x:Name="Pages" Background="{DynamicResource Pgms.ContentBackground}" AutomationProperties.Name="Query option pages" SelectedItemChanged="PageChanged">
+  <TreeView x:Name="Pages" local:Localization.TranslateItems="True" Background="{DynamicResource Pgms.ContentBackground}" AutomationProperties.Name="Query option pages" SelectedItemChanged="PageChanged">
    <TreeViewItem Header="Execution" IsExpanded="True">
     <TreeViewItem x:Name="ExecutionGeneralNode" Header="General" Tag="0" IsSelected="True"/>
     <TreeViewItem x:Name="ExecutionAdvancedNode" Header="Advanced" Tag="1"/>

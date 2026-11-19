@@ -39,10 +39,25 @@ public partial class QueryView
         Editor.PreviewKeyDown += async (_, e) =>
         {
             if (ProcessIntelliSenseKey(e.Key, Keyboard.Modifiers, Environment.TickCount64)) { e.Handled = true; return; }
+            if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt) && e.Key == Key.Space) { e.Handled = true; SwitchCompletionMode(); return; }
             if (Keyboard.Modifiers == ModifierKeys.Control && e.Key is Key.Space or Key.J) { e.Handled = true; await ShowCompletionAsync(); }
             else if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.R) { e.Handled = true; RefreshLocalCache(); }
         };
         Editor.LostKeyboardFocus += (_, _) => intelliSenseChordDeadline = 0;
+    }
+
+    /// <summary>Edit ▸ IntelliSense ▸ Switch Completion Mode (Ctrl+Alt+Space, PGMS-082, M1120), as in the Visual Studio editor of SSMS: in suggestion
+    /// mode the list only suggests, so Enter ends the line with what was typed and only Tab (or a double click) inserts the highlighted name. The mode
+    /// is shared by every query window and lasts until PGMS closes.</summary>
+    public static bool SuggestionMode { get; set; }
+    internal static event Action? SuggestionModeChanged;
+
+    public void SwitchCompletionMode()
+    {
+        SuggestionMode = !SuggestionMode;
+        completionWindow?.Close();
+        SuggestionModeChanged?.Invoke();
+        QueryStatus.Text = SuggestionMode ? "IntelliSense suggestion mode: Tab inserts the highlighted name; Enter keeps what you typed." : "IntelliSense completion mode: Enter or Tab inserts the selected name.";
     }
 
     /// <summary>The Ctrl+B, Ctrl+I chord. Ctrl+I alone stays with Generate SQL with AI.</summary>
@@ -103,7 +118,7 @@ internal sealed class SqlCompletionWindow(TextArea textArea) : CompletionWindow(
 {
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && CompletionList.SelectedItem is null) { Close(); return; }
+        if (e.Key == Key.Enter && (CompletionList.SelectedItem is null || QueryView.SuggestionMode)) { Close(); return; }
         base.OnKeyDown(e);
     }
 }

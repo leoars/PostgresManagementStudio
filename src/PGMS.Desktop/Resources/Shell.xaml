@@ -41,7 +41,8 @@
  <SolidColorBrush x:Key="Pgms.PropertyCategory" Color="#EEF3FA" />
  <SolidColorBrush x:Key="Pgms.PropertyGlyph" Color="#444444" />
  <Style TargetType="Window"><Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="12"/></Style>
- <Style TargetType="ToolBar"><Setter Property="Background" Value="{DynamicResource Pgms.ToolBarBackground}"/><Setter Property="BorderThickness" Value="0"/></Style>
+ <!-- B4 (M1134): WPF makes Tab cycle inside a ToolBar, so Tab never left the Standard toolbar. B1 review (M1137): as in SSMS, the toolbars are not in the Tab order at all; None skips them, and Tab from a button that has the focus (after a click) goes on to the windows. -->
+ <Style TargetType="ToolBar"><Setter Property="Background" Value="{DynamicResource Pgms.ToolBarBackground}"/><Setter Property="BorderThickness" Value="0"/><Setter Property="KeyboardNavigation.TabNavigation" Value="None"/></Style>
  <Style TargetType="ToolTip"><Setter Property="FontSize" Value="12"/></Style>
  <!-- SSMS 22.11 tree expander, sampled from its Object Explorer at 100%: 9x9 box with #919191 border, softened corners and a light-to-grey fill;
       the horizontal bar is #4B63A7 and the vertical bar of "+" is #294272. -->
@@ -213,51 +214,29 @@
   <Setter Property="Template">
    <Setter.Value>
     <ControlTemplate TargetType="DataGridRowHeader">
-     <Grid Background="{DynamicResource Pgms.DialogBackground}" SnapsToDevicePixels="True">
-      <Border BorderBrush="{DynamicResource Pgms.ControlBorder}" BorderThickness="0,0,1,1"/>
-      <ContentPresenter Margin="4,0,4,1" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-     </Grid>
+     <!-- One chrome draws the background and the lines, as the panel and border did; the number has no automation peer of its own,
+          since the header already exposes it as its name (M1132). -->
+     <local:ResultCellChrome Background="{DynamicResource Pgms.DialogBackground}" BorderBrush="{DynamicResource Pgms.ControlBorder}" SnapsToDevicePixels="True">
+      <local:PlainText Margin="4,0,4,1" VerticalAlignment="Center" HorizontalAlignment="Left" Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"/>
+     </local:ResultCellChrome>
     </ControlTemplate>
    </Setter.Value>
   </Setter>
  </Style>
+ <!-- Results cell (M1132): one ResultCellChrome draws the background, the lines and the dotted current-cell rectangle; ResultTextColumn marks
+      the current cell and NULL values when it generates the cell, so no cell holds bindings to the grid. -->
  <Style x:Key="SsmsResultCell" TargetType="DataGridCell">
   <Setter Property="Background" Value="Transparent"/>
   <Setter Property="Foreground" Value="{DynamicResource Pgms.PrimaryText}"/>
   <Setter Property="Template">
    <Setter.Value>
     <ControlTemplate TargetType="DataGridCell">
-     <Grid x:Name="Root" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
-      <Border BorderBrush="{DynamicResource Pgms.ControlBorder}" BorderThickness="0,0,1,1"/>
+     <local:ResultCellChrome x:Name="Root" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource Pgms.ControlBorder}" CurrentBrush="{DynamicResource Pgms.GridCurrentCell}" SnapsToDevicePixels="True">
       <ContentPresenter Margin="7,0,8,1" VerticalAlignment="Center"/>
-      <Rectangle x:Name="Current" Margin="0,0,1,1" Stroke="{DynamicResource Pgms.GridCurrentCell}" StrokeThickness="1" StrokeDashArray="1 1" Visibility="Collapsed" SnapsToDevicePixels="True"/>
-     </Grid>
+     </local:ResultCellChrome>
      <ControlTemplate.Triggers>
-      <DataTrigger Value="True">
-       <DataTrigger.Binding>
-        <MultiBinding Converter="{x:Static local:IsCurrentCellConverter.Instance}">
-         <Binding Path="Column" RelativeSource="{RelativeSource Self}"/>
-         <Binding Path="DataContext" RelativeSource="{RelativeSource Self}"/>
-         <Binding Path="CurrentColumn" RelativeSource="{RelativeSource AncestorType=DataGrid}"/>
-         <Binding Path="CurrentItem" RelativeSource="{RelativeSource AncestorType=DataGrid}"/>
-        </MultiBinding>
-       </DataTrigger.Binding>
-       <Setter TargetName="Current" Property="Visibility" Value="Visible"/>
-      </DataTrigger>
-      <MultiDataTrigger>
-       <MultiDataTrigger.Conditions>
-        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
-        <Condition Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="True"/>
-       </MultiDataTrigger.Conditions>
-       <Setter TargetName="Root" Property="Background" Value="{DynamicResource Pgms.GridSelection}"/>
-      </MultiDataTrigger>
-      <MultiDataTrigger>
-       <MultiDataTrigger.Conditions>
-        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
-        <Condition Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="False"/>
-       </MultiDataTrigger.Conditions>
-       <Setter TargetName="Root" Property="Background" Value="{DynamicResource Pgms.GridSelection}"/>
-      </MultiDataTrigger>
+      <Trigger Property="local:ResultCellChrome.IsCurrentCell" Value="True"><Setter TargetName="Root" Property="IsCurrent" Value="True"/></Trigger>
+      <Trigger Property="IsSelected" Value="True"><Setter TargetName="Root" Property="Background" Value="{DynamicResource Pgms.GridSelection}"/></Trigger>
      </ControlTemplate.Triggers>
     </ControlTemplate>
    </Setter.Value>

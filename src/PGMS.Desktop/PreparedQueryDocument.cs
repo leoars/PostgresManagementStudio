@@ -14,6 +14,9 @@ internal sealed class PreparedQueryDocument
         var document = new TextDocument(text);
         PreparedLexicalStates.Prepare(document,text,token);
         token.ThrowIfCancellationRequested();
+        // The outline of the statements is read here too, off the UI thread (M1132): the editor applies it when the document is attached.
+        SqlFolding.Prepare(document);
+        token.ThrowIfCancellationRequested();
         document.SetOwnerThread(null);
         return new(document);
     }

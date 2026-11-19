@@ -40,8 +40,8 @@ internal static class PaneChecks
         try
         {
             var menu = (MenuItem)shell.FindName("WindowMenu");
-            var names = menu.Items.OfType<MenuItem>().Select(i => i.Name).Take(13).ToArray();
-            check(names.SequenceEqual(["NextPaneMenu", "PreviousPaneMenu", "ShowResultsPaneMenu", "SplitTabMenu", "DockMenu", "AutoHideMenu", "MoveToNewWindowMenu", "SaveWindowLayoutMenu", "ApplyLayoutMenu", "ManageLayoutsMenu", "", "AutoHideAllMenu", "CloseAllTabsMenu"]), "Window lists the SSMS items in its order (Pin Tab left out): " + string.Join(",", names));
+            var names = menu.Items.OfType<MenuItem>().Select(i => i.Name).Take(14).ToArray();
+            check(names.SequenceEqual(["NextPaneMenu", "PreviousPaneMenu", "ShowResultsPaneMenu", "SplitTabMenu", "DockMenu", "AutoHideMenu", "MoveToNewWindowMenu", "PinTabMenu", "SaveWindowLayoutMenu", "ApplyLayoutMenu", "ManageLayoutsMenu", "", "AutoHideAllMenu", "CloseAllTabsMenu"]), "Window lists the SSMS items in its order (Pin Tab since M1121): " + string.Join(",", names));
             check(((MenuItem)shell.FindName("FullScreenMenu")).InputGestureText == "Shift+Alt+Enter", "View ▸ Full Screen");
 
             var query = shell.NewQueryTab("select 1;\nselect 2;\n"); await Idle();

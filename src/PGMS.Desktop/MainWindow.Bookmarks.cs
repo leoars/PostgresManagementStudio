@@ -19,7 +19,7 @@ public partial class MainWindow
     internal bool ClearAllBookmarks()
     {
         if (!documents.Keys.Any(q => q.BookmarkCount > 0)) return false;
-        bool confirmed = ConfirmClearBookmarks?.Invoke() ?? MessageBox.Show(this, "Are you sure you want to delete all of the bookmark(s)?", "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        bool confirmed = ConfirmClearBookmarks?.Invoke() ?? LocalizedMessageBox.Show(this, "Are you sure you want to delete all of the bookmark(s)?", "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
         if (!confirmed) return false;
         foreach (var query in documents.Keys) query.ClearBookmarks();
         return true;

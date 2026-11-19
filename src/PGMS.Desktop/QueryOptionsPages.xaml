@@ -47,6 +47,7 @@
     <CheckBox x:Name="RetainBox" Content="Retain CR/_LF on copy or save"/>
     <TextBlock Text="When off, each line break in a value becomes a space in the clipboard and in exported files." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="20,4,0,8"/>
     <CheckBox x:Name="GridDiscardBox" Content="_Discard results after execution"/>
+     <CheckBox x:Name="StackResultsBox" Content="Show multiple result sets stac_ked in one tab" Margin="0,6,0,0" ToolTip="As SSMS shows them: each result grid under the previous one, instead of Result 1, Result 2… tabs. Applies from the next execution"/>
     <CheckBox x:Name="JsonLinkBox" Content="Display _JSON in text columns as Hyperlink" Margin="0,6,0,0"/>
     <TextBlock Text="Clicking a JSON object or array opens it formatted in a new tab. Applies to the results of the next execution." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="20,4,0,0"/>
     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">

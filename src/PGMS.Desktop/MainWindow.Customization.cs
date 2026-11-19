@@ -32,7 +32,7 @@ public static class KeyboardMap
         {
             foreach (var item in parent.Items.OfType<MenuItem>())
             {
-                string part = Part(item.Header);
+                string part = Part(Localization.EnglishHeader(item, item.Header));
                 if (part.Length == 0 || item.Tag is ExternalTool) continue;
                 string name = prefix.Length == 0 ? part : prefix + "." + part;
                 if (item.Items.Count > 0 || DynamicMenus.Contains(item.Name)) { if (!DynamicMenus.Contains(item.Name)) Walk(item, name); continue; }

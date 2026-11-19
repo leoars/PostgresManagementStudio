@@ -10,6 +10,8 @@ public sealed record RecoveryDraft(Guid Id, string Title, string Text, SqlFileFo
     public int CommandTimeoutSeconds{get;init;}
     public bool WordWrap{get;init;}
     public bool ShowWhiteSpace{get;init;}
+    /// <summary>Window ▸ Pin Tab: a restored tab comes back pinned (B1 review, M1137).</summary>
+    public bool Pinned{get;init;}
 }
 
 /// <summary>One encrypted file per draft; callers own the session lease.</summary>
@@ -99,6 +101,9 @@ public sealed class QueryRecoveryStore(string directory)
         RejectLink(DirectoryPath);
         File.Delete(DraftPath(id));
     }
+
+    /// <summary>When the draft was last written (Environment ▸ AutoRecover ▸ lifetime, M1141).</summary>
+    public DateTime WrittenUtc(Guid id) => File.GetLastWriteTimeUtc(DraftPath(id));
 
     private string DraftPath(Guid id)
     {

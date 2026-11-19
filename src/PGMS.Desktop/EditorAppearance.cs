@@ -77,7 +77,7 @@ public partial class MainWindow
 
     private void RestoreDefaultFontSettingsClicked(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show(this, "Restore the default fonts and sizes of Text Editor, Grid Results and Text Results? Colors and the Presenter Mode sizes are kept.",
+        if (LocalizedMessageBox.Show(this, "Restore the default fonts and sizes of Text Editor, Grid Results and Text Results? Colors and the Presenter Mode sizes are kept.",
             "Restore Default Font Settings", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes) RestoreDefaultFontSettings();
     }
 

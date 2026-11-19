@@ -174,7 +174,7 @@ public partial class ActivityMonitorView : UserControl
             pid = value;
         }
         string state = (StateFilter.SelectedItem as ComboBoxItem)?.Content as string ?? "All states";
-        return new(DatabaseFilter.Text, UserFilter.Text, ApplicationFilter.Text, state == "All states" ? "" : state, pid){BlockedOnly=BlockedOnlyFilter.IsChecked==true};
+        return new(DatabaseFilter.Text, UserFilter.Text, ApplicationFilter.Text, StateFilter.SelectedIndex <= 0 ? "" : state /* "All states" may be translated (M1129); the others are pg_stat_activity values */, pid){BlockedOnly=BlockedOnlyFilter.IsChecked==true};
     }
     public Task ReloadAsync() => LoadAsync(page);
     // A request made while a refresh runs joins it instead of starting another one, so callers resume once current data is shown.
@@ -237,7 +237,10 @@ public partial class ActivityMonitorView : UserControl
             {
                 var active = await metrics.ReadActiveQueriesAsync(token); token.ThrowIfCancellationRequested();
                 Replace(activeRows, active);
-                ActiveQueriesNote.Text = $"{active.Count} running quer{(active.Count == 1 ? "y" : "ies")}, oldest first (at most {ActiveExpensiveQuery.MaximumRows}); the monitor's own reads are left out.";
+                // Whole sentences for singular and plural, so each translates as one pattern (B1 review, M1139).
+                ActiveQueriesNote.Text = active.Count == 1
+                    ? $"{active.Count} running query, oldest first (at most {ActiveExpensiveQuery.MaximumRows}); the monitor's own reads are left out."
+                    : $"{active.Count} running queries, oldest first (at most {ActiveExpensiveQuery.MaximumRows}); the monitor's own reads are left out.";
             }
             catch (Exception ex) when (ex is NpgsqlException or System.IO.IOException or TimeoutException) { ActiveQueriesNote.Text = "Running queries not read: " + Describe(ex); }
         }
@@ -318,8 +321,8 @@ public partial class ActivityMonitorView : UserControl
     internal static bool ConfirmTerminate(Window? owner, ActivitySession session)
     {
         string text = $"Terminate PID {session.Pid}?\nDatabase: {session.Database}\nUser: {session.User}\nApplication: {session.Application}\n\nThe connection will close and its open transaction will roll back.";
-        var answer = owner is null ? MessageBox.Show(text, "Terminate Session", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
-            : MessageBox.Show(owner, text, "Terminate Session", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        var answer = owner is null ? LocalizedMessageBox.Show(text, "Terminate Session", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
+            : LocalizedMessageBox.Show(owner, text, "Terminate Session", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         return answer == MessageBoxResult.Yes;
     }
     // Right-click selects the row first, so the menu always acts on the row under the pointer.

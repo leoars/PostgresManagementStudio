@@ -37,8 +37,10 @@ internal static class ExtensionTypeChecks
             // The path of the results grid: every column is asked as text (AllResultTypesAreUnknown), so any extension type is shown as the server writes it.
             var rows = new List<object[]>(); IReadOnlyList<string>? types = null;
             await session.StreamAsync($"SELECT id, geom FROM {schema}.places ORDER BY id", (batch, _) => { rows.AddRange(batch.Rows); types ??= batch.ColumnTypes; return ValueTask.CompletedTask; });
-            check(rows.Count == 2 && Equals(rows[0][1], PointHex) && rows[1][1] is DBNull or null && types is { Count: 2 } && types[1].StartsWith("unknown type (oid ", StringComparison.Ordinal),
-                $"The results grid stream gives the geometry as text; a type created after Npgsql read the catalog is named by its OID: {(types is null ? "" : string.Join(",", types))}");
+            // M1124: the first query (above) met a type Npgsql did not know, so the session read the types again; this one knows the name, and a
+            // type named geometry is shown as EWKT.
+            check(rows.Count == 2 && Equals(rows[0][1], "SRID=4326;POINT(1 2)") && rows[1][1] is DBNull or null && types is { Count: 2 } && types[1] == schema + ".geometry",
+                $"After a result with an unknown type the session reads the types again: the next stream names the geometry type and shows EWKT: {(types is null ? "" : string.Join(",", types))} {(rows.Count > 0 ? rows[0][1] : "")}");
             // A connection that reads the catalog after the type exists (PostGIS installed before connecting) knows its name.
             await using (var fresh = new QuerySession(connection + ";Application Name=pgms-gis-" + Guid.NewGuid().ToString("N")[..8]))
             {

@@ -45,6 +45,9 @@ public partial class MainWindow
         finally { closingQueries.Remove(query); query.IsEnabled = true; }
     }
 
+    /// <summary>Answers "Save changes to this query?" in tests (receives the query being closed).</summary>
+    internal Func<QueryView, MessageBoxResult>? CloseQueryPrompt { get; set; }
+
     private async Task<bool> ConfirmCloseAsync(QueryView query)
     {
         if (pendingSaves.TryGetValue(query, out var save))
@@ -53,11 +56,11 @@ public partial class MainWindow
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException)
             { Status.Text = "Save failed; query remains open: " + ex.Message; return false; }
         }
-        if (query.IsBusy) { MessageBox.Show(this, "Cancel the running operation before closing this query.", "PGMS"); return false; }
+        if (query.IsBusy) { LocalizedMessageBox.Show(this, "Cancel the running operation before closing this query.", "PGMS"); return false; }
         // Close All Tabs already asked once for every changed query.
         if (query.IsDirty && !discardOnClose.Contains(query))
         {
-            var answer = MessageBox.Show(this, "Save changes to this query?", "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+            var answer = CloseQueryPrompt?.Invoke(query) ?? LocalizedMessageBox.Show(this, "Save changes to this query?", "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (!(answer == MessageBoxResult.No || (answer == MessageBoxResult.Yes && await SaveAsync(query) && !query.IsDirty))) return false;
         }
         return await ConfirmOpenTransactionAsync(query);
@@ -72,8 +75,8 @@ public partial class MainWindow
     {
         if (!query.QueryOptions.CheckOpenTransactions || await query.FindOpenTransactionAsync() is not { } risk) return true;
         var answer = OpenTransactionPrompt?.Invoke(risk.Aborted) ?? (risk.Aborted
-            ? MessageBox.Show(this, "The transaction in this query has failed and will be rolled back. Close the query?", "PGMS", MessageBoxButton.OKCancel, MessageBoxImage.Warning)
-            : MessageBox.Show(this, "There are uncommitted transactions. Do you wish to commit these transactions?", "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question));
+            ? LocalizedMessageBox.Show(this, "The transaction in this query has failed and will be rolled back. Close the query?", "PGMS", MessageBoxButton.OKCancel, MessageBoxImage.Warning)
+            : LocalizedMessageBox.Show(this, "There are uncommitted transactions. Do you wish to commit these transactions?", "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question));
         if (answer == MessageBoxResult.Cancel) return false;
         if (answer != MessageBoxResult.Yes) return true;
         try { await query.CommitOpenTransactionAsync(); return true; }

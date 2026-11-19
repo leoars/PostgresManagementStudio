@@ -40,7 +40,9 @@ public partial class MainWindow
         else if (anchorable.Content is null) anchorable.Content = TemplateExplorer;
         TemplateExplorer.Reload();
         anchorable.Show(); anchorable.IsActive = true;
-        TemplateExplorer.Tree.Focus();
+        SizeNewPane(anchorable);
+        TemplateExplorer.FocusTarget.Focus();
+        FocusToolContent(TemplateExplorer, () => TemplateExplorer.FocusTarget);
     }
 
     /// <summary>A new query tab with the template text, connected like New Query (to the active query's or the Object Explorer server).</summary>

@@ -48,10 +48,10 @@ public partial class MainWindow
 
     private async Task<bool> ConfirmViewDesignerCloseAsync(ViewDesignerView view)
     {
-        if (view.IsBusy) { MessageBox.Show(this, "Cancel the running operation before closing this view.", "PGMS"); return false; }
+        if (view.IsBusy) { LocalizedMessageBox.Show(this, "Cancel the running operation before closing this view.", "PGMS"); return false; }
         await view.Designer.LeaveSqlFirstAsync();
         if (!view.IsDirty) return true;
-        var answer = ViewDesignerClosePrompt?.Invoke(view) ?? MessageBox.Show(this, "Save changes to the following items?\n\n" + view.Title.TrimEnd('*'), "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        var answer = ViewDesignerClosePrompt?.Invoke(view) ?? LocalizedMessageBox.Show(this, "Save changes to the following items?\n\n" + view.Title.TrimEnd('*'), "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
         return answer == MessageBoxResult.No || (answer == MessageBoxResult.Yes && await view.SaveAsync() && !view.IsDirty);
     }
 

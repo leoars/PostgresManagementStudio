@@ -36,7 +36,7 @@ public partial class SchemaEditDialog : Window
         if (request.Operation == SchemaOperation.Drop)
         {
             var c = new NpgsqlConnectionStringBuilder(connection);
-            if (MessageBox.Show(this, $"Drop schema {request.Name}?\nServer: {c.Host}:{c.Port}\nDatabase: {c.Database}\n\n{request.ToSql()}\n\nThis removes the schema. PostgreSQL will refuse if it contains objects.", "Drop Schema", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            if (LocalizedMessageBox.Show(this, $"Drop schema {request.Name}?\nServer: {c.Host}:{c.Port}\nDatabase: {c.Database}\n\n{request.ToSql()}\n\nThis removes the schema. PostgreSQL will refuse if it contains objects.", "Drop Schema", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         }
         SetBusy(true); Feedback.Text = "Applying…";
         try { await new AdministrativeEditService(connection).ApplyAsync(request); WasApplied = true; busy = false; DialogResult = true; }

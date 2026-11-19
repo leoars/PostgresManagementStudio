@@ -33,15 +33,16 @@ public sealed class QueryRecoverySession : IDisposable
         int maximumDocuments = QueryRecoveryStore.MaximumDocuments)
         => RecoverCoreAsync(root, activeDirectory, draft => { accept(draft); return ValueTask.FromResult(true); }, maximumDocuments, CancellationToken.None).GetAwaiter().GetResult();
 
+    /// <param name="lifetime">Environment ▸ AutoRecover (M1141): drafts written longer ago are removed instead of restored; null keeps every draft.</param>
     public static Task<RecoveryReport> RecoverAsync(string root, string activeDirectory,
-        Func<RecoveryDraft, ValueTask<bool>> accept, int maximumDocuments = QueryRecoveryStore.MaximumDocuments, CancellationToken token = default)
+        Func<RecoveryDraft, ValueTask<bool>> accept, int maximumDocuments = QueryRecoveryStore.MaximumDocuments, CancellationToken token = default, TimeSpan? lifetime = null)
     {
         ArgumentNullException.ThrowIfNull(accept);
-        return Task.Run(() => RecoverCoreAsync(root, activeDirectory, accept, maximumDocuments, token));
+        return Task.Run(() => RecoverCoreAsync(root, activeDirectory, accept, maximumDocuments, token, lifetime));
     }
 
     private static async Task<RecoveryReport> RecoverCoreAsync(string root, string activeDirectory,
-        Func<RecoveryDraft, ValueTask<bool>> accept, int maximumDocuments, CancellationToken token)
+        Func<RecoveryDraft, ValueTask<bool>> accept, int maximumDocuments, CancellationToken token, TimeSpan? lifetime = null)
     {
         if (maximumDocuments < 0 || maximumDocuments > QueryRecoveryStore.MaximumDocuments)
             throw new ArgumentOutOfRangeException(nameof(maximumDocuments));
@@ -74,6 +75,7 @@ public sealed class QueryRecoverySession : IDisposable
                     if (restored >= maximumDocuments) { deferred++; continue; }
                     try
                     {
+                        if (lifetime is { } keep && DateTime.UtcNow - session.Store.WrittenUtc(id) > keep) { session.Store.Remove(id); continue; }
                         var draft = session.Store.Read(id);
                         // Acceptance must retain the destination durably before returning true.
                         if (!await accept(draft).ConfigureAwait(false)) { deferred++; continue; }

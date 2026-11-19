@@ -16,7 +16,9 @@ public partial class QueryView
     private DateTime liveStartedUtc;
     internal int LiveSamples { get; private set; }
     /// <summary>Seconds between samples; tests shorten it.</summary>
-    internal TimeSpan LiveInterval { get; set; } = TimeSpan.FromSeconds(1);
+    internal TimeSpan LiveInterval { get; set; } = TimeSpan.FromMilliseconds(DefaultLiveIntervalMilliseconds);
+    /// <summary>Tools ▸ Options ▸ Query Execution ▸ Live Query Statistics ▸ Node Polling Interval (M1141; 250 ms, as in SSMS, since M1143) for query windows opened from now on.</summary>
+    internal static int DefaultLiveIntervalMilliseconds { get; set; } = LiveQueryStatisticsSettings.DefaultPolling;
 
     public bool IncludeLiveStatistics
     {

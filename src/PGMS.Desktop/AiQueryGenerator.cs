@@ -20,7 +20,8 @@ public sealed record AiQueryResult(string Sql, string Provider, string Model);
 public sealed record AiTurn(string Request, string Sql);
 
 /// <summary>Query ▸ Explain/Fix/Optimize SQL with AI (M1115): the request written for the selected SQL; the user can change it before Generate.</summary>
-public enum AiSqlAction { Explain, Fix, Optimize }
+/// <summary>Paste: Edit ▸ Paste Special ▸ Paste with AI (PGMS-082, M1120), the clipboard SQL adapted to the connected database.</summary>
+public enum AiSqlAction { Explain, Fix, Optimize, Paste }
 
 public static partial class AiQueryGenerator
 {
@@ -30,6 +31,7 @@ public static partial class AiQueryGenerator
     {
         AiSqlAction.Explain => "Explain what this SQL does, step by step. Keep the SQL unchanged and put the explanation above it as -- comments.",
         AiSqlAction.Fix => "Fix this SQL so it runs on this database." + (string.IsNullOrEmpty(errorCode) ? "" : $" The server reported {errorCode}: {errorMessage}") + " Keep what it is meant to do; say what changed in -- comments.",
+        AiSqlAction.Paste => "Adapt this SQL, pasted from the clipboard, to this database: use its schemas, tables and columns and PostgreSQL syntax. Keep what it is meant to do; say what changed in -- comments.",
         _ => "Optimize this SQL for PostgreSQL without changing its results: better joins, filters that can use indexes, fewer passes. Say what changed and which indexes would help in -- comments; do not create them.",
     };
 }

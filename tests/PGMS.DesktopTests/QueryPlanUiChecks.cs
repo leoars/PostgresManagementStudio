@@ -8,6 +8,7 @@ internal static class QueryPlanUiChecks
     internal static async Task RunAsync(string connection,Action<bool,string> check)
     {
         await ExecutionPlanUiChecks.RunAsync(connection,check);
+        await PlanSourceUiChecks.RunAsync(connection,check);
         var query=new QueryView();var window=new Window{Content=query,Width=900,Height=650,ShowInTaskbar=false};window.Show();
         try
         {

@@ -72,7 +72,7 @@ public partial class EnumDialog : Window
     {
         if (busy || !ApplyButton.IsEnabled) return;
         var request = Request;
-        if (MessageBox.Show(this, Target.Text + "\n\n" + request.ToSql() + "\n\nRenaming changes existing values as displayed. Review applications that depend on these labels.", "Confirm Enum Change", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+        if (LocalizedMessageBox.Show(this, Target.Text + "\n\n" + request.ToSql() + "\n\nRenaming changes existing values as displayed. Review applications that depend on these labels.", "Confirm Enum Change", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
         { Feedback.Text = "Operation canceled. Nothing was sent."; return; }
         using var source = new CancellationTokenSource(); cancellation = source; busy = true; RequiresParentRefresh = true; Update(true); CancelButton.Focus(); Feedback.Text = "Applying enum change…";
         try { await new AdministrativeEditService(connection).ApplyAsync(request,source.Token); WasApplied = true; Feedback.Text = "Command completed. Inspect before another change."; }

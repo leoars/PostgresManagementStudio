@@ -362,7 +362,17 @@ internal static class RepresentativeLoadChecks
         }, new Border());
         try
         {
-            var restored = ((DockingManager)window.FindName("DockManager")).Layout.Descendents().OfType<LayoutDocument>().Select(d => d.Content).OfType<QueryView>().ToArray();
+            var tabs = ((DockingManager)window.FindName("DockManager")).Layout.Descendents().OfType<LayoutDocument>().ToArray();
+            check(tabs.Length == 5 && window.DeferredQueryCount == 4, "Five drafts restored; only the active tab builds its editor (M1133)");
+            // The editor of a waiting tab is built when the tab is shown: measured on its own (M1133).
+            var waiting = tabs.First(window.IsDeferredQuery);
+            await probe.StepAsync("activate-restored-tab", async () =>
+            {
+                waiting.IsActive = true;
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            }, new Border());
+            window.MountDeferredQueries();
+            var restored = tabs.Select(d => d.Content).OfType<QueryView>().ToArray();
             check(restored.Length == 5 && restored.Any(q => ((TextEditor)q.FindName("Editor")).Text == script), "Five drafts restored, including the complete 5000-line script");
             return new { drafts = restored.Length };
         }

@@ -11,6 +11,8 @@ $start.UseShellExecute = $false
 $start.WorkingDirectory = $package
 $start.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
 $start.Environment['PGMS_STATE_DIRECTORY'] = $state
+# The interface follows the Windows language by default; English keeps the Connect to Server title below the same on every machine.
+$start.Environment['PGMS_LANGUAGE'] = 'en'
 # Point runtime discovery at an empty directory; module inspection below is the decisive evidence.
 $emptyRuntime = Join-Path $state 'empty-runtime'
 New-Item -ItemType Directory -Path $emptyRuntime | Out-Null

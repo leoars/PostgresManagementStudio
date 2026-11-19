@@ -30,7 +30,7 @@ internal static class QueryConnectionChecks
             var file = (MenuItem)window.FindName("FileMenu");
             var fileItems = file.Items.OfType<MenuItem>().Select(i => i.Header as string).ToList();
             var newItems = ((MenuItem)window.FindName("NewMenu")).Items.OfType<MenuItem>().Select(i => i.Header as string).ToList();
-            check(fileItems[0] == "_New" && newItems.SequenceEqual(["_Query with Current Connection", "_Database Engine Query"]) && ((MenuItem)window.FindName("NewQueryCurrentMenu")).InputGestureText == "Ctrl+N", "File ▸ New lists Query with Current Connection (Ctrl+N) and Database Engine Query, as in SSMS");
+            check(fileItems[0] == "_New" && newItems.SequenceEqual(["_Query with Current Connection", "_Database Engine Query", "_File…"]) && ((MenuItem)window.FindName("NewQueryCurrentMenu")).InputGestureText == "Ctrl+N", "File ▸ New lists Query with Current Connection (Ctrl+N) and Database Engine Query, as in SSMS");
             var openItems = ((MenuItem)window.FindName("OpenMenu")).Items.OfType<MenuItem>().Select(i => i.Header as string).ToList();
             check(openItems.SequenceEqual(["_File…", "File with New _Connection…", "File _Disconnected…"]), "File ▸ Open lists File, File with New Connection and File Disconnected, in the SSMS order");
             var connectionItems = ((MenuItem)window.FindName("ConnectionMenu")).Items.OfType<MenuItem>().Select(i => i.Header as string).ToList();

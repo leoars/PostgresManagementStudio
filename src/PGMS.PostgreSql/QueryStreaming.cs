@@ -18,11 +18,25 @@ public sealed record QueryCompletion(int DisplayedRows, int RecordsAffected, boo
 public sealed partial class QuerySession
 {
     /// <summary>The column's type name. A type created after Npgsql read the catalog of this server (for example an extension installed while
-    /// PGMS was open) has no name in Npgsql ("-.-"); it is shown by its OID instead (M1116).</summary>
-    private static string TypeName(NpgsqlDataReader reader, int column)
+    /// PGMS was open) has no name in Npgsql ("-.-"); it is shown by its OID instead (M1116), and the types are read again after the query, so the
+    /// next one knows the name (M1124: a PostGIS column then shows EWKT).</summary>
+    private string TypeName(NpgsqlDataReader reader, int column)
     {
         string name = reader.GetDataTypeName(column);
-        return name is "-.-" or "" ? $"unknown type (oid {reader.GetDataTypeOID(column)})" : name;
+        if (name is not ("-.-" or "")) return name;
+        unknownTypeSeen = true;
+        return $"unknown type (oid {reader.GetDataTypeOID(column)})";
+    }
+
+    private bool unknownTypeSeen;
+
+    /// <summary>Reads the server's types again after a result had a type Npgsql did not know; a failure (aborted transaction, lost connection) is ignored.</summary>
+    private async Task ReloadUnknownTypesAsync()
+    {
+        if (!unknownTypeSeen) return;
+        unknownTypeSeen = false;
+        try { if (connection.State == System.Data.ConnectionState.Open) await connection.ReloadTypesAsync().ConfigureAwait(false); }
+        catch (Exception ex) when (ex is NpgsqlException or InvalidOperationException) { }
     }
 
     /// <summary>Awaits each consumer before reading more: no unbounded UI notification queue.</summary>
@@ -94,8 +108,11 @@ public sealed partial class QuerySession
                         limitReasons |= resultIndex >= QueryDisplayBudget.MaxResultSets ? QueryLimitReason.ResultSets : QueryLimitReason.Columns;
                         metadataLimited = true;
                     }
+                    var columnTypes = Enumerable.Range(0, reader.FieldCount).Select(i => TypeName(reader, i)).ToArray();
+                    // PostGIS geometry and geography columns are shown as EWKT instead of hexadecimal EWKB (M1124).
+                    var spatial = options.SpatialAsText ? columnTypes.Select(SpatialText.IsSpatialType).ToArray() : new bool[columnTypes.Length];
                     if (retain)
-                        await consume(new(resultIndex, Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToArray(), [], ColumnTypes: Enumerable.Range(0, reader.FieldCount).Select(i => TypeName(reader, i)).ToArray()), token).ConfigureAwait(false);
+                        await consume(new(resultIndex, Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToArray(), [], ColumnTypes: columnTypes), token).ConfigureAwait(false);
                     else if (!limited)
                     {
                         limited = true;
@@ -115,6 +132,8 @@ public sealed partial class QuerySession
                                 if (await reader.IsDBNullAsync(i).ConfigureAwait(false)) { cells[i] = DBNull.Value; continue; }
                                 using var text = await reader.GetTextReaderAsync(i).ConfigureAwait(false);
                                 cells[i] = await ReadPrefixAsync(text, prefix, scratch).ConfigureAwait(false);
+                                // A spatial value cut at the prefix is not valid EWKB and stays as read.
+                                if (spatial[i] && cells[i] is string read && SpatialText.TryToEwkt(read, out var wkt)) cells[i] = wkt.Length > prefix ? wkt[..prefix] : wkt;
                             }
                             rows.Add(cells); displayed++;
                             if (first || rows.Count >= 128 || elapsed.ElapsedMilliseconds >= 100)
@@ -147,6 +166,7 @@ public sealed partial class QuerySession
                             using var text = await reader.GetTextReaderAsync(i).ConfigureAwait(false);
                             var value = await ReadBoundedAsync(text, allowance, scratch).ConfigureAwait(false);
                             if (value is null) { textLimited = true; limitReasons |= QueryLimitReason.Text; break; }
+                            if (spatial[i]) value = SpatialText.Display(value);
                             values[i] = value; rowCharacters += value.Length;
                         }
                         if (textLimited)
@@ -184,7 +204,7 @@ public sealed partial class QuerySession
                 throw;
             }
         }
-        finally { if(options.ActualPlans is not null)await DisarmPlanCaptureAsync().ConfigureAwait(false); connection.Notice-=Notice; execution.Release(); }
+        finally { if(options.ActualPlans is not null)await DisarmPlanCaptureAsync().ConfigureAwait(false); await ReloadUnknownTypesAsync().ConfigureAwait(false); connection.Notice-=Notice; execution.Release(); }
     }
 
     /// <summary>First characters of a value; the rest is skipped (sequential access moves past it on the next column).</summary>

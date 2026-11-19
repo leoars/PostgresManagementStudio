@@ -43,7 +43,7 @@ internal static class ExecutionPlanUiChecks
             diagram.Zoom = 1;
             var menu = diagram.ContextMenu;
             string[] names = menu.Items.OfType<MenuItem>().Select(m => m.Name).ToArray();
-            check(names.SequenceEqual(["PlanSaveAs", "PlanShowInNewTab", "PlanFindNode", "PlanMissingIndex", "PlanZoomIn", "PlanZoomOut", "PlanCustomZoom", "PlanZoomFit"]), "Context menu offers save, new tab, find, missing index and zoom");
+            check(names.SequenceEqual(["PlanSaveAs", "PlanShowInNewTab", "PlanShowJson", "PlanShowText", "PlanCompare", "PlanComparePrevious", "PlanFindNode", "PlanMissingIndex", "PlanZoomIn", "PlanZoomOut", "PlanCustomZoom", "PlanZoomFit"]), "Context menu offers save, new tab, find, missing index and zoom");
             menu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanZoomIn").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             check(Math.Abs(diagram.Zoom - 1.25) < 0.001, "Zoom In enlarges by one step");
             menu.Items.OfType<MenuItem>().Single(m => m.Name == "PlanZoomOut").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));

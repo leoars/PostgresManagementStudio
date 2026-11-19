@@ -31,7 +31,7 @@ public partial class RoleDropDialog : Window
     public async Task ApplyAsync()
     {
         if (busy) return; var request = Request; var c = new NpgsqlConnectionStringBuilder(connection);
-        if (MessageBox.Show(this, $"Drop role {request.Name}? No owned objects or grants will be removed automatically.\nServer: {c.Host}:{c.Port}\n\n{request.ToSql()}", "Drop Role", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (LocalizedMessageBox.Show(this, $"Drop role {request.Name}? No owned objects or grants will be removed automatically.\nServer: {c.Host}:{c.Port}\n\n{request.ToSql()}", "Drop Role", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         SetBusy(true); Feedback.Text = "Applying…";
         try { await new AdministrativeEditService(connection).ApplyAsync(request); WasApplied = true; busy = false; DialogResult = true; }
         catch (Exception ex) when (ex is NpgsqlException or IOException or TimeoutException or InvalidOperationException or ArgumentException) { Feedback.Text = ex is PostgresException pg ? $"{pg.SqlState}: {pg.MessageText}" : ex.Message; }

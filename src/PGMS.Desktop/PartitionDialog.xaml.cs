@@ -149,7 +149,7 @@ public partial class PartitionDialog:Window
         if(busy || !ApplyButton.IsEnabled)return;
         if(Standalone){await ApplyStandaloneAsync();return;}
         var request=Request;
-        if(request is DetachPartitionEdit && MessageBox.Show(this,Target.Text+"\n\n"+request.ToSql()+"\n\nKeep the child table but remove its rows from parent queries?","Confirm Detach Partition",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Detach canceled. Nothing was sent.";return;}
+        if(request is DetachPartitionEdit && LocalizedMessageBox.Show(this,Target.Text+"\n\n"+request.ToSql()+"\n\nKeep the child table but remove its rows from parent queries?","Confirm Detach Partition",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Detach canceled. Nothing was sent.";return;}
         using var source=new CancellationTokenSource();cancellation=source;SetBusy(true);RequiresParentRefresh=true;Feedback.Text="Applying partition change…";
         try{await new AdministrativeEditService(connection).ApplyAsync(request,source.Token);WasApplied=true;Feedback.Text="Command completed. Inspect again before another change.";}
         catch(Exception ex)when(Handled(ex)){Feedback.Text=Error(ex)+" Result not confirmed; inspect before retrying. Cancel cannot undo a completed commit.";}
@@ -158,7 +158,7 @@ public partial class PartitionDialog:Window
     private async Task ApplyStandaloneAsync()
     {
         var parent=snapshot!.Parent;var child=SelectedChild!;string sql=ConcurrentPartitionDetachService.ToSql(parent,child);
-        if(MessageBox.Show(this,Target.Text+"\n\n"+sql+"\n\nThis runs outside a transaction and cannot be rolled back. Keep the child table but remove its rows from parent queries?",child.DetachPending?"Confirm Finalize Detach":"Confirm Concurrent Detach",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Detach canceled. Nothing was sent.";return;}
+        if(LocalizedMessageBox.Show(this,Target.Text+"\n\n"+sql+"\n\nThis runs outside a transaction and cannot be rolled back. Keep the child table but remove its rows from parent queries?",child.DetachPending?"Confirm Finalize Detach":"Confirm Concurrent Detach",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Detach canceled. Nothing was sent.";return;}
         using var source=new CancellationTokenSource();cancellation=source;SetBusy(true);RequiresParentRefresh=true;Feedback.Text=child.DetachPending?"Finalizing pending detach…":"Detaching concurrently; waiting for running queries on the parent…";
         try{await new ConcurrentPartitionDetachService(connection).ApplyAsync(parent,child,true,source.Token);WasApplied=true;Feedback.Text="Partition detached and verified. Inspect again before another change.";}
         catch(PartitionDetachUncertainException ex){Feedback.Text=Outcome(ex);}

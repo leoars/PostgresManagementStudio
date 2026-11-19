@@ -98,6 +98,9 @@ internal static class EditorConvenienceChecks
             first.ProcessIncrementalSearchKey(Key.I, ModifierKeys.Control);
             check(firstEditor.SelectionStart > firstA && firstEditor.SelectedText == "a", "Ctrl+I inside the search goes to the next match");
             check(!first.ProcessIncrementalSearchKey(Key.Right, ModifierKeys.None) && !first.IsIncrementalSearchActive, "Another key stops the search and does its own work");
+            check(!firstEditor.TextArea.DefaultInputHandler.Editing.InputBindings.OfType<KeyBinding>().Any(b => b.Key == Key.I && b.Modifiers == ModifierKeys.Control)
+                && !firstEditor.TextArea.CommandBindings.OfType<CommandBinding>().Any(b => b.Command == ICSharpCode.AvalonEdit.AvalonEditCommands.IndentSelection)
+                && window.InputBindings.OfType<KeyBinding>().Any(b => b.Key == Key.I && b.Modifiers == ModifierKeys.Control && b.Command == MainWindow.GenerateSqlWithAi), "Ctrl+I in the editor reaches Generate SQL with AI (AvalonEdit's Indent Selection binding is removed)");
 
             // Clipboard history.
             ClipboardHistory.Clear();

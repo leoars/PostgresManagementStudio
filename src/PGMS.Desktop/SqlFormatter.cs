@@ -14,9 +14,35 @@ internal readonly record struct SqlToken(SqlTokenKind Kind, string Text, int Sta
 /// uppercase, one list item per line, clause bodies aligned after the longest clause keyword, AND/OR and joins on their
 /// own lines, subqueries aligned inside their parenthesis, a blank line between statements. Only whitespace and the case
 /// of unquoted keywords change; the result is re-read and compared token by token before it is accepted.</summary>
+/// <summary>Tools ▸ Options ▸ SQL Formatter (B1 review, M1142): the options of the SSMS pages that the PGMS formatter can honor. Every default is the
+/// layout Format SQL had before (M1077), which already matches the SSMS defaults of these options, except Space between data type and parameters,
+/// on as in SSMS 22.11 since M1143 (VARCHAR (20)).</summary>
+public sealed record SqlFormatterSettings(
+    SqlKeywordCasing KeywordCasing = SqlKeywordCasing.Upper, bool FormatOnSave = false,
+    bool AlignClauseBodies = true, int IndentationSize = 4,
+    bool MultilineSelectList = true, bool MultilineSetItems = true, bool MultilineWherePredicates = true, bool MultilineGroupBy = true, bool MultilineHavingPredicates = true,
+    bool MultilineOrderBy = true, bool MultilineValues = true,
+    bool NewLineBeforeFrom = true, bool NewLineBeforeWhere = true, bool NewLineBeforeGroupBy = true, bool NewLineBeforeHaving = true, bool NewLineBeforeOrderBy = true,
+    bool NewLineBeforeOffset = true, bool NewLineBeforeWindow = true, bool NewLineBeforeReturning = true, bool NewLineBeforeJoin = true, bool NewLineAfterJoin = true,
+    bool NewLineBeforeOn = true, bool NewLineBeforeClosingParenthesis = true, int NewLinesAfterStatement = 1, bool SpaceBetweenTypeAndParameters = true)
+{
+    public const int MinIndentation = 1, MaxIndentation = 16, MaxNewLines = 5;
+    public SqlFormatterSettings Normalized() => this with
+    {
+        KeywordCasing = Enum.IsDefined(KeywordCasing) ? KeywordCasing : SqlKeywordCasing.Upper,
+        IndentationSize = IndentationSize is >= MinIndentation and <= MaxIndentation ? IndentationSize : 4,
+        NewLinesAfterStatement = NewLinesAfterStatement is >= 0 and <= MaxNewLines ? NewLinesAfterStatement : 1,
+    };
+}
+
+public enum SqlKeywordCasing { Upper, Lower, Unchanged }
+
 internal static class SqlFormatter
 {
     internal const int MaximumCharacters = 1_000_000;
+    /// <summary>The SQL Formatter options in effect (set at startup and by Tools ▸ Options).</summary>
+    internal static SqlFormatterSettings Settings { get; set; } = new();
+    private static string Case(string keyword) => Settings.KeywordCasing switch { SqlKeywordCasing.Lower => keyword.ToLowerInvariant(), SqlKeywordCasing.Unchanged => keyword, _ => keyword.ToUpperInvariant() };
 
     private static readonly HashSet<string> Keywords = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -152,7 +178,7 @@ internal static class SqlFormatter
             TrimEnd(Current);
             lines.Add(new StringBuilder().Append(' ', column)); Last = null;
         }
-        internal void BlankLine() { pendingColumn = -1; TrimEnd(Current); if (Current.Length == 0 && lines.Count == 1) return; lines.Add(new StringBuilder()); lines.Add(new StringBuilder()); Last = null; }
+        internal void BlankLine(int count = 1) { pendingColumn = -1; TrimEnd(Current); if (Current.Length == 0 && lines.Count == 1) return; for (int n = 0; n <= count; n++) lines.Add(new StringBuilder()); Last = null; }
         internal void PadTo(int column) { int col = Column; Current.Append(' ', col < column ? column - col : 1); }
         internal void Write(SqlToken token, string text, bool space)
         {
@@ -209,7 +235,7 @@ internal static class SqlFormatter
             {
                 // Leading comments of the statement, each on its own line.
                 int start = i;
-                if (!first) w.BlankLine();
+                if (!first) w.BlankLine(Settings.NewLinesAfterStatement);
                 while (i < tokens.Count && tokens[i].IsComment) { if (i > start) w.NewLine(0); w.WriteRaw(tokens[i].Text); i++; }
                 if (i >= tokens.Count) break;
                 if (i > start) w.NewLine(0);
@@ -316,12 +342,13 @@ internal static class SqlFormatter
                 if (tokens[i].Kind == SqlTokenKind.OpenParen) { i = Match(i); continue; }
                 if (tokens[i].Kind is SqlTokenKind.Comma || i == close)
                 {
-                    if (item < i) { w.NewLine(4); Inline(item, i, 4, Body.Plain); }
+                    if (item < i) { w.NewLine(Settings.IndentationSize); Inline(item, i, Settings.IndentationSize, Body.Plain); }
                     if (i < close) WriteToken(i, false);
                     item = i + 1;
                 }
             }
-            w.NewLine(0); WriteToken(close, false);
+            if (Settings.NewLineBeforeClosingParenthesis) w.NewLine(0);
+            WriteToken(close, false);
             if (close + 1 < end) Inline(close + 1, end, 0, Body.Plain);
         }
 
@@ -333,18 +360,42 @@ internal static class SqlFormatter
         {
             var clauses = Clauses(start, end);
             int width = clauses.Where(c => !c.Separator).Select(c => c.Keyword.Length).DefaultIfEmpty(0).Max() + 1;
-            int bodyColumn = baseColumn + width;
             for (int n = 0; n < clauses.Count; n++)
             {
                 var c = clauses[n];
-                if (n > 0) w.NewLine(baseColumn);
-                for (int k = c.Start; k < c.KeywordEnd; k++) if (tokens[k].IsComment) WriteToken(k, true); else w.Write(tokens[k], tokens[k].Text.ToUpperInvariant(), k > c.Start);
+                // SQL Formatter ▸ New Line (M1142): a clause whose option is off continues the line of the clause before it.
+                bool ownLine = n == 0 || c.Separator || NewLineBefore(c.Keyword);
+                if (n > 0) { if (ownLine) w.NewLine(baseColumn); }
+                int lineStart = ownLine ? baseColumn : w.Column + 1;
+                for (int k = c.Start; k < c.KeywordEnd; k++) if (tokens[k].IsComment) WriteToken(k, true); else w.Write(tokens[k], Case(tokens[k].Text), k > c.Start || !ownLine);
                 if (c.Separator) { if (c.KeywordEnd < c.End) Inline(c.KeywordEnd, c.End, baseColumn, Body.Plain); continue; }
                 if (c.KeywordEnd >= c.End) continue;
+                // Alignment ▸ Align clause bodies: after the longest clause keyword, or one space after its own.
+                int bodyColumn = ownLine && Settings.AlignClauseBodies ? baseColumn + width : lineStart + c.Keyword.Length + 1;
                 w.PadTo(bodyColumn);
-                Inline(c.KeywordEnd, c.End, bodyColumn, c.Body);
+                Inline(c.KeywordEnd, c.End, bodyColumn, Multiline(c.Keyword, c.Body));
             }
         }
+
+        private static bool NewLineBefore(string keyword) => keyword switch
+        {
+            "FROM" => Settings.NewLineBeforeFrom, "WHERE" => Settings.NewLineBeforeWhere, "GROUP BY" => Settings.NewLineBeforeGroupBy, "HAVING" => Settings.NewLineBeforeHaving,
+            "ORDER BY" => Settings.NewLineBeforeOrderBy, "OFFSET" or "LIMIT" or "FETCH" => Settings.NewLineBeforeOffset, "WINDOW" => Settings.NewLineBeforeWindow, "RETURNING" => Settings.NewLineBeforeReturning,
+            _ => true,
+        };
+
+        /// <summary>SQL Formatter ▸ Multiline: a list or predicate whose option is off stays on one line.</summary>
+        private static Body Multiline(string keyword, Body body) => keyword switch
+        {
+            "SELECT" when !Settings.MultilineSelectList => Body.Plain,
+            "SET" when !Settings.MultilineSetItems => Body.Plain,
+            "WHERE" when !Settings.MultilineWherePredicates => Body.Plain,
+            "HAVING" when !Settings.MultilineHavingPredicates => Body.Plain,
+            "GROUP BY" when !Settings.MultilineGroupBy => Body.Plain,
+            "ORDER BY" when !Settings.MultilineOrderBy => Body.Plain,
+            "VALUES" when !Settings.MultilineValues => Body.Plain,
+            _ => body,
+        };
 
         private List<Clause> Clauses(int start, int end)
         {
@@ -446,13 +497,13 @@ internal static class SqlFormatter
                         int j = i; while (j < end && IsJoinWord(tokens[j])) j++;
                         if (j > i && tokens[j - 1].IsWord("JOIN"))
                         {
-                            w.NewLine(column);
-                            for (int k = i; k < j; k++) WriteToken(k, k > i);
-                            w.BreakBeforeNext(column);
+                            if (Settings.NewLineBeforeJoin) w.NewLine(column);
+                            for (int k = i; k < j; k++) WriteToken(k, k > i || !Settings.NewLineBeforeJoin);
+                            if (Settings.NewLineAfterJoin) w.BreakBeforeNext(column);
                             i = j - 1; continue;
                         }
                     }
-                    if (body == Body.From && caseDepth == 0 && (t.IsWord("ON") || t.IsWord("USING"))) { w.NewLine(column); WriteToken(i, false); continue; }
+                    if (body == Body.From && caseDepth == 0 && (t.IsWord("ON") || t.IsWord("USING")) && Settings.NewLineBeforeOn) { w.NewLine(column); WriteToken(i, false); continue; }
                 }
                 WriteToken(i, SpaceBefore(i));
             }
@@ -471,7 +522,7 @@ internal static class SqlFormatter
         private void WriteToken(int i, bool space)
         {
             var t = tokens[i];
-            w.Write(t, IsKeywordAt(i) ? t.Text.ToUpperInvariant() : t.Text, space);
+            w.Write(t, IsKeywordAt(i) ? Case(t.Text) : t.Text, space);
         }
 
         private bool IsUnaryAt(int i)
@@ -497,7 +548,7 @@ internal static class SqlFormatter
             if (t.Kind == SqlTokenKind.OpenParen)
             {
                 if (prev.Kind is SqlTokenKind.QuotedIdentifier) return false;
-                if (prev.Kind == SqlTokenKind.Word) return p >= 0 && IsKeywordAt(p) && !TypeNames.Contains(prev.Text);
+                if (prev.Kind == SqlTokenKind.Word) return p >= 0 && IsKeywordAt(p) && (!TypeNames.Contains(prev.Text) || Settings.SpaceBetweenTypeAndParameters);
                 return true;
             }
             return true;

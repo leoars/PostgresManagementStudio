@@ -47,6 +47,7 @@ public partial class QueryOptionsPages : UserControl
             case ResultsGrid:
                 RetainBox.IsChecked = o.RetainLineBreaks;
                 GridDiscardBox.IsChecked = o.GridDiscardResults;
+                StackResultsBox.IsChecked = o.GridStackResults;
                 JsonLinkBox.IsChecked = o.DisplayJsonAsLink;
                 PageRowsBox.Text = o.GridPageRows.ToString(CultureInfo.InvariantCulture);
                 break;
@@ -94,7 +95,7 @@ public partial class QueryOptionsPages : UserControl
         return new QueryOptions(timeout, CheckTransactionsBox.IsChecked == true,
             NoCountBox.IsChecked == true, (QueryIsolationLevel)Math.Max(0, IsolationBox.SelectedIndex), lockTimeout, CompletionBox.IsChecked == true,
             RetainBox.IsChecked == true, GridDiscardBox.IsChecked == true, JsonLinkBox.IsChecked == true,
-            format, DelimiterBox.Text.Length == 1 ? DelimiterBox.Text : ";", TextHeadersBox.IsChecked == true, TextQueryBox.IsChecked == true, RightAlignBox.IsChecked == true, TextDiscardBox.IsChecked == true, maxCharacters, pageRows, planRatio, planMinimum);
+            format, DelimiterBox.Text.Length == 1 ? DelimiterBox.Text : ";", TextHeadersBox.IsChecked == true, TextQueryBox.IsChecked == true, RightAlignBox.IsChecked == true, TextDiscardBox.IsChecked == true, maxCharacters, pageRows, planRatio, planMinimum, StackResultsBox.IsChecked == true);
     }
 
     /// <summary>Page holding the last rejected value, for the host to select it in its tree.</summary>

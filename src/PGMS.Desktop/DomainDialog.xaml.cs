@@ -66,7 +66,7 @@ public partial class DomainDialog : Window
     public async Task ApplyAsync()
     {
         if(busy || !ApplyButton.IsEnabled)return;var request=Request;
-        if(MessageBox.Show(this,Target.Text+"\n\n"+request.ToSql()+"\n\nThis affects all uses of the domain. Review validation timing and the effect of removing restrictions.","Confirm Domain Change",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Operation canceled. Nothing was sent.";return;}
+        if(LocalizedMessageBox.Show(this,Target.Text+"\n\n"+request.ToSql()+"\n\nThis affects all uses of the domain. Review validation timing and the effect of removing restrictions.","Confirm Domain Change",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Operation canceled. Nothing was sent.";return;}
         using var source=new CancellationTokenSource();cancellation=source;busy=true;RequiresParentRefresh=true;Update(true);CancelButton.Focus();Feedback.Text="Applying domain change…";
         try{await new AdministrativeEditService(connection).ApplyAsync(request,source.Token);WasApplied=true;Feedback.Text="Command completed. Inspect before another change.";}
         catch(Exception ex)when(ex is NpgsqlException or System.IO.IOException or TimeoutException or OperationCanceledException or InvalidOperationException or ArgumentException){Feedback.Text=(source.IsCancellationRequested?"Domain change interrupted.":ex is PostgresException pg?$"{pg.SqlState}: {pg.MessageText}":ex.Message)+" Result not confirmed. Inspect before retrying; cancellation cannot undo a completed commit.";}

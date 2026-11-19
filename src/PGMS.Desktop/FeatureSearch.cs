@@ -22,6 +22,7 @@ public static class FeatureSearch
     public static string Text(object? header)
     {
         string raw = header as string ?? (header as TextBlock)?.Text ?? "";
+        raw = System.Text.RegularExpressions.Regex.Replace(raw, @"\s?\(_[^)\s]\)", ""); // Japanese and Korean access keys: "ファイル(_F)" (M1129).
         var text = new StringBuilder(raw.Length);
         for (int i = 0; i < raw.Length; i++)
         {
@@ -56,7 +57,7 @@ public static class FeatureSearch
         var result = new List<FeatureSearchResult>();
         foreach (var page in pages)
         {
-            string path = "Tools > Options > " + page.Path;
+            string path = FeatureSearch.Text(Localization.T("_Tools")) + " > " + FeatureSearch.Text(Localization.T("_Options…")).TrimEnd('…', '.') + " > " + page.Path;
             result.Add(new(page.Path.Split(" > ")[^1], path, "", null, page.Path));
             foreach (var setting in page.Settings) result.Add(new(setting, path + " > " + setting, "", null, page.Path));
         }
@@ -176,6 +177,7 @@ public partial class MainWindow
         if (optionsSearch is null)
         {
             var index = new OptionsDialog(EnvironmentSettings, () => Task.FromResult(0), KeyboardCommands());
+            Localization.Translate(index); // The index is in the interface language, as the menu commands it lists with (M1129).
             try { optionsSearch = FeatureSearch.Settings(index.SearchIndex()); }
             finally { index.Close(); }
         }

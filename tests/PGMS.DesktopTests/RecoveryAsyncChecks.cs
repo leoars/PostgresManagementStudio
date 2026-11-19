@@ -75,8 +75,9 @@ internal static class RecoveryAsyncChecks
             await window.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             check(ReferenceEquals(dock.ActiveContent, chosen), "Async restore preserves the document chosen while disk IO was pending");
             var docs = dock.Layout.Descendents().OfType<AvalonDock.Layout.LayoutDocument>().ToArray();
-            check(docs.Length == 2 && docs.Any(d => d.Content is QueryView q && q.IsDirty && q.FilePath is null),
-                "Background restore adds its complete dirty document alongside the selected SQL file");
+            // The restored tab is not shown, so it waits as text until selected (M1133).
+            check(docs.Length == 2 && docs.Count(window.IsDeferredQuery) == 1 && docs.Single(window.IsDeferredQuery).Title.EndsWith('*'),
+                "Background restore adds its dirty document alongside the selected SQL file");
             // Queue focus for an existing file, then change selection before that callback runs.
             window.OpenQueryFile(path);
             var recovered = docs.Single(d => !ReferenceEquals(d.Content, chosen));
@@ -84,10 +85,13 @@ internal static class RecoveryAsyncChecks
             await window.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             check(ReferenceEquals(dock.ActiveContent, recovered.Content) && !((ICSharpCode.AvalonEdit.TextEditor)chosen.FindName("Editor")).IsKeyboardFocusWithin,
                 "Deferred Open focus does not reactivate a document after another selection");
+            check(recovered.Content is QueryView q && q.IsDirty && q.FilePath is null && ((ICSharpCode.AvalonEdit.TextEditor)q.FindName("Editor")).Text == draft.Text,
+                "The restored tab, once selected, has its complete dirty document");
         }
         finally
         {
             release.Set(); await blocker; await window.RecoveryCompletion;
+            window.MountDeferredQueries();
             foreach (var doc in dock.Layout.Descendents().OfType<AvalonDock.Layout.LayoutDocument>())
                 if (doc.Content is QueryView query) query.IsDirty = false;
             window.Close(); await window.CloseCompletion;

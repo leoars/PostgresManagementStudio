@@ -390,7 +390,7 @@ public partial class PrivilegeDialog : Window
         if(request.Cascade)
         {
             if(reviewed is null || reviewed.Request!=request)return;
-            if(MessageBox.Show(this,Target.Text+"\n\n"+request.ToSql()+$"\n\n{reviewed.PotentialChanges.Count} grant(s) are potentially affected. Independent access may remain. Revoke with CASCADE?", "Confirm Cascading Revoke", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)!=MessageBoxResult.Yes)
+            if(LocalizedMessageBox.Show(this,Target.Text+"\n\n"+request.ToSql()+$"\n\n{reviewed.PotentialChanges.Count} grant(s) are potentially affected. Independent access may remain. Revoke with CASCADE?", "Confirm Cascading Revoke", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)!=MessageBoxResult.Yes)
             { Feedback.Text="Cascading revoke canceled. Nothing was sent."; return; }
         }
         focus.Capture();
