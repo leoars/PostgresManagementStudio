@@ -1,0 +1,55 @@
+name: Translation problem / Problema de tradução
+description: A text of the interface is wrong, unclear or still in English. The translations have not been reviewed by native speakers yet. / Um texto da interface está errado, confuso ou ainda em inglês. As traduções ainda não foram revisadas por falantes nativos.
+labels: [translation]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping. Object Explorer folder names, Keyboard command names, SQL keywords and texts that come from the server or your data stay in English on purpose, as in SSMS.
+
+        Obrigado pela ajuda. Os nomes das pastas do Object Explorer, os nomes de comando da página Keyboard, as palavras-chave do SQL e os textos que vêm do servidor ou dos seus dados ficam em inglês de propósito, como no SSMS.
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language / Idioma
+      options:
+        - Português (Brasil)
+        - Español
+        - Deutsch
+        - Italiano
+        - Français
+        - 한국어
+        - 日本語
+        - English
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PGMS version / Versão do PGMS
+      description: Shown in Help > About. / Exibida em Help > About.
+      placeholder: v0.1.0-beta.1 (M1143)
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where / Onde
+      description: Window, menu, page of Tools > Options or message. / Janela, menu, página de Tools > Options ou mensagem.
+      placeholder: Tools > Options > Environment > AutoRecover
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Text shown / Texto exibido
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested text / Texto sugerido
+      description: Optional. / Opcional.
+    validations:
+      required: false

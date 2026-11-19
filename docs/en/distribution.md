@@ -1,8 +1,10 @@
-# PGMS v0.1.0-alpha.7 — portable distribution (M1117)
+# PGMS v0.1.0-beta.1 — portable distribution (M1143)
 
 English | Português (Brasil): LEIA-ME.md in the package, or docs/pt-BR/distribution.md in the source repository.
 
-Extract the entire directory and run PGMS.exe. A win-x64 self-contained package includes .NET/WPF; keep its DLLs, resources, LICENSE, notices and licenses directory together. No SSMS is required. No PostgreSQL server or client tools are bundled. Use PostgreSQL 16–18 and matching-major pg_dump/pg_restore/psql/pg_dumpall for applicable operations. No signed installer, MSI or automatic update is provided.
+Extract the entire directory and run PGMS.exe. A win-x64 self-contained package includes .NET/WPF; keep its DLLs, resources, LICENSE, notices and licenses directory together. No SSMS is required. No PostgreSQL server or client tools are bundled. Use PostgreSQL 16–18 and matching-major pg_dump/pg_restore/psql/pg_dumpall for applicable operations. No signed installer, MSI or automatic update is provided; a release package only checks GitHub for a newer release (Tools > Options > Environment > Product Updates turns it off).
+
+The interface follows the Windows display language when it is one of English, Portuguese (Brazil), Spanish, German, Italian, French, Korean or Japanese, and English otherwise; Tools > Options > Environment > International Settings chooses another. The translations have not been reviewed by native speakers; please report problems in the repository below.
 
 Connect with the intended PostgreSQL role and appropriate TLS settings (VerifyFull by default). Review SQL, target and role before administering. Only run trusted restore scripts; SQL can issue COMMIT, reconnect or execute local psql commands. Cancel is a request and may arrive after COMMIT. Check the destination before retrying.
 

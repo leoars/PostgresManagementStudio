@@ -1,8 +1,10 @@
-# PGMS v0.1.0-alpha.7 — distribuição portátil (M1117)
+# PGMS v0.1.0-beta.1 — distribuição portátil (M1143)
 
 [English]: READ-ME.md no pacote, ou docs/en/distribution.md no repositório. Português (Brasil).
 
-Extraia todo o diretório e execute PGMS.exe. Pacote win-x64 self-contained inclui .NET/WPF; preserve DLLs, recursos, LICENSE, avisos e pasta licenses juntos. SSMS não é necessário. Não inclui servidor ou ferramentas PostgreSQL. Use PostgreSQL 16–18 e pg_dump/pg_restore/psql/pg_dumpall da mesma versão principal conforme a operação. Sem instalador assinado, MSI ou atualização automática.
+Extraia todo o diretório e execute PGMS.exe. Pacote win-x64 self-contained inclui .NET/WPF; preserve DLLs, recursos, LICENSE, avisos e pasta licenses juntos. SSMS não é necessário. Não inclui servidor ou ferramentas PostgreSQL. Use PostgreSQL 16–18 e pg_dump/pg_restore/psql/pg_dumpall da mesma versão principal conforme a operação. Sem instalador assinado, MSI ou atualização automática; um pacote de release só pergunta ao GitHub se há versão mais nova (Tools > Options > Environment > Product Updates desliga).
+
+A interface segue o idioma de exibição do Windows quando ele é inglês, português (Brasil), espanhol, alemão, italiano, francês, coreano ou japonês, e inglês nos outros casos; Tools > Options > Environment > International Settings escolhe outro. As traduções não foram revisadas por falantes nativos; relate problemas no repositório indicado abaixo.
 
 Conecte com a role pretendida e TLS adequado (VerifyFull por padrão). Revise SQL, destino e role antes de administrar. Execute restore somente com scripts confiáveis; SQL pode emitir COMMIT, reconectar ou executar comandos locais psql. Cancelar é solicitação e pode chegar após COMMIT. Confira o destino antes de repetir.
 
