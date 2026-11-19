@@ -1,6 +1,6 @@
 {
-  "Version": "0.1.0-alpha.7",
-  "NumericVersion": "0.1.0.7",
-  "Milestone": "M1117",
-  "ManifestSha256": "40D3EE2B8737B00DD928C14B9AFDB1B9C709512D521BDCA39083FCEBC4A5A75F"
+  "Version": "0.1.0-beta.1",
+  "NumericVersion": "0.1.0.8",
+  "Milestone": "M1143",
+  "ManifestSha256": "3C6857DA42E501F69D2594E5846B37252EF6167CFE0C46E49228132E6385AD1A"
 }
