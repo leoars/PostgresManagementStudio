@@ -19,11 +19,11 @@
       },
       "Dirkster.AvalonDock": {
         "type": "Direct",
-        "requested": "[5.0.1, )",
-        "resolved": "5.0.1",
-        "contentHash": "xDEEVUGMB5qJ53DPIEnUbctWMeSke2JamHL3NEia4t8L5ApwioCx3UzUTk8JAoEkiXJPHnHBZJiCk8xQXfa2Iw==",
+        "requested": "[5.0.2, )",
+        "resolved": "5.0.2",
+        "contentHash": "WfLzuhDilMqm+OJgA5QW9icEn7eKh/yngVFljh7IPCOCA2Xyz9eznZ0MYWkkdSvHJLNaFI2/Z09z3DNp9W+Apg==",
         "dependencies": {
-          "Dirkster.AvalonDock.Core": "5.0.1"
+          "Dirkster.AvalonDock.Core": "5.0.2"
         }
       },
       "Dirkster.AvalonDock.Serializer.Xml": {
@@ -46,8 +46,8 @@
       },
       "Dirkster.AvalonDock.Core": {
         "type": "Transitive",
-        "resolved": "5.0.1",
-        "contentHash": "ZDuRCunKD8WEWExa5SkCXYfr3A6V93cpLyqNbUgE3i1o20zs9VU5QzGVyH/uXLnxeH4fVuMyn/YiZUD/ypyMOA=="
+        "resolved": "5.0.2",
+        "contentHash": "viL+5loMFdTIsnKW7833OK1y0FdlX5o7Kacl76ArRD9DYUD8BcmpV1IeLffrTX7vXv/cNLvGx6OHSKaYfDVe6g=="
       },
       "Microsoft.Extensions.AI.Abstractions": {
         "type": "Transitive",
