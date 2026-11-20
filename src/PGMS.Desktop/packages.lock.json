@@ -37,11 +37,11 @@
       },
       "Dirkster.AvalonDock.Themes.VS": {
         "type": "Direct",
-        "requested": "[5.0.1, )",
-        "resolved": "5.0.1",
-        "contentHash": "tCjPWl40GBrXaWh5wsueV4+ow/tugZA6ERz5bVRqAfjvr6qN/gBQ6kMwrorSp7esYDOTi20JDGt2m3AMvOOpfA==",
+        "requested": "[5.0.2, )",
+        "resolved": "5.0.2",
+        "contentHash": "MRoNZ7fF7mdB2NjsHpoOQ4wS09GOTGxPjwPzLBtz+PKXxhRB8JhEad0DrfrDSeBHxOk6V06vBTQX9flYl3lIQg==",
         "dependencies": {
-          "Dirkster.AvalonDock": "5.0.1"
+          "Dirkster.AvalonDock": "5.0.2"
         }
       },
       "Dirkster.AvalonDock.Core": {
