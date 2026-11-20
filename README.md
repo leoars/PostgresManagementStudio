@@ -62,7 +62,7 @@ Press `Ctrl+Space` and get what fits that position. After `FROM`: tables, views 
 - Editor and windows: Paste Special (Format SQL, Paste with AI), Switch Completion Mode, File ▸ New ▸ File, Code Snippets Manager, Navigate Backward/Forward, Pin Tab (kept on recovered and reopened tabs), All Windows, several result sets in tabs or stacked.
 - PGMS message boxes with buttons in the PGMS language; keyboard and screen reader fixes; windows fit the screen at 150–175% scaling; faster result grids.
 
-**Defaults that changed to match SSMS:** new tabs open first (after pinned tabs), unsaved queries are backed up every 5 minutes, system schemas and template databases are listed in Object Explorer, Table Designer saves stop after 3600 seconds, Live Query Statistics reads every 250 ms and Format SQL writes `VARCHAR (20)`. Settings you changed yourself are kept; each one can be changed back in Tools ▸ Options.
+**Defaults that changed to match SSMS:** new tabs open first (after pinned tabs), unsaved queries are backed up every 5 minutes, system schemas and template databases are listed in Object Explorer (in the System Schemas and System Databases folders), Table Designer saves stop after 3600 seconds, Live Query Statistics reads every 250 ms and Format SQL writes `VARCHAR (20)`. Settings you changed yourself are kept; each one can be changed back in Tools ▸ Options.
 
 See the [release notes](docs/en/release-notes.md) for details and limits.
 

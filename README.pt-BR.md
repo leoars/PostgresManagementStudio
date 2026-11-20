@@ -62,7 +62,7 @@ Aperte `Ctrl+Space` e receba o que cabe naquela posição. Depois de `FROM`: tab
 - Editor e janelas: Paste Special (Format SQL, Paste with AI), Switch Completion Mode, File ▸ New ▸ File, Code Snippets Manager, Navigate Backward/Forward, Pin Tab (mantido em abas recuperadas e reabertas), All Windows, vários conjuntos de resultados em abas ou empilhados.
 - Caixas de mensagem do PGMS com os botões no idioma do PGMS; correções de teclado e leitor de tela; janelas que cabem na tela em 150–175% de escala; grades de resultados mais rápidas.
 
-**Padrões que mudaram para seguir o SSMS:** abas novas abrem primeiro (depois das fixadas), consultas não salvas têm cópia a cada 5 minutos, esquemas de sistema e bancos modelo aparecem no Object Explorer, salvamentos do Table Designer param depois de 3600 segundos, o Live Query Statistics lê a cada 250 ms e o Format SQL escreve `VARCHAR (20)`. Configurações que você mudou continuam como estavam; cada uma pode ser mudada de volta em Tools ▸ Options.
+**Padrões que mudaram para seguir o SSMS:** abas novas abrem primeiro (depois das fixadas), consultas não salvas têm cópia a cada 5 minutos, esquemas de sistema e bancos modelo aparecem no Object Explorer (nas pastas System Schemas e System Databases), salvamentos do Table Designer param depois de 3600 segundos, o Live Query Statistics lê a cada 250 ms e o Format SQL escreve `VARCHAR (20)`. Configurações que você mudou continuam como estavam; cada uma pode ser mudada de volta em Tools ▸ Options.
 
 Veja as [notas da versão](docs/pt-BR/release-notes.md) para detalhes e limites.
 

@@ -28,7 +28,7 @@ body:
     attributes:
       label: PGMS version / Versão do PGMS
       description: Shown in Help > About. / Exibida em Help > About.
-      placeholder: v0.1.0-beta.1 (M1143)
+      placeholder: v0.1.0-beta.1 (M1145)
     validations:
       required: true
   - type: input

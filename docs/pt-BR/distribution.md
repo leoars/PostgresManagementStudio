@@ -1,4 +1,4 @@
-# PGMS v0.1.0-beta.1 — distribuição portátil (M1143)
+# PGMS v0.1.0-beta.1 — distribuição portátil (M1145)
 
 [English]: READ-ME.md no pacote, ou docs/en/distribution.md no repositório. Português (Brasil).
 

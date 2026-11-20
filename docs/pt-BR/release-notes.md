@@ -2,7 +2,9 @@
 
 [English](../en/release-notes.md) | Português (Brasil)
 
-Primeiro beta do PGMS, ainda publicado como pré-release. As funções desta versão estão completas e ela se destina a trabalho real; ainda pode ter defeitos, então mantenha backups e relate o que encontrar. Rótulo de build: M1143. Os binários são gerados e atestados pelo mesmo [workflow de release](../../.github/workflows/release.yml) das versões anteriores. O trabalho original está sob Apache-2.0, com créditos no `NOTICE`; as versões até a alpha.4 continuam sob MIT.
+Primeiro beta do PGMS, ainda publicado como pré-release. As funções desta versão estão completas e ela se destina a trabalho real; ainda pode ter defeitos, então mantenha backups e relate o que encontrar. Rótulo de build: M1145. Os binários são gerados e atestados pelo mesmo [workflow de release](../../.github/workflows/release.yml) das versões anteriores. O trabalho original está sob Apache-2.0, com créditos no `NOTICE`; as versões até a alpha.4 continuam sob MIT.
+
+> **Não testado numa máquina Windows limpa.** Este beta foi instalado e executado só no computador do mantenedor, que já tem PostgreSQL, SSMS e ferramentas de desenvolvimento. Ele não foi testado numa máquina virtual Windows limpa nem por outro usuário Windows sem direitos de administrador. Se o instalador ou a primeira abertura falhar na sua máquina, por favor [relate](https://github.com/leoars/PostgresManagementStudio/issues/new?template=bug_report.yml).
 
 ## Destaques
 
@@ -18,7 +20,7 @@ Primeiro beta do PGMS, ainda publicado como pré-release. As funções desta ver
 
 **Opções**
 - Páginas novas, cada opção com efeito real ou mostrada desabilitada com o motivo: Environment ▸ **AutoRecover** (liga/desliga, intervalo em minutos, vida útil em dias), **Documents** (arquivos mudados fora do PGMS, arquivos somente leitura, Open a partir da pasta do arquivo ativo, finais de linha mistos, salvar em segundo plano, codificação ao salvar), **Tabs**, **Task List** (só leitura) e **Windows**; as sete páginas do **SQL Formatter** (caixa das palavras-chave, Format on save, alinhamento, recuo, listas em várias linhas, quebras de linha, espaçamento); Designers ▸ **Table Options** (tempo limite ao salvar, aviso de tabela sem chave primária); Object Explorer ▸ **General** (Hide system objects) e **Commands** (confirmar renomeações); Query Execution ▸ **Live Query Statistics** (intervalo de leitura); Text Editor ▸ **Transact-SQL** (quebra de linha, números de linha, tabulação, IntelliSense para janelas novas).
-- **Padrões que seguem o SSMS:** abas novas abrem primeiro, depois das fixadas; consultas não salvas têm cópia a cada 5 minutos; esquemas de sistema (`pg_catalog`, `information_schema`) e bancos modelo aparecem no Object Explorer; uma instrução do Table Designer que passe de 3600 segundos interrompe o salvamento e nada é alterado; o Live Query Statistics lê a cada 250 ms; o Format SQL escreve um espaço entre o tipo e os parâmetros (`VARCHAR (20)`). Consultas recuperadas continuam voltando na ordem salva. Qualquer um desses pode ser mudado de volta em Tools ▸ Options.
+- **Padrões que seguem o SSMS:** abas novas abrem primeiro, depois das fixadas; consultas não salvas têm cópia a cada 5 minutos; esquemas de sistema (`pg_catalog`, `information_schema`) e bancos modelo aparecem no Object Explorer, nas pastas **System Schemas** e **System Databases**, a primeira pasta em Schemas e em Databases (com Hide system objects ligado, as pastas e seus objetos somem); uma instrução do Table Designer que passe de 3600 segundos interrompe o salvamento e nada é alterado; o Live Query Statistics lê a cada 250 ms; o Format SQL escreve um espaço entre o tipo e os parâmetros (`VARCHAR (20)`). Consultas recuperadas continuam voltando na ordem salva. Qualquer um desses pode ser mudado de volta em Tools ▸ Options.
 - **Results to Grid ▸ Show multiple result sets stacked in one tab** (desligada por padrão: uma aba por conjunto de resultados).
 
 **Editor e janelas**
@@ -67,7 +69,7 @@ Editor SQL com IntelliSense e sessões independentes, Object Explorer, Results p
 
 ## Validação
 
-Comportamento do aplicativo: a fonte M1143 passou na regressão completa deste repositório no PostgreSQL 17.11, e a fonte M1141 (as mesmas funções sem as seis mudanças de padrão do M1143) passou no 16.15, 17.11 e 18.6 (veja [validação](validation.md#v010-beta1--m1143--19112026)), num cluster isolado em loopback; o serviço PostgreSQL do host não é usado. Navegação só pelo teclado com teclas reais, Narrador, escala de 100/150/175% em três temas e três idiomas e os cenários de desempenho do projeto foram conferidos na máquina do mantenedor antes das mudanças de padrão. O PostGIS foi testado com o pacote oficial PostGIS 3.7.0 no PostgreSQL 17.11. As funções de IA foram testadas com um provedor falso local, não com um real.
+Comportamento do aplicativo: a fonte M1145 passou na regressão completa deste repositório no PostgreSQL 17.11, e a fonte M1141 (as mesmas funções sem as seis mudanças de padrão do M1143 e as pastas de sistema do M1145) passou no 16.15, 17.11 e 18.6 (veja [validação](validation.md#v010-beta1--m1145--20112026)), num cluster isolado em loopback; o serviço PostgreSQL do host não é usado. Navegação só pelo teclado com teclas reais, Narrador, escala de 100/150/175% em três temas e três idiomas e os cenários de desempenho do projeto foram conferidos na máquina do mantenedor antes das mudanças de padrão. O PostGIS foi testado com o pacote oficial PostGIS 3.7.0 no PostgreSQL 17.11. As funções de IA foram testadas com um provedor falso local, não com um real.
 
 Instalação numa VM Windows limpa e por outro usuário Windows sem privilégios não são certificadas por esta release.
 

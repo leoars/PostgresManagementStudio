@@ -2,7 +2,9 @@
 
 English | [Português (Brasil)](../pt-BR/release-notes.md)
 
-First beta of PGMS, still published as a pre-release. The features of this version are complete and it is meant for real work; it can still have bugs, so keep backups and report what you find. Build label: M1143. The binaries are built and attested by the same [release workflow](../../.github/workflows/release.yml) as the previous releases. Original work is under Apache-2.0, with credits in `NOTICE`; releases through alpha.4 remain under MIT.
+First beta of PGMS, still published as a pre-release. The features of this version are complete and it is meant for real work; it can still have bugs, so keep backups and report what you find. Build label: M1145. The binaries are built and attested by the same [release workflow](../../.github/workflows/release.yml) as the previous releases. Original work is under Apache-2.0, with credits in `NOTICE`; releases through alpha.4 remain under MIT.
+
+> **Not tested on a clean Windows machine.** This beta was installed and run only on the maintainer's computer, which already has PostgreSQL, SSMS and development tools. It has not been tested on a clean Windows virtual machine or by another Windows user without administrator rights. If the installer or the first start fails on your machine, please [report it](https://github.com/leoars/PostgresManagementStudio/issues/new?template=bug_report.yml).
 
 ## Highlights
 
@@ -18,7 +20,7 @@ First beta of PGMS, still published as a pre-release. The features of this versi
 
 **Options**
 - New pages, each option with a real effect or shown disabled with the reason: Environment ▸ **AutoRecover** (on/off, interval in minutes, lifetime in days), **Documents** (files changed outside PGMS, read-only files, Open from the folder of the active file, mixed line endings, save in the background, save encoding), **Tabs**, **Task List** (read only) and **Windows**; the seven **SQL Formatter** pages (keyword casing, Format on save, alignment, indentation, multiline lists, new lines, spacing); Designers ▸ **Table Options** (save time-out, warning on a table without a primary key); Object Explorer ▸ **General** (Hide system objects) and **Commands** (confirm renames); Query Execution ▸ **Live Query Statistics** (polling interval); Text Editor ▸ **Transact-SQL** (word wrap, line numbers, tabs, IntelliSense for new windows).
-- **Defaults that follow SSMS:** new tabs open first, after the pinned tabs; unsaved queries are backed up every 5 minutes; system schemas (`pg_catalog`, `information_schema`) and template databases are listed in Object Explorer; a Table Designer statement that runs longer than 3600 seconds stops the save and nothing is changed; Live Query Statistics reads every 250 ms; Format SQL writes a space between a type and its parameters (`VARCHAR (20)`). Recovered queries still come back in their saved order. Change any of these back in Tools ▸ Options.
+- **Defaults that follow SSMS:** new tabs open first, after the pinned tabs; unsaved queries are backed up every 5 minutes; system schemas (`pg_catalog`, `information_schema`) and template databases are listed in Object Explorer, in the **System Schemas** and **System Databases** folders, the first folder under Schemas and under Databases (with Hide system objects on, the folders and their objects are hidden); a Table Designer statement that runs longer than 3600 seconds stops the save and nothing is changed; Live Query Statistics reads every 250 ms; Format SQL writes a space between a type and its parameters (`VARCHAR (20)`). Recovered queries still come back in their saved order. Change any of these back in Tools ▸ Options.
 - **Results to Grid ▸ Show multiple result sets stacked in one tab** (off by default: one tab per result set).
 
 **Editor and windows**
@@ -67,7 +69,7 @@ SQL editor with IntelliSense and independent sessions, Object Explorer, paged Re
 
 ## Validation
 
-Application behavior: the M1143 source passed the complete regression of this repository on PostgreSQL 17.11, and the M1141 source (the same features without the six default changes of M1143) passed it on 16.15, 17.11 and 18.6 (see [validation](validation.md#v010-beta1--m1143--2026-11-19)), on an isolated loopback cluster; the host PostgreSQL service is not used. Keyboard-only navigation with real key presses, Narrator, 100/150/175% scaling in three themes and three languages, and the performance scenarios of the project were checked on the maintainer's machine before the default changes. PostGIS was tested with the official PostGIS 3.7.0 package on PostgreSQL 17.11. The AI features were tested with a local fake provider, not with a real one.
+Application behavior: the M1145 source passed the complete regression of this repository on PostgreSQL 17.11, and the M1141 source (the same features without the six default changes of M1143 and the system folders of M1145) passed it on 16.15, 17.11 and 18.6 (see [validation](validation.md#v010-beta1--m1145--2026-11-20)), on an isolated loopback cluster; the host PostgreSQL service is not used. Keyboard-only navigation with real key presses, Narrator, 100/150/175% scaling in three themes and three languages, and the performance scenarios of the project were checked on the maintainer's machine before the default changes. PostGIS was tested with the official PostGIS 3.7.0 package on PostgreSQL 17.11. The AI features were tested with a local fake provider, not with a real one.
 
 A clean-Windows VM installation and another Windows user without privileges are not certified by this release.
 
