@@ -247,12 +247,16 @@ try
     // M1143: Object Explorer ▸ General ▸ Hide system objects.
     Check(!schemas.Any(s => s.Name is "pg_catalog" or "information_schema"), "system schemas are hidden by default");
     var withSystem = new CatalogService(catalog.ConnectionFor("postgres")) { ShowSystemObjects = true };
-    var systemSchemas = await withSystem.ChildrenAsync(new(CatalogKind.Schemas, "Schemas", "postgres"));
-    Check(systemSchemas.Any(s => s.Name == "pg_catalog") && systemSchemas.Any(s => s.Name == "information_schema") && !systemSchemas.Any(s => s.Name.StartsWith("pg_toast", StringComparison.Ordinal))
-        && systemSchemas[^1].Name is "pg_catalog" or "information_schema", "with system objects shown, pg_catalog and information_schema are listed after the user schemas, without pg_toast");
-    var systemDatabases = await withSystem.ChildrenAsync(new(CatalogKind.Databases, "Databases"));
-    Check(systemDatabases.Any(d => d.Name.StartsWith("template1", StringComparison.Ordinal)) && !(await catalog.ChildrenAsync(new(CatalogKind.Databases, "Databases"))).Any(d => d.Name.StartsWith("template1", StringComparison.Ordinal)),
-        "template databases are listed only when system objects are shown");
+    // M1145: they go to the System Schemas and System Databases folders, the first child of each folder.
+    var shownSchemas = await withSystem.ChildrenAsync(new(CatalogKind.Schemas, "Schemas", "postgres"));
+    var systemSchemas = await withSystem.ChildrenAsync(shownSchemas[0]);
+    Check(shownSchemas[0].Kind == CatalogKind.SystemSchemas && shownSchemas[0].Name == CatalogService.SystemSchemasFolder && !shownSchemas.Any(s => s.Name is "pg_catalog" or "information_schema")
+        && systemSchemas.Select(s => s.Name).SequenceEqual(["information_schema", "pg_catalog"]), "with system objects shown, pg_catalog and information_schema are listed in System Schemas, without pg_toast");
+    var shownDatabases = await withSystem.ChildrenAsync(new(CatalogKind.Databases, "Databases"));
+    var systemDatabases = await withSystem.ChildrenAsync(shownDatabases[0]);
+    Check(shownDatabases[0].Kind == CatalogKind.SystemDatabases && systemDatabases.Any(d => d.Name.StartsWith("template1", StringComparison.Ordinal)) && !shownDatabases.Any(d => d.Name.StartsWith("template1", StringComparison.Ordinal))
+        && !(await catalog.ChildrenAsync(new(CatalogKind.Databases, "Databases"))).Any(d => d.Kind == CatalogKind.SystemDatabases || d.Name.StartsWith("template1", StringComparison.Ordinal)),
+        "template databases are listed in System Databases only when system objects are shown");
     string schemaId = SqlIdentifier.Quote(schemaName);
     await session.ExecuteAsync($"CREATE TABLE {schemaId}.sample(id integer PRIMARY KEY, note text); CREATE FUNCTION {schemaId}.f(a integer) RETURNS integer LANGUAGE sql AS 'SELECT a'; CREATE FUNCTION {schemaId}.f(a text) RETURNS text LANGUAGE sql AS 'SELECT a';");
     var tables = await catalog.ChildrenAsync(new(CatalogKind.Tables, "Tables", "postgres", schemaName));

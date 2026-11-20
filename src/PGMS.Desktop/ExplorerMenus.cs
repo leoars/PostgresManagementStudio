@@ -197,6 +197,17 @@ public partial class MainWindow
                 Separator(); Add("Restore Database…", RestoreDatabase, "ExplorerRestoreDatabase");
                 Footer();
                 break;
+            case CatalogKind.SystemDatabases:
+                // SSMS 22.11 (M1145): Restore Database…, Restore Files and Filegroups…, Reports ▸, Refresh. PostgreSQL has no filegroups,
+                // and the Databases folder offers no reports here either. Neither folder has Start PowerShell in SSMS, so no Start psql.
+                Add("Restore Database…", RestoreDatabase, "ExplorerRestoreDatabase");
+                Separator(); Add("_Refresh", RefreshExplorer, "ExplorerRefresh");
+                break;
+            case CatalogKind.SystemSchemas:
+                // SSMS 22.11 has no System Schemas folder; its System Tables folder offers Filter ▸, Reports ▸ and Refresh (M1145).
+                // System schemas cannot be created and the Schemas folder has no filter, so only Refresh is left.
+                Add("_Refresh", RefreshExplorer, "ExplorerRefresh");
+                break;
             case CatalogKind.Database when entry.IsOffline:
                 // Nothing can connect to it: the only thing left to do is bring it back.
                 Add("New _Database…", NewDatabase, "ExplorerNewDatabase");

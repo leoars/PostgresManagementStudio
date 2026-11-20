@@ -4,7 +4,9 @@ namespace PGMS.PostgreSql;
 
 public enum CatalogKind { Server, Databases, Database, Schemas, Schema, Tables, Views, MaterializedViews, Sequences, Functions, Procedures, Relation, Routine, Columns, Column, Indexes, Index, Roles, Role, Enums, Domains, DataType, DatabaseDiagrams, DatabaseDiagram, Keys, Key, Constraints, Constraint, Triggers, Trigger, Extensions, Extension,
     // PGMS-063 (M1099): composite types, foreign servers and logical replication.
-    CompositeTypes, ForeignServers, ForeignServer, Replication, Publications, Publication, Subscriptions, Subscription }
+    CompositeTypes, ForeignServers, ForeignServer, Replication, Publications, Publication, Subscriptions, Subscription,
+    // M1145: like SSMS 22.11 System Databases, shown first under Databases (and System Schemas under Schemas) only while system objects are shown.
+    SystemDatabases, SystemSchemas }
 public sealed record CatalogEntry(CatalogKind Kind, string Name, string? Database = null, string? Schema = null, uint Oid = 0)
 {
     public string? RelationType { get; init; }
@@ -41,12 +43,19 @@ public sealed class CatalogService(string connectionString)
     }
     public string ConnectionFor(string? database) => new NpgsqlConnectionStringBuilder(connectionString) { Database = database ?? DefaultDatabase }.ConnectionString;
 
-    /// <summary>Lists template databases and the pg_catalog and information_schema schemas (Object Explorer ▸ General, Hide system objects off; M1143).</summary>
+    /// <summary>Lists template databases and the pg_catalog and information_schema schemas (Object Explorer ▸ General, Hide system objects off; M1143),
+    /// in the System Databases and System Schemas folders (M1145).</summary>
     public bool ShowSystemObjects { get; set; }
+
+    /// <summary>Folder names of the system objects (M1145); they stay in English in every language, like the other folders (M1137).</summary>
+    public const string SystemDatabasesFolder = "System Databases", SystemSchemasFolder = "System Schemas";
 
     public async Task<IReadOnlyList<CatalogEntry>> ChildrenAsync(CatalogEntry parent, CancellationToken token = default)
     {
         CatalogEntry Folder(CatalogKind kind, string name) => new(kind, name, parent.Database, parent.Schema, parent.Oid);
+        // SSMS 22.11 (M1145): System Databases is the first child of Databases, before the user databases; with system objects hidden it is not there.
+        IReadOnlyList<CatalogEntry> WithSystemFolder(CatalogKind kind, string name, IReadOnlyList<CatalogEntry> entries) =>
+            ShowSystemObjects ? [Folder(kind, name), .. entries] : entries;
         switch (parent.Kind)
         {
             case CatalogKind.Server: return [Folder(CatalogKind.Databases, "Databases"), Folder(CatalogKind.Roles, "Login/Group Roles")];
@@ -66,15 +75,17 @@ public sealed class CatalogService(string connectionString)
         if (!parent.CanExpand) return [];
         string sql = parent.Kind switch
         {
-            // Object Explorer ▸ General ▸ Hide system objects (M1143): template databases and the pg_catalog and information_schema schemas.
-            CatalogKind.Databases => "SELECT oid, datname || CASE WHEN datallowconn THEN '' ELSE ' (Offline)' END, datname, NOT datallowconn FROM pg_catalog.pg_database" + (ShowSystemObjects ? "" : " WHERE NOT datistemplate") + " ORDER BY datname",
+            // Object Explorer ▸ General ▸ Hide system objects (M1143): template databases and the pg_catalog and information_schema schemas,
+            // listed in the System Databases and System Schemas folders (M1145), never among the user's objects.
+            CatalogKind.Databases or CatalogKind.SystemDatabases => "SELECT oid, datname || CASE WHEN datallowconn THEN '' ELSE ' (Offline)' END, datname, NOT datallowconn FROM pg_catalog.pg_database WHERE "
+                + (parent.Kind == CatalogKind.SystemDatabases ? "" : "NOT ") + "datistemplate ORDER BY datname",
             CatalogKind.Keys => "SELECT oid, conname FROM pg_catalog.pg_constraint WHERE conrelid=@oid AND contype IN ('p','u','f') ORDER BY CASE contype WHEN 'p' THEN 0 WHEN 'u' THEN 1 ELSE 2 END, conname",
             CatalogKind.Constraints => "SELECT oid, conname FROM pg_catalog.pg_constraint WHERE conrelid=@oid AND contype IN ('c','x') ORDER BY conname",
             CatalogKind.Triggers => "SELECT oid, tgname FROM pg_catalog.pg_trigger WHERE tgrelid=@oid AND NOT tgisinternal ORDER BY tgname",
             CatalogKind.Extensions => "SELECT oid, extname FROM pg_catalog.pg_extension ORDER BY extname",
-            CatalogKind.Schemas => ShowSystemObjects
-                ? "SELECT oid, nspname FROM pg_catalog.pg_namespace WHERE nspname !~ '^pg_(toast|temp_)' ORDER BY nspname IN ('pg_catalog','information_schema'), nspname"
-                : "SELECT oid, nspname FROM pg_catalog.pg_namespace WHERE nspname <> 'information_schema' AND nspname !~ '^pg_' ORDER BY nspname",
+            // pg_toast and the temporary schemas stay out, as before: their contents belong to other objects or sessions.
+            CatalogKind.Schemas => "SELECT oid, nspname FROM pg_catalog.pg_namespace WHERE nspname <> 'information_schema' AND nspname !~ '^pg_' ORDER BY nspname",
+            CatalogKind.SystemSchemas => "SELECT oid, nspname FROM pg_catalog.pg_namespace WHERE nspname IN ('pg_catalog','information_schema') ORDER BY nspname",
             CatalogKind.Roles => "SELECT oid, rolname || CASE WHEN rolcanlogin THEN ' (login)' ELSE '' END, rolname FROM pg_catalog.pg_roles ORDER BY rolname",
             // Only standalone composite types (CREATE TYPE ... AS): every table also has a composite row type.
             CatalogKind.CompositeTypes => "SELECT t.oid, t.typname, 'c' FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace JOIN pg_catalog.pg_class c ON c.oid=t.typrelid WHERE n.nspname=@schema AND t.typtype='c' AND c.relkind='c' ORDER BY t.typname, t.oid",
@@ -108,7 +119,7 @@ public sealed class CatalogService(string connectionString)
             string name = reader.GetString(1);
             CatalogKind kind = parent.Kind switch
             {
-                CatalogKind.Databases => CatalogKind.Database, CatalogKind.Schemas => CatalogKind.Schema,
+                CatalogKind.Databases or CatalogKind.SystemDatabases => CatalogKind.Database, CatalogKind.Schemas or CatalogKind.SystemSchemas => CatalogKind.Schema,
                 CatalogKind.Roles => CatalogKind.Role, CatalogKind.Columns => CatalogKind.Column,
                 CatalogKind.Indexes => CatalogKind.Index, CatalogKind.Functions or CatalogKind.Procedures => CatalogKind.Routine,
                 CatalogKind.Enums or CatalogKind.Domains or CatalogKind.CompositeTypes => CatalogKind.DataType,
@@ -120,7 +131,12 @@ public sealed class CatalogService(string connectionString)
             entries.Add(new(kind, name, kind == CatalogKind.Database ? reader.GetString(2) : parent.Database,
                 kind == CatalogKind.Schema ? name : parent.Schema, oid) { IsOffline = kind == CatalogKind.Database && reader.GetBoolean(3), RelationType = kind == CatalogKind.Relation && reader.FieldCount > 2 ? reader.GetString(2) : null, DataTypeKind = kind == CatalogKind.DataType ? reader.GetString(2) : null, RoutineKind = kind == CatalogKind.Routine ? (parent.Kind == CatalogKind.Procedures ? "p" : "f") : null, RoleName = kind == CatalogKind.Role ? reader.GetString(2) : null, Owner = kind == CatalogKind.Relation ? reader.GetString(3) : kind == CatalogKind.Routine ? reader.GetString(2) : null });
         }
-        return entries;
+        return parent.Kind switch
+        {
+            CatalogKind.Databases => WithSystemFolder(CatalogKind.SystemDatabases, SystemDatabasesFolder, entries),
+            CatalogKind.Schemas => WithSystemFolder(CatalogKind.SystemSchemas, SystemSchemasFolder, entries),
+            _ => entries
+        };
     }
 
     private async Task<IReadOnlyList<CatalogEntry>> DiagramsAsync(CatalogEntry folder, CancellationToken token)

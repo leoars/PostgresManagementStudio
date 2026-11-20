@@ -102,6 +102,59 @@ internal static class ExplorerExperienceChecks
             check(failed.Error is null && !failed.Name.Contains("load failed"), "Retry after failed refresh clears stale error on success");
         }
         finally { await session.ExecuteAsync($"DROP DATABASE IF EXISTS {database};"); }
+        await SystemFoldersAsync(connection, check);
+    }
+
+    /// <summary>M1145: System Databases and System Schemas, as SSMS 22.11 System Databases, only while system objects are shown.</summary>
+    private static async Task SystemFoldersAsync(string connection, Action<bool, string> check)
+    {
+        var shown = new CatalogService(connection) { ShowSystemObjects = true };
+        var databases = new CatalogNode(new(CatalogKind.Databases, "Databases"), shown);
+        await databases.LoadAsync();
+        var systemDatabases = databases.Children.First();
+        check(systemDatabases.Entry.Kind == CatalogKind.SystemDatabases && systemDatabases.Name == "System Databases" && databases.Children.Skip(1).All(n => n.Entry.Kind == CatalogKind.Database)
+            && databases.Children.Any(n => n.Entry.Database == "postgres") && !databases.Children.Any(n => n.Entry.Database is "template0" or "template1"),
+            "System Databases is the first child of Databases; template databases leave the user list, postgres stays in it");
+        await systemDatabases.LoadAsync();
+        check(systemDatabases.Children.Select(n => n.Name).SequenceEqual(["template0 (Offline)", "template1"]) && systemDatabases.Children.All(n => n.Entry.Kind == CatalogKind.Database) && systemDatabases.Children[0].Entry.IsOffline,
+            "System Databases lists template0 (Offline) and template1 as databases");
+        var schemas = new CatalogNode(new(CatalogKind.Schemas, "Schemas", "postgres"), shown);
+        await schemas.LoadAsync();
+        var systemSchemas = schemas.Children.First();
+        check(systemSchemas.Entry.Kind == CatalogKind.SystemSchemas && systemSchemas.Name == "System Schemas" && schemas.Children.Any(n => n.Name == "public")
+            && !schemas.Children.Any(n => n.Name is "pg_catalog" or "information_schema" || n.Name.StartsWith("pg_toast", StringComparison.Ordinal)), "System Schemas is the first child of Schemas; the user schemas follow without the system ones");
+        await systemSchemas.LoadAsync();
+        check(systemSchemas.Children.Select(n => n.Name).SequenceEqual(["information_schema", "pg_catalog"]) && systemSchemas.Children.All(n => n.Entry is { Kind: CatalogKind.Schema, Database: "postgres" }),
+            "System Schemas lists information_schema and pg_catalog, without pg_toast or temporary schemas");
+        var catalog = systemSchemas.Children.Single(n => n.Name == "pg_catalog");
+        await catalog.LoadAsync();
+        var tables = catalog.Children.Single(n => n.Entry.Kind == CatalogKind.Tables); await tables.LoadAsync();
+        check(tables.Children.Any(n => n.Name == "pg_class"), "A schema in System Schemas expands like any other schema");
+        var template1 = systemDatabases.Children.Single(n => n.Name == "template1"); await template1.LoadAsync();
+        check(template1.Children.Any(n => n.Entry.Kind == CatalogKind.Schemas), "A database in System Databases expands like any other database");
+
+        var hidden = new CatalogService(connection);
+        var hiddenDatabases = new CatalogNode(new(CatalogKind.Databases, "Databases"), hidden); await hiddenDatabases.LoadAsync();
+        var hiddenSchemas = new CatalogNode(new(CatalogKind.Schemas, "Schemas", "postgres"), hidden); await hiddenSchemas.LoadAsync();
+        check(hiddenDatabases.Children.All(n => n.Entry.Kind == CatalogKind.Database) && hiddenSchemas.Children.All(n => n.Entry.Kind == CatalogKind.Schema)
+            && hiddenDatabases.Children.Select(n => n.Name).SequenceEqual(databases.Children.Skip(1).Select(n => n.Name)) && !hiddenSchemas.Children.Any(n => n.Name is "pg_catalog" or "information_schema"),
+            "With Hide system objects on, the folders and their objects are not there and the user objects are the same");
+        shown.ShowSystemObjects = false; await databases.LoadAsync(refresh: true);
+        check(databases.Children.All(n => n.Entry.Kind == CatalogKind.Database), "Turning Hide system objects on removes System Databases at the next refresh");
+        shown.ShowSystemObjects = true; await databases.LoadAsync(refresh: true);
+        check(databases.Children.First().Entry.Kind == CatalogKind.SystemDatabases && !ReferenceEquals(databases.Children.First(), systemDatabases), "Turning it off brings the folder back at the next refresh");
+
+        var window = new MainWindow { ShowInTaskbar = false, Opacity = 0 };
+        window.Show(); await window.RecoveryCompletion; await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        try
+        {
+            string[] Menu(CatalogNode node) { var menu = new ContextMenu(); window.FillExplorerMenu(menu, node); return menu.Items.OfType<MenuItem>().Select(m => m.Name).ToArray(); }
+            var systemDatabasesMenu = Menu(databases.Children.First());
+            check(systemDatabasesMenu.SequenceEqual(["ExplorerRestoreDatabase", "ExplorerRefresh"]), "System Databases menu: Restore Database…, Refresh (SSMS also has filegroups and reports, and no Start PowerShell), got " + string.Join(", ", systemDatabasesMenu));
+            var systemSchemasMenu = Menu(systemSchemas);
+            check(systemSchemasMenu.SequenceEqual(["ExplorerRefresh"]), "System Schemas menu: Refresh only, no New Schema, got " + string.Join(", ", systemSchemasMenu));
+        }
+        finally { window.Close(); await window.CloseCompletion; }
     }
 
     /// <summary>Ctrl+N: the database selected in the Explorer while it is active, otherwise the active query's database.</summary>

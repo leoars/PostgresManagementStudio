@@ -113,7 +113,7 @@
      <TextBlock Text="General" FontWeight="SemiBold" Margin="0,0,0,6"/>
      <CheckBox x:Name="HideSystemObjectsBox" Content="_Hide system objects in Object Explorer"/>
      <CheckBox Content="Group objects by schema" IsChecked="True" IsEnabled="False" Margin="0,4,0,0"/>
-     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="System objects are the pg_catalog and information_schema schemas and the template databases. Off (the default, as in SSMS), they are listed after the other schemas and among the databases; on, they are hidden after a refresh. PostgreSQL objects always belong to a schema, so Object Explorer always groups them by schema."/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="System objects are the pg_catalog and information_schema schemas and the template databases. Off (the default, as in SSMS), they are listed in the System Schemas and System Databases folders; on, the folders and their objects are hidden after a refresh. PostgreSQL objects always belong to a schema, so Object Explorer always groups them by schema."/>
     </StackPanel>
     <StackPanel x:Name="LiveStatisticsPanel" Visibility="Collapsed">
      <TextBlock Text="Live Query Statistics" FontWeight="SemiBold" Margin="0,0,0,6"/>

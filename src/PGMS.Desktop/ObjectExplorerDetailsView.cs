@@ -157,7 +157,8 @@ public sealed partial class ObjectExplorerDetailsView : UserControl
         CatalogKind.DataType => entry.DataTypeKind switch { "e" => "Enum", "d" => "Domain", "c" => "Composite Type", "r" => "Range Type", _ => "Data Type" },
         CatalogKind.Databases or CatalogKind.Schemas or CatalogKind.Tables or CatalogKind.Views or CatalogKind.MaterializedViews or CatalogKind.Sequences or CatalogKind.Functions or CatalogKind.Procedures
             or CatalogKind.Columns or CatalogKind.Indexes or CatalogKind.Roles or CatalogKind.Enums or CatalogKind.Domains or CatalogKind.DatabaseDiagrams or CatalogKind.Keys or CatalogKind.Constraints or CatalogKind.Triggers or CatalogKind.Extensions
-            or CatalogKind.CompositeTypes or CatalogKind.ForeignServers or CatalogKind.Replication or CatalogKind.Publications or CatalogKind.Subscriptions => "Folder",
+            or CatalogKind.CompositeTypes or CatalogKind.ForeignServers or CatalogKind.Replication or CatalogKind.Publications or CatalogKind.Subscriptions
+        or CatalogKind.SystemDatabases or CatalogKind.SystemSchemas => "Folder",
         CatalogKind.DatabaseDiagram => "Database Diagram",
         _ => WordBreak().Replace(entry.Kind.ToString(), " ")
     };
