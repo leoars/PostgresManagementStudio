@@ -42,6 +42,26 @@ public sealed class DataTypeCatalog(string connectionString)
         var values=await Read(c,tx,expected.Schema,expected.Name,token).ConfigureAwait(false);
         if(values.Count!=1 || values[0]!=expected)throw new InvalidOperationException("Selected type identity, definition or USAGE authority changed. Inspect types again.");
     }
+    /// <summary>
+    /// Base types that extensions add (PostGIS geometry, geography, box2d…; M1124), as schema and name, for the Table Designer's type list. Only
+    /// names are offered there: the column type is written as text and checked by the server, so these do not need the verified identity above.
+    /// </summary>
+    public async Task<IReadOnlyList<(string Schema,string Name)>> ExtensionBaseTypesAsync(CancellationToken token=default)
+    {
+        await using var c=new NpgsqlConnection(connectionString);await c.OpenAsync(token).ConfigureAwait(false);
+        await using var command=new NpgsqlCommand("""
+            SELECT n.nspname::text,t.typname::text FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace
+            WHERE t.typtype='b' AND t.typisdefined AND t.typcategory<>'A' AND left(t.typname,1)<>'_'
+              AND n.nspname NOT LIKE 'pg\_%' ESCAPE '\' AND n.nspname<>'information_schema'
+              AND EXISTS(SELECT 1 FROM pg_catalog.pg_depend d WHERE d.classid='pg_catalog.pg_type'::regclass AND d.objid=t.oid AND d.deptype='e')
+              AND pg_catalog.has_type_privilege(t.oid,'USAGE') AND pg_catalog.has_schema_privilege(n.oid,'USAGE')
+            ORDER BY 1,2 LIMIT 1000
+            """,c){CommandTimeout=15};
+        await using var r=await command.ExecuteReaderAsync(token).ConfigureAwait(false);var result=new List<(string,string)>();
+        while(await r.ReadAsync(token).ConfigureAwait(false))result.Add((r.GetString(0),r.GetString(1)));
+        return result;
+    }
+
     internal static async Task<IReadOnlyList<InspectedDataType>> Read(NpgsqlConnection c,NpgsqlTransaction tx,string? schema,string? name,CancellationToken token)
     {
         await using var command=new NpgsqlCommand("""

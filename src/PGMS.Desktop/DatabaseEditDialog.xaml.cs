@@ -44,7 +44,7 @@ public partial class DatabaseEditDialog : Window
         string warning = request.Operation == DatabaseOperation.Drop
             ? $"Permanently drop database {request.Name}? All data in it will be removed.\n\nServer: {c.Host}:{c.Port}\n\n{request.ToSql()}"
             : $"Rename database {request.Name} to {request.NewName}?\n\nServer: {c.Host}:{c.Port}\n\n{request.ToSql()}";
-        if (MessageBox.Show(this, warning, request.Operation == DatabaseOperation.Drop ? "Drop Database" : "Rename Database", MessageBoxButton.YesNo,
+        if (LocalizedMessageBox.Show(this, warning, request.Operation == DatabaseOperation.Drop ? "Drop Database" : "Rename Database", MessageBoxButton.YesNo,
             request.Operation == DatabaseOperation.Drop ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         SetBusy(true); Feedback.Text = "Applying outside a transaction…";
         try { await new DatabaseEditService(connection).ApplyAsync(request); WasApplied = true; busy = false; DialogResult = true; }

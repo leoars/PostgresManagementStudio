@@ -87,7 +87,7 @@ public partial class ConcurrentIndexDialog : Window
         if(!ApplyButton.IsEnabled || (proposal is null && maintenance is null))return;
         var operation=maintenance is null?IndexMaintenanceOperation.Reindex:(IndexMaintenanceOperation)Operation.SelectedValue;
         if(maintenance is not null && operation==IndexMaintenanceOperation.DropConcurrently &&
-            MessageBox.Show(this,"Drop the inspected index? Table rows are preserved. This standalone command cannot be rolled back.","Drop Index",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
+            LocalizedMessageBox.Show(this,"Drop the inspected index? Table rows are preserved. This standalone command cannot be rolled back.","Drop Index",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
         using var source=new CancellationTokenSource();cancellation=source;busy=true;attempted=true;RequiresParentRefresh=true;Update();
         Feedback.Text=maintenance is not null && operation==IndexMaintenanceOperation.Reindex?"Rebuilding inside a transaction; waiting for the server…":"Executing outside a transaction. Cancel may leave residues; waiting for the server…";
         try
@@ -129,7 +129,7 @@ public partial class ConcurrentIndexDialog : Window
     public async Task ArchiveAsync()
     {
         if(!ArchiveButton.IsEnabled)return;
-        bool confirmed=MessageBox.Show(this,"Archive this inspected receipt? This only ends local tracking. It does not retry the command or change the database; any invalid index remains for explicit maintenance.","Archive Index Receipt",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes;
+        bool confirmed=LocalizedMessageBox.Show(this,"Archive this inspected receipt? This only ends local tracking. It does not retry the command or change the database; any invalid index remains for explicit maintenance.","Archive Index Receipt",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes;
         await ArchiveReviewedAsync(confirmed);
     }
     internal async Task ArchiveReviewedAsync(bool confirmed)

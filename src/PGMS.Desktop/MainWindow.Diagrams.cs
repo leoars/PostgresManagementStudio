@@ -20,7 +20,7 @@ public partial class MainWindow
     internal Func<DatabaseDiagramView, MessageBoxResult>? DiagramClosePrompt { get; set; }
     /// <summary>Replaces Install Diagram Support (question, script and the optional function of PGMS-045); without it, DiagramConfirmPrompt answers the question alone.</summary>
     internal Func<InstallDiagramSupportDialog, bool>? DiagramInstallPrompt { get; set; }
-    private bool ConfirmDiagram(string text) => DiagramConfirmPrompt?.Invoke(text) ?? MessageBox.Show(this, text, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+    private bool ConfirmDiagram(string text) => DiagramConfirmPrompt?.Invoke(text) ?? LocalizedMessageBox.Show(this, text, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
     private string? AskDiagramName(string title, string suggested) => DiagramNamePrompt is { } prompt ? prompt(title, suggested) : NamePrompt.Show(this, title, "Enter a name for the diagram:", suggested);
 
     private const string InstallQuestion = "This database does not have one or more of the support objects required to use database diagramming. Do you wish to create them?\n\nPGMS creates the schema pgms and the table pgms.diagrams, which keeps the tables shown in each diagram and their positions, never table data.";
@@ -142,9 +142,9 @@ public partial class MainWindow
     /// <summary>Save changes to the following items? Save / Don't Save / Cancel, as SSMS asks when a changed diagram closes.</summary>
     private async Task<bool> ConfirmDiagramCloseAsync(DatabaseDiagramView view)
     {
-        if (view.IsBusy) { MessageBox.Show(this, "Cancel the running operation before closing this diagram.", "PGMS"); return false; }
+        if (view.IsBusy) { LocalizedMessageBox.Show(this, "Cancel the running operation before closing this diagram.", "PGMS"); return false; }
         if (!view.IsDirty) return true;
-        var answer = DiagramClosePrompt?.Invoke(view) ?? MessageBox.Show(this, "Save changes to the following items?\n\n" + view.DiagramName, "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        var answer = DiagramClosePrompt?.Invoke(view) ?? LocalizedMessageBox.Show(this, "Save changes to the following items?\n\n" + view.DiagramName, "PGMS", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
         return answer == MessageBoxResult.No || (answer == MessageBoxResult.Yes && await view.SaveAsync() && !view.IsDirty);
     }
 

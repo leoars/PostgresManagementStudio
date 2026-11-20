@@ -64,7 +64,8 @@ public sealed record TableDesignChange(IReadOnlyList<string> Statements, IReadOn
 /// <summary>Compares the table as read with the table as designed and writes the ALTER statements, in an order that lets PostgreSQL run them in one transaction.</summary>
 public static class TableDesignScript
 {
-    private static readonly Regex TypeShape = new("""^[\p{L}_"][\p{L}\p{N}_$." ]*(\(\s*\d+(\s*,\s*-?\d+)?\s*\))?(\s+with(out)?\s+time\s+zone)?(\s*\[\s*\d*\s*\])*$""", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    // Type modifiers are numbers (numeric(18,2)) or words and numbers of extension types (PostGIS geometry(Point,4326), M1124); nothing else.
+    private static readonly Regex TypeShape = new("""^[\p{L}_"][\p{L}\p{N}_$." ]*(\(\s*-?[\p{L}\p{N}_]+(\s*,\s*-?[\p{L}\p{N}_]+)*\s*\))?(\s+with(out)?\s+time\s+zone)?(\s*\[\s*\d*\s*\])*$""", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
     private static readonly string[] IdentityTypes = ["smallint", "integer", "bigint", "int2", "int4", "int8"];
 
     public static TableDesignChange Build(TableDesign? original, TableDesign current)
@@ -315,9 +316,11 @@ public static class TableDesignScript
 }
 
 /// <summary>Applies a designer change in one transaction, refusing it when the table no longer matches what the designer read.</summary>
-public sealed class TableDesignEdit(TableDesign? original, TableDesign current) : IAdministrativeEdit
+/// <param name="timeoutSeconds">0 (default) waits as long as needed: type changes can rewrite large tables and Cancel stops them. Table Designer
+/// gives the transaction time-out of Tools ▸ Options ▸ Designers when it is on (M1143).</param>
+public sealed class TableDesignEdit(TableDesign? original, TableDesign current, int timeoutSeconds = 0) : IAdministrativeEdit
 {
-    public int CommandTimeoutSeconds => 0; // Type changes can rewrite large tables; Cancel stops them.
+    public int CommandTimeoutSeconds => timeoutSeconds;
     public string ToSql() => TableDesignScript.Build(original, current).Sql;
     public async Task ValidateAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, CancellationToken token = default)
     {

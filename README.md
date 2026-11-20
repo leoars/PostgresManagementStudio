@@ -6,13 +6,13 @@ English | [Português (Brasil)](README.pt-BR.md)
 
 **The SQL Server Management Studio experience, for PostgreSQL.** A native Windows client with **database diagrams**, a **visual query designer** and **context-aware IntelliSense**, plus Object Explorer, F5 to run, execution plans, session monitoring and backup/restore, built for people who already think in SSMS.
 
-**[Download v0.1.0-alpha.7 for Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-alpha.7)** · Graphical installer (EN/pt-BR) or portable ZIP, .NET runtime included · Works with PostgreSQL 16–18
+**[Download v0.1.0-beta.1 for Windows x64](https://github.com/leoars/PostgresManagementStudio/releases/tag/v0.1.0-beta.1)** · Graphical installer (EN/pt-BR) or portable ZIP, .NET runtime included · Works with PostgreSQL 16–18 · Interface in 8 languages
 
 ![PGMS editor, Object Explorer and query results](docs/assets/pgms-results-m959.jpg)
 
-> Early pre-release. Querying, browsing and monitoring are the core of this alpha; administration and backup run through reviewable SQL and the official PostgreSQL tools. Full SSMS parity is not claimed. See [known limits](docs/en/validation.md) and [release notes](docs/en/release-notes.md).
+> First beta, still a pre-release: the features are complete for this version and it is meant for real work, but it can have bugs. Administration and backup run through reviewable SQL and the official PostgreSQL tools. Full SSMS parity is not claimed. See [known limits](docs/en/validation.md), the [release notes](docs/en/release-notes.md) and [how to report a problem](#contribute-and-report-problems).
 
-**Contents:** [Highlights](#highlights) · [New in alpha.7](#new-in-alpha7) · [Why PGMS](#why-pgms) · [Features](#features) · [Get started](#get-started) · [Documentation](#documentation) · [Contribute and report problems](#contribute-and-report-problems) · [License](#license)
+**Contents:** [Highlights](#highlights) · [New in beta.1](#new-in-beta1) · [Why PGMS](#why-pgms) · [Features](#features) · [Get started](#get-started) · [Languages](#languages) · [Documentation](#documentation) · [Contribute and report problems](#contribute-and-report-problems) · [License](#license)
 
 ## Highlights
 
@@ -49,17 +49,20 @@ Press `Ctrl+Space` and get what fits that position. After `FROM`: tables, views 
 - **Execution plan advice.** Graphical plans flag operators that discard many rows and suggest a missing index as a commented `CREATE INDEX` script, checked against the catalog and never run for you.
 - **Schema Compare.** Compare two databases and get a change script in a query tab connected to the target, for you to review and run.
 - **Query History.** Every query you run, grouped and searchable, stored only on your computer and encrypted for your Windows user.
+- **PostGIS.** `geometry` and `geography` values appear as EWKT text in the grid, Results to Text, copy and export, and Table Designer accepts types such as `geometry(Point,4326)`.
 
-## New in alpha.7
+## New in beta.1
 
-- **AI conversation** and **Explain / Fix / Optimize SQL with AI**.
-- **Dark theme**, Editor Appearance, Fonts and Colors, and Presenter Mode.
-- **Unexpected errors are logged** to `%LOCALAPPDATA%\PGMS\logs` and shown in a window with **Report Issue**, instead of closing PGMS silently.
-- Editor: Format SQL, Parameter Info and Quick Info, bookmarks, outlining, templates and snippets, Find in Files, spell checking of comments and strings, and the SSMS Edit ▸ Advanced commands.
-- Schema Compare, Live Query Statistics (progress, waits and blockers), Object Explorer Details (`F7`), the Properties window (`F4`), Error List and Output.
-- Object Explorer: extensions, maintenance (Vacuum, Analyze, Refresh Materialized View), menus for keys, constraints and triggers, composite types, foreign servers and logical replication.
-- Backup with LZ4/Zstandard, parallel restore and restoring only chosen items; client certificates in Connect.
-- Window layouts, Split Tab, Full Screen, Restore Closed Tab, a menu in the title bar with Search (`Ctrl+Q`), Keyboard and Query Shortcuts, Import and Export Settings and External Tools.
+- **Interface in 8 languages:** English, Português (Brasil), Español, Deutsch, Italiano, Français, 한국어 and 日本語 (see [Languages](#languages)).
+- **The 13 SSMS color themes** (Cool Breeze by default), plus Use system setting.
+- **Execution plans:** Show Execution Plan JSON or as Text, and **Compare Showplan** with another plan file or the previous plan of the same tab, with the operators that differ highlighted in the drawing.
+- **PostGIS** values shown as EWKT (above).
+- **Update notice:** a few seconds after start, release packages ask the GitHub API whether a newer release exists (GitHub sees your IP address, as with any web request) and show **Update available** in the title bar. Nothing is downloaded or installed. You can turn it off in Tools ▸ Options ▸ Environment ▸ Product Updates.
+- **More of the SSMS Options:** AutoRecover, Documents, Tabs, Windows, the seven SQL Formatter pages, Table Options, Object Explorer General and Commands, and Live Query Statistics. Each option works or is shown disabled with the reason.
+- Editor and windows: Paste Special (Format SQL, Paste with AI), Switch Completion Mode, File ▸ New ▸ File, Code Snippets Manager, Navigate Backward/Forward, Pin Tab (kept on recovered and reopened tabs), All Windows, several result sets in tabs or stacked.
+- PGMS message boxes with buttons in the PGMS language; keyboard and screen reader fixes; windows fit the screen at 150–175% scaling; faster result grids.
+
+**Defaults that changed to match SSMS:** new tabs open first (after pinned tabs), unsaved queries are backed up every 5 minutes, system schemas and template databases are listed in Object Explorer (in the System Schemas and System Databases folders), Table Designer saves stop after 3600 seconds, Live Query Statistics reads every 250 ms and Format SQL writes `VARCHAR (20)`. Settings you changed yourself are kept; each one can be changed back in Tools ▸ Options.
 
 See the [release notes](docs/en/release-notes.md) for details and limits.
 
@@ -80,7 +83,7 @@ See the [release notes](docs/en/release-notes.md) for details and limits.
 - Reviewed SQL administration for supported databases, schemas, tables, columns, identity, indexes, constraints, sequences, roles and privileges.
 - Session/blocker monitoring, with distinct query cancellation and session termination.
 - Logical backup/restore through external PostgreSQL tools: custom, tar, SQL and directory formats, gzip/LZ4/Zstandard, parallel and partial restore, plus reviewed global operations.
-- Light, dark or system theme, Fonts and Colors, keyboard shortcuts and window layouts.
+- The SSMS themes (Cool Breeze, Light, Dark and the color themes), Fonts and Colors, keyboard shortcuts, window layouts and an interface in 8 languages.
 
 ## Get started
 
@@ -99,7 +102,7 @@ Get-FileHash .\PGMS-* -Algorithm SHA256
 Compare the hashes with `SHA256SUMS.txt` in the release. Starting with v0.1.0-alpha.2 the assets are built by the [release workflow](.github/workflows/release.yml) on GitHub Actions and carry a build provenance attestation, so you can also confirm that the ZIP or installer came from that workflow and this repository (requires the [GitHub CLI](https://cli.github.com/)):
 
 ```powershell
-gh attestation verify .\PGMS-0.1.0-alpha.7-Setup-x64.exe --repo leoars/PostgresManagementStudio
+gh attestation verify .\PGMS-0.1.0-beta.1-Setup-x64.exe --repo leoars/PostgresManagementStudio
 ```
 
 v0.1.0-alpha.1 was built on the maintainer's machine and has checksums only. Code signing through the SignPath Foundation open source program is planned.
@@ -117,6 +120,12 @@ dotnet run --project src/PGMS.Desktop
 
 The self-contained portable package includes .NET/WPF, but no PostgreSQL server or tools. Local candidate ZIPs and acceptance artifacts are absent from a fresh clone. See [setup and packaging](docs/en/getting-started.md).
 
+## Languages
+
+The interface is available in English, Português (Brasil), Español, Deutsch, Italiano, Français, 한국어 and 日本語. By default PGMS follows the Windows display language (English when Windows uses another one); choose another in **Tools ▸ Options ▸ Environment ▸ International Settings** and restart PGMS. As in SSMS, some things stay in English on purpose: Object Explorer folder names, command names in the Keyboard page, SQL keywords and anything that comes from the server or your data.
+
+**The translations have not been reviewed by native speakers yet.** If a text is wrong, unclear or still in English, please [report a translation problem](https://github.com/leoars/PostgresManagementStudio/issues/new?template=translation.yml) with the language, the window and the text you saw. The guides are maintained in English and Brazilian Portuguese only.
+
 ## Documentation
 
 | Topic | English | Português (Brasil) |
@@ -128,11 +137,13 @@ The self-contained portable package includes .NET/WPF, but no PostgreSQL server 
 | Evidence and limits | [Validation](docs/en/validation.md) | [Validação](docs/pt-BR/validation.md) |
 | Attribution | [Licensing](docs/en/licensing.md) | [Licenças](docs/pt-BR/licensing.md) |
 
-[Documentation index](docs/README.md). Public guides are maintained in both languages; the original internal development history is not included in this curated source repository. Bilingual documentation does not localize the application UI.
+[Documentation index](docs/README.md). Public guides are maintained in both languages; the original internal development history is not included in this curated source repository.
 
 ## Contribute and report problems
 
 **If PGMS hits an error.** An unexpected error opens a window with the details; PGMS also writes them to a daily log in `%LOCALAPPDATA%\PGMS\logs` (kept 30 days, nothing sent over the network). Choose **Report Issue**, describe what you were doing and attach the log or the text from **Copy Details** after reading it: an error message can quote what the server sent. You can usually choose **Continue**; your open queries keep their text.
+
+**Any other problem.** [Open a bug report](https://github.com/leoars/PostgresManagementStudio/issues/new?template=bug_report.yml): the form asks for the PGMS version (Help ▸ About), the Windows and PostgreSQL versions, how you installed PGMS, the steps, what you expected and what happened, and the log when there is one.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md). English and Brazilian Portuguese are welcome. Issue templates guide bug reports and feature requests; usage questions go to [Discussions](https://github.com/leoars/PostgresManagementStudio/discussions). Use synthetic data and remove credentials and personal information from reports. For vulnerabilities, follow [SECURITY.md](SECURITY.md).
 

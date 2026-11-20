@@ -17,5 +17,5 @@
     <ProjectReference Include="../PGMS.PostgreSql/PGMS.PostgreSql.csproj" />
   </ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="PGMS.DesktopTests" /></ItemGroup>
-  <ItemGroup><Resource Include="Resources/PostgreSQL.xshd" /><Resource Include="Resources/PGMS.ico" /><Resource Include="Resources/PGMS-logo.png" /></ItemGroup>
+  <ItemGroup><Resource Include="Resources/PostgreSQL.xshd" /><Resource Include="Resources/PGMS.ico" /><Resource Include="Resources/PGMS-logo.png" /><Resource Include="Resources/Strings/*.json" /></ItemGroup>
 </Project>

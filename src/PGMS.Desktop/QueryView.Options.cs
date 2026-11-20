@@ -12,6 +12,17 @@ public partial class QueryView
     /// <summary>Opens the formatted JSON of a result link in a new tab.</summary>
     internal event Action<string>? JsonLinkRequested;
 
+    /// <summary>Text Editor ▸ Transact-SQL (M1122): line numbers and tabs always; word wrap and IntelliSense only for a new tab, where they start.</summary>
+    internal void ApplyTextEditorSettings(TextEditorSettings settings, bool newTab)
+    {
+        settings = settings.Normalized();
+        Editor.ShowLineNumbers = settings.LineNumbers;
+        Editor.Options.IndentationSize = settings.TabSize;
+        Editor.Options.ConvertTabsToSpaces = settings.InsertSpaces;
+        if (newTab) { WordWrap = settings.WordWrap; IntelliSenseEnabled = settings.IntelliSense; }
+        UpdateEditorInfo();
+    }
+
     internal void ApplyQueryOptions(QueryOptions options)
     {
         QueryOptions = options.Normalized();

@@ -40,8 +40,8 @@ public partial class EditRowsView : UserControl
         service = new TableRowsService(connectionString);
         var builder = new NpgsqlConnectionStringBuilder(connectionString);
         Title = $"{builder.Host}.{builder.Database} - {schema}.{tableName}";
-        ConfirmDelete = text => MessageBox.Show(Window.GetWindow(this), text, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
-        ShowSaveError = text => MessageBox.Show(Window.GetWindow(this), text, "PGMS", MessageBoxButton.OK, MessageBoxImage.Information);
+        ConfirmDelete = text => LocalizedMessageBox.Show(Window.GetWindow(this), text, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        ShowSaveError = text => LocalizedMessageBox.Show(Window.GetWindow(this), text, "PGMS", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     public bool Targets(string connection, string schema, string tableName) => ConnectionString == connection && Schema == schema && Table == tableName;

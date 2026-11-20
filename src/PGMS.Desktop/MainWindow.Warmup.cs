@@ -14,7 +14,7 @@ public partial class MainWindow
     {
         await RecoveryCompletion;
         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-        if (spareQuery is not null || documents.Count > 0 || recoveryClosed || shuttingDown || closingWindow) return;
+        if (spareQuery is not null || documents.Count > 0 || deferredQueries.Count > 0 || recoveryClosed || shuttingDown || closingWindow) return;
         var view = QueryView.CreateInstrumented(Guid.NewGuid(), UiPhaseMeasured);
         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         if (recoveryClosed || shuttingDown || closingWindow) { await view.DisposeAsync(); return; }

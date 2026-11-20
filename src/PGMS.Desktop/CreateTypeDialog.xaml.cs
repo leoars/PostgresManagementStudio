@@ -57,7 +57,7 @@ public partial class CreateTypeDialog : Window
     public async Task ApplyAsync()
     {
         if(busy || !ApplyButton.IsEnabled)return;var request=Request;
-        if(MessageBox.Show(this,request.ToSql()+"\n\nCreate this type in the inspected schema?","Confirm Type Creation",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Operation canceled. Nothing was sent.";return;}
+        if(LocalizedMessageBox.Show(this,request.ToSql()+"\n\nCreate this type in the inspected schema?","Confirm Type Creation",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Operation canceled. Nothing was sent.";return;}
         using var source=new CancellationTokenSource();cancellation=source;busy=true;RequiresParentRefresh=true;Update(true);CancelButton.Focus();Feedback.Text="Creating type…";
         try{await new AdministrativeEditService(connection).ApplyAsync(request,source.Token);WasApplied=true;Feedback.Text="Command completed. Inspect before another change.";}
         catch(Exception ex)when(ex is NpgsqlException or System.IO.IOException or TimeoutException or OperationCanceledException or InvalidOperationException or ArgumentException){Feedback.Text=(source.IsCancellationRequested?"Type creation interrupted.":ex is PostgresException pg?$"{pg.SqlState}: {pg.MessageText}":ex.Message)+" Result not confirmed. Inspect before retrying; cancellation cannot undo a completed commit.";}

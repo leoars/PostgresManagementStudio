@@ -16,6 +16,7 @@ public partial class MainWindow
         document.Closed += (_, _) => RefreshCommands();
         AddDocument(document);
         document.IsActive = true;
+        FocusToolContent(view);
         RefreshCommands();
         return view;
     }

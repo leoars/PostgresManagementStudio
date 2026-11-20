@@ -92,6 +92,7 @@
   <Setter Property="Background" Value="{DynamicResource Pgms.ToolBarBackground}"/>
   <Setter Property="BorderThickness" Value="0"/>
   <Setter Property="Foreground" Value="{DynamicResource Pgms.PrimaryText}"/>
+  <Setter Property="KeyboardNavigation.TabNavigation" Value="None"/>
  </Style>
 
  <!-- Check and radio boxes -->
@@ -180,7 +181,8 @@
      <Grid SnapsToDevicePixels="True">
       <ToggleButton x:Name="Toggle" Template="{StaticResource Pgms.Dark.ComboToggle}" Focusable="False" ClickMode="Press" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"/>
       <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False" Margin="{TemplateBinding Padding}" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-      <TextBox x:Name="PART_EditableTextBox" Visibility="Hidden" Margin="2,2,18,2" Padding="1,0" Background="Transparent" BorderThickness="0" Foreground="{TemplateBinding Foreground}" CaretBrush="{TemplateBinding Foreground}" IsReadOnly="{Binding IsReadOnly, RelativeSource={RelativeSource TemplatedParent}}" VerticalContentAlignment="Center" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+      <!-- B4 (M1134): the edit box of an editable combo box carries the combo's name; the Narrator read an unnamed "edit" in the dark theme. -->
+      <TextBox x:Name="PART_EditableTextBox" AutomationProperties.Name="{Binding (AutomationProperties.Name), RelativeSource={RelativeSource TemplatedParent}}" Visibility="Hidden" Margin="2,2,18,2" Padding="1,0" Background="Transparent" BorderThickness="0" Foreground="{TemplateBinding Foreground}" CaretBrush="{TemplateBinding Foreground}" IsReadOnly="{Binding IsReadOnly, RelativeSource={RelativeSource TemplatedParent}}" VerticalContentAlignment="Center" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"/>
       <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="None" IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
        <Border MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}" Background="{DynamicResource Pgms.Dark.Popup}" BorderBrush="{DynamicResource Pgms.Dark.PopupBorder}" BorderThickness="1">
         <ScrollViewer SnapsToDevicePixels="True"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer>

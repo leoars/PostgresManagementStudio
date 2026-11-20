@@ -63,6 +63,7 @@ public partial class MainWindow
             query.FileFormat = file.Format;
             query.FileVersion = file.Version;
             RememberRecentFile(file.Path);
+            AfterFileOpened(query, file.Path);
             completion.SetResult(query);
         }
         catch (OperationCanceledException) { completion.SetCanceled(cancellation.Token); }
@@ -121,11 +122,13 @@ public partial class MainWindow
             throw new IOException("This file is already open or being saved in another query tab.");
         try
         {
+            FormatOnSave(query); // SQL Formatter ▸ Formatting ▸ Format on save (M1142)
             QueryTextSnapshot text;
             using (UiPhaseScope.Start(UiPhaseMeasured, "save-capture"))
                 text = QueryTextSnapshot.Capture(query.Editor.Document);
             long revision = query.EditRevision;
-            var format = query.FileFormat;
+            var format = SaveFormat(query); // Environment ▸ Documents ▸ Save files with a specific encoding (M1141)
+            query.FileFormat = format;
             string? previousPath = query.FilePath;
             var previousVersion = query.FileVersion;
             var saved = await fileIo.RunAsync(() =>

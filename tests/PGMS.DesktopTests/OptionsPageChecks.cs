@@ -34,7 +34,7 @@ internal static class OptionsPageChecks
             var dialog = new OptionsDialog(store) { ShowInTaskbar = false }; dialog.Show(); await Idle();
             var tree = (TreeView)dialog.FindName("Pages");
             var headers = tree.Items.OfType<TreeViewItem>().Select(i => (string)i.Header).ToList();
-            check(headers.SequenceEqual(["Environment", "Connection Dialog", "Designers", "Query Execution", "Query Results", "Object Explorer"]), "Option pages in SSMS order: " + string.Join(", ", headers));
+            check(headers.SequenceEqual(["Environment", "Text Editor", "Connection Dialog", "Designers", "Query Execution", "Query Results", "SQL Formatter", "Object Explorer"]), "Option pages in SSMS order (SQL Formatter since M1141): " + string.Join(", ", headers));
             void Show(string page) { ((TreeViewItem)dialog.FindName(page)).IsSelected = true; }
             bool Visible(string panel) => ((FrameworkElement)dialog.FindName(panel)).Visibility == Visibility.Visible;
             Show("ScriptingPage"); await Idle();

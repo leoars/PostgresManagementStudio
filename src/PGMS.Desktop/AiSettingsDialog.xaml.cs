@@ -123,7 +123,7 @@ public partial class AiSettingsDialog : Window
 
     private void RemoveKey(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show(this, $"Remove the saved {shown} API key from this computer?", "AI Assistant Settings", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (LocalizedMessageBox.Show(this, $"Remove the saved {shown} API key from this computer?", "AI Assistant Settings", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         RemoveSavedKey();
     }
     public void RemoveSavedKey()

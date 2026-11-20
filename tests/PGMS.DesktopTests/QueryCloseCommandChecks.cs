@@ -210,22 +210,17 @@ internal static class QueryCloseCommandChecks
         {
             if (DateTime.UtcNow > deadline) { Console.Error.WriteLine("Owned query confirmation timeout"); Environment.Exit(1); }
             if (handled) return;
-            nint found = 0;
-            EnumThreadWindows(thread, (handle, _) =>
-            {
-                var name = new StringBuilder(64); GetClassName(handle, name, name.Capacity);
-                if (GetWindow(handle, 4) == ownerHandle && name.ToString() == "#32770") { found = handle; return false; }
-                return true;
-            }, 0);
-            if (found == 0) return;
+            // The PGMS message box (M1138) owned by this window; answered through its own buttons, never global input.
+            var found = owner.OwnedWindows.OfType<PgmsMessageBox>().FirstOrDefault(b => b.IsVisible);
+            if (found is null) return;
             handled = true;
             try
             {
-                check(GetDlgItem(found, 2) != 0 && GetDlgItem(found, 6) != 0 && GetDlgItem(found, 7) != 0 && !IsWindowEnabled(ownerHandle), "Close opens the owned native Yes/No/Cancel confirmation");
+                check(found.Choices.SequenceEqual([MessageBoxResult.Yes, MessageBoxResult.No, MessageBoxResult.Cancel]) && !IsWindowEnabled(ownerHandle), "Close opens the owned Yes/No/Cancel confirmation");
                 check(!ApplicationCommands.Close.CanExecute(null, target), "Pending Close disables duplicate command execution");
             }
             catch (Exception ex) { failure = ex; }
-            SendMessage(found, 0x0111, failure is null ? response : 2, 0); // WM_COMMAND, never global input.
+            found.Answer(failure is not null ? MessageBoxResult.Cancel : response switch { 6 => MessageBoxResult.Yes, 7 => MessageBoxResult.No, _ => MessageBoxResult.Cancel });
         };
         timer.Start();
         try { ApplicationCommands.Close.Execute(null, target); await owner.TabCloseCompletion; }

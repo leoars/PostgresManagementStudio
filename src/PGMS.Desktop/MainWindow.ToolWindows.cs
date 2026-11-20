@@ -55,7 +55,9 @@ public partial class MainWindow
             errorCount = new TextBlock { Margin = new Thickness(4, 2, 4, 4), Text = "0 Errors" };
             AutomationProperties.SetName(errorCount, "Error count");
             DockPanel.SetDock(errorCount, Dock.Top);
-            errorListContent = new DockPanel { Background = Brushes.White, Children = { errorCount, errorGrid } };
+            // B5 (M1134): the theme's content colour (white in the light themes, as before); a fixed white left "0 Errors" unreadable in Dark.
+            errorListContent = new DockPanel { Children = { errorCount, errorGrid } };
+            errorListContent.SetResourceReference(Panel.BackgroundProperty, "Pgms.ContentBackground");
             DockManager.ActiveContentChanged += (_, _) => RefreshErrorList();
             RefreshErrorList();
             return errorListContent;
@@ -73,7 +75,8 @@ public partial class MainWindow
             clear.Click += (_, _) => ClearOutput();
             var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 2, 4, 4), Children = { new TextBlock { Text = "Show output from: PGMS", VerticalAlignment = VerticalAlignment.Center }, clear } };
             DockPanel.SetDock(bar, Dock.Top);
-            outputContent = new DockPanel { Background = Brushes.White, Children = { bar, outputText } };
+            outputContent = new DockPanel { Children = { bar, outputText } };
+            outputContent.SetResourceReference(Panel.BackgroundProperty, "Pgms.ContentBackground");
             return outputContent;
         }
     }
@@ -83,7 +86,7 @@ public partial class MainWindow
     {
         if (outputHooked) return;
         outputHooked = true;
-        DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock)).AddValueChanged(Status, (_, _) => { if (!string.IsNullOrWhiteSpace(Status.Text)) WriteOutput(Status.Text); });
+        DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock)).AddValueChanged(Status, (_, _) => { if (!string.IsNullOrWhiteSpace(Status.Text) && Localization.Message(Status.Text) == Status.Text) WriteOutput(Status.Text); });
     }
 
     /// <summary>Adds a line to Output with the time, keeping the last 5,000.</summary>
@@ -155,6 +158,86 @@ public partial class MainWindow
         else if (anchorable.Content is null) anchorable.Content = ToolContentFor(id);
         if (id == ErrorListId) RefreshErrorList();
         anchorable.Show(); anchorable.IsActive = true;
+        SizeNewPane(anchorable);
+        FocusToolContent(anchorable.Content as FrameworkElement, () => id == ErrorListId ? errorGrid : outputText);
+    }
+
+    internal const double SideToolWidth = 300, BottomToolHeight = 220;
+
+    /// <summary>B4 (M1134): the strips where AvalonDock keeps auto-hidden windows (an ItemsControl on each side of the dock) were Tab stops with
+    /// no name, so Tab and the Narrator stopped on an empty "list". The tabs inside them stay reachable by mouse, as before.</summary>
+    static MainWindow()
+    {
+        EventManager.RegisterClassHandler(typeof(AvalonDock.Controls.LayoutAnchorSideControl), LoadedEvent, new RoutedEventHandler((sender, _) =>
+        {
+            var side = (Control)sender;
+            side.Focusable = false; side.IsTabStop = false;
+            side.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => SkipStrips(side));
+        }));
+        // B1 review (M1137): toolbars are out of the Tab order (TabNavigation=None in Shell.xaml and Dark.xaml), as in SSMS. A button that got
+        // the keyboard focus (a click, Ctrl+Tab) would keep it on Tab, because None does not move it out: Tab gives it back to the window,
+        // to the element that had it before (the toolbar is its own focus scope), or to the first Tab stop.
+        EventManager.RegisterClassHandler(typeof(ToolBar), PreviewKeyDownEvent, new KeyEventHandler((sender, e) =>
+        {
+            if (e.Key != Key.Tab || (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Alt)) != 0) return;
+            var toolbar = (ToolBar)sender;
+            if (KeyboardNavigation.GetTabNavigation(toolbar) != KeyboardNavigationMode.None || Window.GetWindow(toolbar) is not { } window) return;
+            if (FocusManager.GetFocusedElement(window) is UIElement { IsVisible: true, IsEnabled: true } previous && !IsInToolBar(previous) && previous.Focus()) { e.Handled = true; return; }
+            e.Handled = window.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+        }));
+    }
+
+    private static bool IsInToolBar(DependencyObject element)
+    {
+        for (var node = element; node is not null; node = node is Visual ? VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node))
+            if (node is ToolBar) return true;
+        return false;
+    }
+
+    private static void SkipStrips(DependencyObject root)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is ItemsControl strip && strip.GetType() == typeof(ItemsControl)) { strip.Focusable = false; strip.IsTabStop = false; }
+            SkipStrips(child);
+        }
+    }
+
+    /// <summary>B5 (M1134): a tool window docked for the first time by AddToLayout or next to Error List/Output got a pane of a few pixels,
+    /// with its content cut. A pane at the side gets 300 px of width and one at the bottom 220 px of height, about what SSMS 22.11 gives them;
+    /// a pane the user already sized (a pixel length other than these) keeps its size.</summary>
+    internal static void SizeNewPane(LayoutAnchorable anchorable)
+    {
+        if (anchorable.Parent is not LayoutAnchorablePane pane || pane.Parent is not LayoutPanel panel) return;
+        if (panel.Orientation == Orientation.Horizontal && !pane.DockWidth.IsAbsolute) pane.DockWidth = new GridLength(SideToolWidth);
+        if (panel.Orientation == Orientation.Vertical && !pane.DockHeight.IsAbsolute) pane.DockHeight = new GridLength(BottomToolHeight);
+    }
+
+    /// <summary>B4 (M1134): showing a tool window from the menu or its shortcut puts the keyboard focus in it, as SSMS does; before, the focus
+    /// stayed where it was (or nowhere) and Tab never reached the window. Runs after AvalonDock's own activation, on the preferred control when
+    /// it can take the focus, otherwise on the first control of the window that is a tab stop.</summary>
+    internal void FocusToolContent(FrameworkElement? content, Func<IInputElement?>? preferred = null)
+    {
+        if (content is null) return;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () =>
+        {
+            if (!content.IsVisible) return;
+            if (preferred?.Invoke() is UIElement { IsVisible: true, IsEnabled: true, Focusable: true } target && Keyboard.Focus(target) is not null && target.IsKeyboardFocusWithin) return;
+            if (content.IsKeyboardFocusWithin) return;
+            if (FirstTabStop(content) is { } first) Keyboard.Focus(first);
+        });
+    }
+
+    internal static UIElement? FirstTabStop(DependencyObject root)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            if (VisualTreeHelper.GetChild(root, i) is not UIElement child || !child.IsVisible || !child.IsEnabled) continue;
+            if (child.Focusable && KeyboardNavigation.GetIsTabStop(child)) return child;
+            if (FirstTabStop(child) is { } inner) return inner;
+        }
+        return null;
     }
 
     private long toolChordDeadline;

@@ -19,7 +19,7 @@ public partial class MainWindow
     public void CancelRecovery() { Dispatcher.VerifyAccess(); restoreCancellation?.Cancel(); }
     private bool recoveryStarted;
     private bool recoveryClosed;
-    private readonly DispatcherTimer recoveryTimer = new() { Interval = TimeSpan.FromSeconds(10) };
+    private readonly DispatcherTimer recoveryTimer = new() { Interval = TimeSpan.FromMinutes(AutoRecoverSettings.DefaultInterval) };
     private readonly Dictionary<Guid, long> checkpointRevisions = [];
     private readonly HashSet<Guid> pendingRecoveryRemovals = [];
     public string? RecoveryDirectory => recoverySession?.Store.DirectoryPath;
@@ -37,8 +37,27 @@ public partial class MainWindow
             // Skip ticks while IO is pending instead of accumulating awaiting event handlers.
             if (checkpointTask.IsCompleted) await CheckpointQueriesAsync();
         };
-        recoveryTimer.Start();
+        ApplyAutoRecover(EnvironmentSettings.Load().Recovery);
     }
+
+    /// <summary>Environment ▸ AutoRecover (M1141): off stops writing drafts (the ones of this session are removed); the interval, in minutes since
+    /// M1143 as in SSMS, is the checkpoint period. An unchanged interval keeps the running period (setting it would start the wait over).</summary>
+    internal void ApplyAutoRecover(AutoRecoverSettings settings)
+    {
+        var interval = TimeSpan.FromMinutes(settings.Normalized().IntervalMinutes);
+        if (recoveryTimer.Interval != interval) recoveryTimer.Interval = interval;
+        autoRecoverEnabled = settings.Enabled;
+        if (settings.Enabled) { if (recoveryStarted && !recoveryClosed) recoveryTimer.Start(); }
+        else
+        {
+            recoveryTimer.Stop();
+            foreach (var query in documents.Keys) if (checkpointRevisions.ContainsKey(query.RecoveryId)) ForgetRecovery(query);
+        }
+    }
+
+    private bool autoRecoverEnabled = true;
+    internal TimeSpan AutoRecoverInterval => recoveryTimer.Interval;
+    internal bool AutoRecoverRunning => recoveryTimer.IsEnabled;
 
     public RecoveryReport RecoverPendingQueries()
     {
@@ -47,16 +66,20 @@ public partial class MainWindow
         if (recoverySession is null) return new(0, 0, 1, 0);
         try
         {
-            int occupied = documents.Keys.Select(q => q.RecoveryId).Concat(recoverySession.Store.ListIds()).Distinct().Count();
+            int occupied = OpenRecoveryIds().Concat(recoverySession.Store.ListIds()).Distinct().Count();
             int available = Math.Max(0, QueryRecoveryStore.MaximumDocuments - occupied);
             var result = QueryRecoverySession.Recover(Path.Combine(Path.GetDirectoryName(layoutFile)!, "recovery"), recoverySession.Store.DirectoryPath, draft =>
             {
-                var query = NewQuery(draft.Text, origin: QueryHistoryOrigin.Typed);
+                QueryView query;
+                appendRestoredTabs = true;
+                try { query = NewQuery(draft.Text, origin: QueryHistoryOrigin.Typed); }
+                finally { appendRestoredTabs = false; }
                 query.FileFormat = draft.Format;query.WordWrap=draft.WordWrap;query.ShowWhiteSpace=draft.ShowWhiteSpace;query.CommandTimeoutSeconds=draft.CommandTimeoutSeconds;
                 query.IsDirty = true;
                 string title = draft.Title.StartsWith("Recovered - ", StringComparison.Ordinal) ? draft.Title : "Recovered - " + draft.Title;
                 title = BoundRecoveryTitle(title);
                 documents[query].Title = title + "*";
+                if (draft.Pinned) SetTabPinned(documents[query], true);
                 try
                 {
                     recoveryIo.Run(() => recoverySession.Store.Save(draft with{Id=query.RecoveryId,Title=title}));
@@ -91,7 +114,7 @@ public partial class MainWindow
         using var cancel = new CancellationTokenSource();
         restoreCancellation = cancel;
         var store = recoverySession.Store;
-        var documentIds = documents.Keys.Select(q => q.RecoveryId).ToArray();
+        var documentIds = OpenRecoveryIds().ToArray();
         Status.Text = "Recovering unsaved queries...";
         try
         {
@@ -102,25 +125,31 @@ public partial class MainWindow
                 string title = BoundRecoveryTitle(draft.Title.StartsWith("Recovered - ", StringComparison.Ordinal) ? draft.Title : "Recovered - " + draft.Title);
                 var destination = draft with { Id = Guid.NewGuid(), Title = title };
                 var existingIds = await recoveryIo.RunAsync(store.ListIds).ConfigureAwait(false);
-                bool hasCapacity = await Dispatcher.InvokeAsync(() => !cancel.IsCancellationRequested && !recoveryClosed && !shuttingDown &&
-                    documents.Keys.Select(q => q.RecoveryId).Concat(existingIds).Distinct().Count() < QueryRecoveryStore.MaximumDocuments);
-                if (!hasCapacity) return false;
-                var prepared = await Task.Run(() => PreparedQueryDocument.Create(destination.Text, cancel.Token), cancel.Token).ConfigureAwait(false);
+                (bool Capacity, bool Shown) slot = await Dispatcher.InvokeAsync(() => (!cancel.IsCancellationRequested && !recoveryClosed && !shuttingDown &&
+                    OpenRecoveryIds().Concat(existingIds).Distinct().Count() < QueryRecoveryStore.MaximumDocuments, ActiveQuery is null));
+                if (!slot.Capacity) return false;
+                // Only the tab that becomes active gets its editor now; the others keep the text until shown (M1133).
+                var prepared = slot.Shown ? await Task.Run(() => PreparedQueryDocument.Create(destination.Text, cancel.Token), cancel.Token).ConfigureAwait(false) : null;
                 // Persist before exposing a tab, so Save/Close can never precede this write.
                 var retained = await recoveryIo.RunAsync(() => { store.Save(destination); return store.ListIds(); }).ConfigureAwait(false);
                 bool accepted = await Dispatcher.InvokeAsync(() =>
                 {
                     if (cancel.IsCancellationRequested || recoveryClosed || shuttingDown ||
-                        documents.Keys.Select(q => q.RecoveryId).Concat(retained).Distinct().Count() > QueryRecoveryStore.MaximumDocuments) return false;
-                    var query = NewQuery(recoveryId: destination.Id, activate: ActiveQuery is null, prepared: prepared);
-                    query.FileFormat = destination.Format;query.WordWrap=destination.WordWrap;query.ShowWhiteSpace=destination.ShowWhiteSpace;query.CommandTimeoutSeconds=destination.CommandTimeoutSeconds; query.IsDirty = true;
-                    documents[query].Title = destination.Title + "*";
-                    checkpointRevisions[query.RecoveryId] = query.RecoveryRevision;
-                    return true;
+                        OpenRecoveryIds().Concat(retained).Distinct().Count() > QueryRecoveryStore.MaximumDocuments) return false;
+                    // As before, a restored tab becomes active only when no query is; that one is mounted, the others wait.
+                    appendRestoredTabs = true;
+                    try
+                    {
+                        if (ActiveQuery is not null) { AddDeferredQuery(destination); return true; }
+                        var query = NewQuery(prepared is null ? destination.Text : null, recoveryId: destination.Id, activate: true, prepared: prepared, origin: QueryHistoryOrigin.Typed);
+                        ApplyRecoveredState(query, destination);
+                        return true;
+                    }
+                    finally { appendRestoredTabs = false; }
                 }, DispatcherPriority.Background);
                 if (!accepted) await recoveryIo.RunAsync(() => store.Remove(destination.Id)).ConfigureAwait(false);
                 return accepted;
-            }, available, cancel.Token);
+            }, available, cancel.Token, TimeSpan.FromDays(EnvironmentSettings.Load().Recovery.LifetimeDays));
             Status.Text = $"Recovery{(report.Canceled ? " canceled" : "")}: {report.Restored} queries restored; {report.Failed} errors; {report.Deferred} deferred. Review recovered tabs and use Save As.";
             return report;
         }
@@ -131,7 +160,7 @@ public partial class MainWindow
 
     public int CheckpointQueries()
     {
-        if (recoveryClosed || shuttingDown || closingWindow) return 0;
+        if (recoveryClosed || shuttingDown || closingWindow || !autoRecoverEnabled) return 0;
         int saved = 0;
         try
         {
@@ -145,7 +174,7 @@ public partial class MainWindow
                 {
                     string title = pair.Value.Title.TrimEnd('*');
                     title = BoundRecoveryTitle(title);
-                    var draft = new RecoveryDraft(query.RecoveryId, title, query.Editor.Text, query.FileFormat){WordWrap=query.WordWrap,ShowWhiteSpace=query.ShowWhiteSpace,CommandTimeoutSeconds=query.CommandTimeoutSeconds};
+                    var draft = new RecoveryDraft(query.RecoveryId, title, query.Editor.Text, query.FileFormat){WordWrap=query.WordWrap,ShowWhiteSpace=query.ShowWhiteSpace,CommandTimeoutSeconds=query.CommandTimeoutSeconds,Pinned=pinnedTabs.Contains(pair.Value)};
                     recoveryIo.Run(() => recoverySession.Store.Save(draft));
                     checkpointRevisions[query.RecoveryId] = query.RecoveryRevision;
                     pendingRecoveryRemovals.Remove(query.RecoveryId);
@@ -167,7 +196,7 @@ public partial class MainWindow
 
     private async Task<int> CheckpointQueriesCoreAsync()
     {
-        if (recoveryClosed || shuttingDown || closingWindow) return 0;
+        if (recoveryClosed || shuttingDown || closingWindow || !autoRecoverEnabled) return 0;
         try
         {
             recoverySession ??= new(Path.Combine(Path.GetDirectoryName(layoutFile)!, "recovery"));
@@ -182,7 +211,7 @@ public partial class MainWindow
                 .Take(QueryRecoveryStore.MaximumDocuments)
                 .Select(pair => (Query: pair.Key, Revision: pair.Key.RecoveryRevision,
                     Id: pair.Key.RecoveryId, Title: BoundRecoveryTitle(pair.Value.Title.TrimEnd('*')),
-                    Text: QueryTextSnapshot.Capture(pair.Key.Editor.Document), Format: pair.Key.FileFormat,Wrap:pair.Key.WordWrap,WhiteSpace:pair.Key.ShowWhiteSpace,Timeout:pair.Key.CommandTimeoutSeconds)).ToArray();
+                    Text: QueryTextSnapshot.Capture(pair.Key.Editor.Document), Format: pair.Key.FileFormat,Wrap:pair.Key.WordWrap,WhiteSpace:pair.Key.ShowWhiteSpace,Timeout:pair.Key.CommandTimeoutSeconds,Pinned:pinnedTabs.Contains(pair.Value))).ToArray();
             snapshotPhase?.Dispose();
             var store = recoverySession.Store;
             var resultBatch = await recoveryIo.RunAsync(() =>
@@ -194,7 +223,7 @@ public partial class MainWindow
                 }).ToArray();
                 var writes = snapshots.Select(snapshot =>
                 {
-                    try { store.Save(new(snapshot.Id, snapshot.Title, snapshot.Text.Materialize(), snapshot.Format){WordWrap=snapshot.Wrap,ShowWhiteSpace=snapshot.WhiteSpace,CommandTimeoutSeconds=snapshot.Timeout}); return (snapshot, Error: (Exception?)null); }
+                    try { store.Save(new(snapshot.Id, snapshot.Title, snapshot.Text.Materialize(), snapshot.Format){WordWrap=snapshot.Wrap,ShowWhiteSpace=snapshot.WhiteSpace,CommandTimeoutSeconds=snapshot.Timeout,Pinned=snapshot.Pinned}); return (snapshot, Error: (Exception?)null); }
                     catch (Exception ex) when (IsRecoveryError(ex)) { return (snapshot, Error: (Exception?)ex); }
                 }).ToArray();
                 return (cleanup, writes);

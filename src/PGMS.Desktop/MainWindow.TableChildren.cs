@@ -37,6 +37,10 @@ public partial class MainWindow
     internal async Task<bool> RenameTableChildAsync(CatalogNode node, string newName)
     {
         if (catalogService?.ConnectionFor(node.Entry.Database) is not { } connection) return false;
+        // Object Explorer ▸ Commands ▸ Prompt to confirm the renaming of schema objects (M1143), as in SSMS.
+        if (explorerSettings.ConfirmRename && !(RenameConfirmPrompt?.Invoke(node.Entry.Name, newName) ?? LocalizedMessageBox.Show(this, $"Rename {node.Entry.Name} to {newName}?",
+                "Rename", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes))
+        { Status.Text = "Not renamed."; return false; }
         try
         {
             await TableChildObjects.RenameAsync(connection, node.Entry.Kind == CatalogKind.Trigger, node.Entry.Oid, node.Entry.Name, newName);
@@ -61,7 +65,7 @@ public partial class MainWindow
         {
             string sql = await TableChildObjects.DescribeDropAsync(connection, trigger, node.Entry.Oid, node.Entry.Name);
             string question = $"Delete {(trigger ? "trigger" : "constraint")} {node.Entry.Name}? This runs:\n\n{sql}\n\nIt cannot be undone.";
-            bool yes = DeleteObjectConfirm?.Invoke(question) ?? MessageBox.Show(this, question, "Delete Object", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+            bool yes = DeleteObjectConfirm?.Invoke(question) ?? LocalizedMessageBox.Show(this, question, "Delete Object", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
             if (!yes) { Status.Text = "Nothing was deleted."; return false; }
             await TableChildObjects.DropAsync(connection, trigger, node.Entry.Oid, node.Entry.Name);
         }

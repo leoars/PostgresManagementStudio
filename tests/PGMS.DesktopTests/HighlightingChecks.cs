@@ -65,7 +65,7 @@ internal static class HighlightingChecks
         await FontsAndColorsChecks.RunAsync(check);
             await WhitespaceChecks.RunAsync(check);
             await NavigationChecks.RunAsync(check);
-            await LongLineDisplayChecks.RunAsync(check); await EditorConvenienceChecks.RunAsync(check); await ToolWindowChecks.RunAsync(check); await SettingsTransferChecks.RunAsync(check); await CustomizationChecks.RunAsync(check); await ThemeChecks.RunAsync(check); await EditorAppearanceChecks.RunAsync(check); await SpellCheckerChecks.RunAsync(check); await ResultsAreaChecks.RunAsync(check); await TitleBarChecks.RunAsync(check); await SearchSettingsChecks.RunAsync(check); await CrashReportChecks.RunAsync(check);
+            await LongLineDisplayChecks.RunAsync(check); await EditorConvenienceChecks.RunAsync(check); await ToolWindowChecks.RunAsync(check); await SettingsTransferChecks.RunAsync(check); await CustomizationChecks.RunAsync(check); await ThemeChecks.RunAsync(check); await LocalizationChecks.RunAsync(check); await EditorAppearanceChecks.RunAsync(check); await SpellCheckerChecks.RunAsync(check); await ResultsAreaChecks.RunAsync(check); await ResultGridLookChecks.RunAsync(check); await TitleBarChecks.RunAsync(check); await SearchSettingsChecks.RunAsync(check); await CrashReportChecks.RunAsync(check); await UpdateCheckChecks.RunAsync(check); await EditorSpecialsChecks.RunAsync(check); await NavigationTabChecks.RunAsync(check); await ParityOptionsChecks.RunAsync(check); await EnvironmentPagesChecks.RunAsync(check);
             HighlightingCacheChecks.Run(editor,check);
             await DollarHighlightingChecks.RunAsync(view,editor,check);
         }

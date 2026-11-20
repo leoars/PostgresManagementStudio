@@ -57,6 +57,7 @@ public partial class MainWindow
             beforeFullScreen = null;
             WindowStyle = style; ResizeMode = resize; WindowState = WindowState.Normal; WindowState = state;
             MainToolBars.Visibility = Visibility.Visible;
+            ShowToolWindowsAgain(); // View ▸ All Windows only hides them while in Full Screen
         }
         FullScreenMenu.IsChecked = on;
         UpdateTitleBand();
@@ -120,7 +121,7 @@ public partial class MainWindow
         {
             var layout = saved[i];
             var item = new MenuItem { Header = $"_{(i + 1) % 10} {layout.Name}" };
-            item.Click += (_, _) => ApplyWindowLayout(layout.Name);
+            item.Click += (_, _) => ApplyWindowLayoutFromMenu(layout.Name);
             ApplyLayoutMenu.Items.Add(item);
         }
         if (saved.Count == 0) ApplyLayoutMenu.Items.Add(new MenuItem { Header = "No Saved Layouts", IsEnabled = false });

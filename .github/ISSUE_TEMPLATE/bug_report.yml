@@ -13,9 +13,17 @@ body:
     attributes:
       label: PGMS version / Versão do PGMS
       description: Release tag or build label shown in Help > About. / Tag da release ou rótulo de build exibido em Help > About.
-      placeholder: v0.1.0-alpha.7 (M1117)
+      placeholder: v0.1.0-beta.1 (M1145)
     validations:
       required: true
+  - type: input
+    id: language
+    attributes:
+      label: Interface language and theme / Idioma da interface e tema
+      description: Tools > Options > Environment > International Settings, and Tools > Theme. / Tools > Options > Environment > International Settings, e Tools > Theme.
+      placeholder: English, Cool Breeze
+    validations:
+      required: false
   - type: input
     id: environment
     attributes:

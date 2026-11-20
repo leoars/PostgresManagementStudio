@@ -45,6 +45,9 @@ internal static class RecoveryLoadChecks
             var restoreIntervalCounters = restoreCounters.Complete();
             LoadTraceEvents.Log.Boundary("restore", "end");
             check(memory.Samples > 1 && memory.Maximum.ManagedBytes >= memory.Baseline.ManagedBytes, "Recovery load records sampled process and managed memory during restore");
+            var tabs = ((AvalonDock.DockingManager)window.FindName("DockManager")).Layout.Descendents().OfType<LayoutDocument>().ToArray();
+            check(tabs.Length == 32 && tabs.Count(d => d.Content is QueryView) == 1 && window.DeferredQueryCount == 31, "Load restores 32 tabs and builds the editor only for the active one (M1133)");
+            window.MountDeferredQueries();
             var documents = ((AvalonDock.DockingManager)window.FindName("DockManager")).Layout.Descendents()
                 .OfType<LayoutDocument>().Select(d => d.Content).OfType<QueryView>().ToArray();
             check(documents.Length == 32, "Load restores 32 maximum-size documents");
@@ -93,6 +96,7 @@ internal static class RecoveryLoadChecks
         {
             if (window is not null)
             {
+                window.MountDeferredQueries();
                 foreach (var query in ((AvalonDock.DockingManager)window.FindName("DockManager")).Layout.Descendents().OfType<LayoutDocument>().Select(d => d.Content).OfType<QueryView>()) query.IsDirty = false;
                 window.Close(); await window.CloseCompletion;
                 await window.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);

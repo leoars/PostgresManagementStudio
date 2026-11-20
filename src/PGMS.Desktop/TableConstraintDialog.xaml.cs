@@ -147,7 +147,7 @@ public partial class TableConstraintDialog : Window
         if (busy) return;
         var request = Request;
         if (request.Operation == TableConstraintOperation.Drop &&
-            MessageBox.Show(this, Target.Text + "\n\n" + request.ToSql() + "\n\nDrop this table constraint?", "Confirm constraint deletion",
+            LocalizedMessageBox.Show(this, Target.Text + "\n\n" + request.ToSql() + "\n\nDrop this table constraint?", "Confirm constraint deletion",
                 MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
 
         SetBusy(true);

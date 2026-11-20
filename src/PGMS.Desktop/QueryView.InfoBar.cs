@@ -87,7 +87,10 @@ public partial class QueryView
         UpdateEditorInfo();
         string current = button.Content as string ?? "";
         foreach (var item in menu.Items.OfType<MenuItem>())
-            item.IsChecked = button == IndentationButton ? (string)item.Header == (current == "SPC" ? "Spaces" : "Tabs") : button == LineEndingButton && (string)item.Header == current;
+        {
+            object? header = Localization.EnglishHeader(item, item.Header); // The English text: the menu may be translated (M1126).
+            item.IsChecked = button == IndentationButton ? Equals(header, current == "SPC" ? "Spaces" : "Tabs") : button == LineEndingButton && Equals(header, current);
+        }
         menu.PlacementTarget = button; menu.Placement = PlacementMode.Top; menu.IsOpen = true;
     }
 }

@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Markup;
 using System.Windows.Media;
 using ICSharpCode.AvalonEdit;
@@ -71,6 +72,14 @@ public sealed class SchemaCompareView : UserControl
         {
             HeaderTemplate = (DataTemplate)XamlReader.Parse("""<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><TextBlock Margin="4,6,0,2" FontWeight="SemiBold"><Run Text="{Binding Name, Mode=OneWay}"/><Run Text=" ("/><Run Text="{Binding ItemCount, Mode=OneWay}"/><Run Text=")"/></TextBlock></DataTemplate>""")
         });
+        // B5 (M1134): the document is created before it has a width, the DataGrid then squeezed every column to its 20 px minimum and kept
+        // them there ("In", "Ty", "Sc"…). Each column gets a minimum that fits its header, and the widths are recomputed once the grid is wide.
+        foreach (var column in grid.Columns) column.MinWidth = column.Header is "Include" ? 64 : column.Header is "Type" or "Action" ? 72 : 120;
+        grid.SizeChanged += (_, e) =>
+        {
+            if (e.PreviousSize.Width >= 200 || e.NewSize.Width < 200) return;
+            foreach (var column in grid.Columns) { var width = column.Width; column.Width = new DataGridLength(0); column.Width = width; }
+        };
         AutomationProperties.SetName(grid, "Schema differences");
         AutomationProperties.SetName(groupBy, "Group By");
         grid.SelectionChanged += (_, _) => ShowDefinitions(grid.SelectedItem as SchemaDifference);
@@ -104,7 +113,7 @@ public sealed class SchemaCompareView : UserControl
         var definitions = new Grid();
         definitions.ColumnDefinitions.Add(new ColumnDefinition()); definitions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) }); definitions.ColumnDefinitions.Add(new ColumnDefinition());
         System.Windows.Controls.Grid.SetColumn(targetText, 2);
-        var middle = new GridSplitter { Width = 6, HorizontalAlignment = HorizontalAlignment.Stretch, ResizeBehavior = GridResizeBehavior.PreviousAndNext };
+        var middle = new GridSplitter { Width = 6, HorizontalAlignment = HorizontalAlignment.Stretch, ResizeBehavior = GridResizeBehavior.PreviousAndNext, IsTabStop = false }; // B4 (M1134): no Tab stop without a name, as in SSMS
         System.Windows.Controls.Grid.SetColumn(middle, 1);
         System.Windows.Controls.Grid.SetColumnSpan(placeholder, 3);
         definitions.Children.Add(sourceText); definitions.Children.Add(middle); definitions.Children.Add(targetText); definitions.Children.Add(placeholder);
@@ -113,7 +122,7 @@ public sealed class SchemaCompareView : UserControl
         body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(3, GridUnitType.Star), MinHeight = 80 });
         body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(6) });
         body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2, GridUnitType.Star), MinHeight = 80 });
-        var splitter = new GridSplitter { Height = 6, HorizontalAlignment = HorizontalAlignment.Stretch, ResizeBehavior = GridResizeBehavior.PreviousAndNext };
+        var splitter = new GridSplitter { Height = 6, HorizontalAlignment = HorizontalAlignment.Stretch, ResizeBehavior = GridResizeBehavior.PreviousAndNext, IsTabStop = false };
         System.Windows.Controls.Grid.SetRow(splitter, 1); System.Windows.Controls.Grid.SetRow(definitions, 2);
         body.Children.Add(grid); body.Children.Add(splitter); body.Children.Add(definitions);
 
@@ -121,7 +130,11 @@ public sealed class SchemaCompareView : UserControl
         foreach (var top in new FrameworkElement[] { toolbar, endpoints, messageBar }) { DockPanel.SetDock(top, Dock.Top); root.Children.Add(top); }
         root.Children.Add(body);
         Content = root;
-        Background = SystemColors.WindowBrush;
+        // B5 (M1134): theme colours instead of the Windows ones, so the document is dark in the dark themes (it stayed white, with pale labels);
+        // the yellow message bar keeps dark text in every theme.
+        SetResourceReference(BackgroundProperty, "Pgms.ContentBackground");
+        foreach (var editor in new[] { sourceText, targetText }) { editor.SetResourceReference(BackgroundProperty, "Pgms.ContentBackground"); editor.SetResourceReference(ForegroundProperty, "Pgms.PrimaryText"); }
+        TextElement.SetForeground(messageBar, Brushes.Black);
         ShowDefinitions(null);
         Refresh();
     }
@@ -135,7 +148,7 @@ public sealed class SchemaCompareView : UserControl
     private static FrameworkElement Separator() => new Border { Width = 1, Margin = new Thickness(4, 3, 8, 3), Background = SystemColors.ControlDarkBrush };
     private static TextBox Endpoint(string name)
     {
-        var box = new TextBox { IsReadOnly = true, Padding = new Thickness(3), Background = SystemColors.ControlLightLightBrush };
+        var box = new TextBox { IsReadOnly = true, Padding = new Thickness(3) };
         AutomationProperties.SetName(box, name);
         return box;
     }
@@ -286,6 +299,8 @@ public sealed class SchemaCompareView : UserControl
     private sealed class DiffLines(Color color) : IBackgroundRenderer
     {
         private readonly Brush brush = Frozen(color);
+        // B5 (M1134): in the dark themes the pale green/red would sit under light text; the same hue at 35% over the dark background reads.
+        private readonly Brush darkBrush = Frozen(Color.FromArgb(0x59, color.R, color.G, color.B));
         private static Brush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
         public HashSet<int> Lines { get; set; } = [];
         public KnownLayer Layer => KnownLayer.Background;
@@ -297,7 +312,7 @@ public sealed class SchemaCompareView : UserControl
             {
                 if (!Lines.Contains(line.FirstDocumentLine.LineNumber)) continue;
                 double top = line.VisualTop - textView.ScrollOffset.Y;
-                drawingContext.DrawRectangle(brush, null, new Rect(0, top, Math.Max(textView.ActualWidth, 1), line.Height));
+                drawingContext.DrawRectangle(Theme.IsDark ? darkBrush : brush, null, new Rect(0, top, Math.Max(textView.ActualWidth, 1), line.Height));
             }
         }
     }

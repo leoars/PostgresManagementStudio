@@ -43,7 +43,7 @@ internal static class FileTabChecks
             shell.EnvironmentSettings.Update(d=>d with{RecentFilesCount=10});
             File.Delete(fileC);shell.EnvironmentSettings.Update(d=>d with{RecentFiles=[fileC,..d.RecentFiles??[]]});
             await shell.OpenRecentFileAsync(fileC);
-            check(errors.Count==1 && errors[0].Contains("no longer exists") && !(shell.EnvironmentSettings.Load().RecentFiles??[]).Contains(fileC),"A recent file that no longer exists is reported and removed from the list");
+            check(errors.Count==1 && errors[0].Contains("no longer exists") && !(shell.EnvironmentSettings.Load().RecentFiles??[]).Contains(fileC),"A recent file that no longer exists is reported and removed from the list: "+string.Join(" | ",errors));
             var options=new OptionsDialog(shell.EnvironmentSettings){ShowInTaskbar=false};
             ((TextBox)options.FindName("RecentFilesBox")).Text="0";options.Accept(options,new RoutedEventArgs());
             check(((TextBlock)options.FindName("GeneralError")).Visibility==Visibility.Visible && shell.EnvironmentSettings.Load().RecentCount==10,"Options refuses a recent count outside 1 to 24");

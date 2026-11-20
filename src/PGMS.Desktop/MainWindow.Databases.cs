@@ -89,5 +89,5 @@ public partial class MainWindow
 
     private bool ConfirmDatabaseSwitch(string warning) => DatabaseSwitchConfirm is { } confirm
         ? confirm(warning)
-        : MessageBox.Show(this, warning, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+        : LocalizedMessageBox.Show(this, warning, "PGMS", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 }

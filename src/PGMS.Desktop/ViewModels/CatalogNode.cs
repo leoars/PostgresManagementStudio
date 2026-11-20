@@ -39,6 +39,7 @@ public sealed class CatalogNode : INotifyPropertyChanged
     private string? label;
     /// <summary>Text shown instead of the entry name, such as the server node with its version (PGMS-051); the entry keeps its name.</summary>
     public string? Label { get => label; set { label = value; PropertyChanged?.Invoke(this, new(nameof(Name))); } }
+    /// <summary>The tree label stays in English in every language, folders and state suffixes included (user review of B1, 19/11/2026, reverting M1127); context menus are still translated.</summary>
     public string Name => (label ?? Entry.Name) + (Filter.IsActive ? " (filtered)" : "") + (busy ? " (loading)" : WasCanceled ? " (load canceled)" : Error is not null ? " (load failed)" : "");
     public string FilterSummary => (busy ? "Loading… " : WasCanceled ? "Load canceled; displayed items may be outdated. Refresh to retry. " : Error is not null ? "Load failed; displayed items may be outdated. Refresh to retry. " : "") + (loaded ? $"{allChildren.Count(n => Matches(n))} of {allChildren.Count} items." : "Expand or refresh to load items.");
     private bool Matches(CatalogNode node) => Filter.Matches(node.FilterName, node.Entry.Owner);

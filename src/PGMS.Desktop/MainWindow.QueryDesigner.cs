@@ -25,7 +25,7 @@ public partial class MainWindow
         {
             string refusal = statement is null ? QueryDesignerRefusal : QueryDesignerStatementRefusal;
             if (QueryDesignerRefused is { } report) report(refusal);
-            else MessageBox.Show(this, refusal, "PGMS", MessageBoxButton.OK, MessageBoxImage.Warning);
+            else LocalizedMessageBox.Show(this, refusal, "PGMS", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         var dialog = new QueryDesignerDialog(connection, selected) { Owner = this };

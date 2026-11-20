@@ -135,8 +135,8 @@ public partial class TableEditDialog : Window
     {
         if (busy) return;
         var request = Request;
-        if (request.Operation == TableOperation.Drop && MessageBox.Show(this, Target.Text + "\n\n" + request.ToSql() + "\n\nPermanently delete this table and all its rows, indexes, triggers and constraints? External dependencies prevent deletion.", "Drop Table", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-        if (request.Operation == TableOperation.DropColumn && MessageBox.Show(this, Target.Text + "\n\n" + request.ToSql() + "\n\nPermanently delete this column's values and local indexes/constraints using it? External dependencies prevent deletion.", "Drop Column", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (request.Operation == TableOperation.Drop && LocalizedMessageBox.Show(this, Target.Text + "\n\n" + request.ToSql() + "\n\nPermanently delete this table and all its rows, indexes, triggers and constraints? External dependencies prevent deletion.", "Drop Table", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (request.Operation == TableOperation.DropColumn && LocalizedMessageBox.Show(this, Target.Text + "\n\n" + request.ToSql() + "\n\nPermanently delete this column's values and local indexes/constraints using it? External dependencies prevent deletion.", "Drop Column", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         SetBusy(true); Feedback.Text = "Applying…";
         try { await new AdministrativeEditService(connection).ApplyAsync(request); WasApplied = true; busy = false; DialogResult = true; }
         catch (Exception ex) when (ex is NpgsqlException or System.IO.IOException or TimeoutException or InvalidOperationException or ArgumentException) { Feedback.Text = ex is PostgresException pg ? $"{pg.SqlState}: {pg.MessageText}" : ex.Message; }

@@ -45,7 +45,7 @@ internal static class RolePasswordInput
             RolePasswordTransport.Loopback => "The connection is loopback without guaranteed TLS: the password verifier does not leave this computer. The secret is not saved.",
             _ => "WARNING: the connection is not encrypted. The password verifier will cross the network in clear text and can be captured for offline guessing. The secret is not saved."
         };
-        if (MessageBox.Show(owner, $"Set a new password for role {role}?\n{channel}", "Set Role Password", MessageBoxButton.YesNo, transport == RolePasswordTransport.Unencrypted ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return false;
+        if (LocalizedMessageBox.Show(owner, $"Set a new password for role {role}?\n{channel}", "Set Role Password", MessageBoxButton.YesNo, transport == RolePasswordTransport.Unencrypted ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return false;
         SecureString secret = password.SecurePassword.Copy(); setBusy(true); report("Applying password change…");
         bool applied = false; string message;
         try { await RolePasswordService.SetAsync(connection, role, secret, allowUnencrypted: allowUnencrypted); applied = true; message = "Password changed. Inspect or connect to verify access."; password.Clear(); confirm.Clear(); }

@@ -43,6 +43,7 @@ public partial class MainWindow
     {
         baseTitle ??= Title;
         foreach (var (view, document) in documents) document.ToolTip = QueryTabToolTip(document.Title.TrimEnd('*'), view.FilePath, view.ConnectionCaption);
+        foreach (var document in deferredQueries.Keys) document.ToolTip = QueryTabToolTip(document.Title.TrimEnd('*'), null, null); // restored: no file, not connected
         if (DockManager.Layout?.ActiveContent is not LayoutDocument active) { if (!OpenDocuments().Any()) Title = baseTitle; return; }
         string name = active.Title;
         Title = active.Content is QueryView { ConnectionCaption: { } caption } ? $"{name} - {caption} - {baseTitle}" : $"{name} - {baseTitle}";

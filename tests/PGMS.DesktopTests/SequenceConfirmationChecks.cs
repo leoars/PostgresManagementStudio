@@ -72,34 +72,24 @@ internal static class SequenceConfirmationChecks
                 Environment.Exit(1);
             }
             if (handled) return;
-            nint found = 0;
-            EnumThreadWindows(thread, (handle, _) =>
-            {
-                var name = new StringBuilder(64); GetClassName(handle, name, name.Capacity);
-                if (GetWindow(handle, 4) == ownerHandle && name.ToString() == "#32770") { found = handle; return false; }
-                return true;
-            }, 0);
-            if (found == 0)
-            {
-                return;
-            }
+            // The PGMS message box (M1138) owned by this window, answered through its own button, never by global input.
+            var found = owner.OwnedWindows.OfType<PgmsMessageBox>().FirstOrDefault(b => b.IsVisible);
+            if (found is null) return;
             handled = true;
             try
             {
-                long defaultId = SendMessage(found, 0x0400, 0, 0).ToInt64();
-                check((defaultId & 0xffff) == 7 && (defaultId >> 16) == 0x534b, "native sequence confirmation defaults to No");
-                check(!IsWindowEnabled(ownerHandle), "native sequence confirmation disables its owner");
-                check(GetDlgItem(found, 6) != 0 && GetDlgItem(found, 7) != 0, "native sequence confirmation exposes Yes and No");
+                check(found.DefaultResult == MessageBoxResult.No, "sequence confirmation defaults to No");
+                check(!IsWindowEnabled(ownerHandle), "sequence confirmation disables its owner");
+                check(found.Choices.SequenceEqual([MessageBoxResult.Yes, MessageBoxResult.No]), "sequence confirmation exposes Yes and No");
             }
             catch (Exception ex) { failure = ex; }
-            SetActiveWindow(found);
-            SendMessage(GetDlgItem(found, failure is null && yes ? 6 : 7), 0x00f5, 0, 0); // BM_CLICK
+            found.Answer(failure is null && yes ? MessageBoxResult.Yes : MessageBoxResult.No);
         };
         timer.Start();
         try { await apply(); }
         finally { timer.Stop(); }
         if (failure is not null) throw failure;
-        check(handled, "sequence Apply presents a real native confirmation");
+        check(handled, "sequence Apply presents a real modal confirmation");
     }
 
     private delegate bool WindowCallback(nint handle, nint parameter);

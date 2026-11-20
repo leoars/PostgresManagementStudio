@@ -13,20 +13,44 @@ internal sealed class WindowWorkArea
     private HwndSource? source;
     private DispatcherOperation? pending;
     private bool moving, closed, applying;
-    internal static void Attach(Window window) => _ = new WindowWorkArea(window);
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Window, WindowWorkArea> attached = new();
+    private static bool everyWindow;
+
+    internal static void Attach(Window window)
+    {
+        if (!attached.TryGetValue(window, out _)) attached.Add(window, new WindowWorkArea(window));
+    }
+
+    /// <summary>B5 (M1134): every PGMS window is kept inside the work area of its monitor, not only the main window and the few dialogs
+    /// that attached themselves. At 175% on a 1080p screen (577 DIP of height) AI Assistant Settings (620 DIP) and about thirty
+    /// administrative dialogs taller than that opened with their buttons below the taskbar. AvalonDock's floating windows are left alone.</summary>
+    internal static void AttachToEveryWindow()
+    {
+        if (everyWindow) return;
+        everyWindow = true;
+        // Loaded reaches no class handler on a Window (it is raised straight on the instance); SizeChanged does, on the first layout of every window.
+        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.SizeChangedEvent, new SizeChangedEventHandler((sender, _) =>
+        {
+            if (sender is Window window && window.GetType().Namespace?.StartsWith("AvalonDock", StringComparison.Ordinal) != true) Attach(window);
+        }));
+    }
 
     private WindowWorkArea(Window window)
     {
         this.window = window;
         minimumWidth = window.MinWidth; minimumHeight = window.MinHeight;
-        window.SourceInitialized += (_, _) =>
-        {
-            source = HwndSource.FromHwnd(new WindowInteropHelper(window).Handle);
-            source?.AddHook(OnMessage); Queue();
-        };
+        window.SourceInitialized += (_, _) => Hook();
+        if (new WindowInteropHelper(window).Handle != 0) Hook();
         window.Loaded += (_, _) => Queue();
         window.StateChanged += (_, _) => Queue();
         window.Closed += (_, _) => { closed = true; pending?.Abort(); source?.RemoveHook(OnMessage); source = null; };
+    }
+
+    private void Hook()
+    {
+        if (source is not null || closed) return;
+        source = HwndSource.FromHwnd(new WindowInteropHelper(window).Handle);
+        source?.AddHook(OnMessage); Queue();
     }
 
     private nint OnMessage(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)

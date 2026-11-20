@@ -27,8 +27,17 @@ public partial class OptionsDialog
     internal bool SelectPagePath(string path)
     {
         foreach (var (pagePath, page) in LeafPages())
-            if (string.Equals(pagePath, path, StringComparison.OrdinalIgnoreCase)) { page.IsSelected = true; return true; }
+            if (string.Equals(pagePath, path, StringComparison.OrdinalIgnoreCase) || string.Equals(PathIn(page, translated: true), path, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(PathIn(page, translated: false), path, StringComparison.OrdinalIgnoreCase)) { page.IsSelected = true; return true; }
         return false;
+    }
+
+    /// <summary>The path of a page in English or in the interface language, whether or not the tree was translated yet (M1129): the Search index
+    /// is built from a translated window, and the window it opens may not be translated when the page is selected.</summary>
+    private static string PathIn(TreeViewItem page, bool translated)
+    {
+        string Name(TreeViewItem item) { var english = Localization.EnglishHeader(item, item.Header) as string ?? ""; return FeatureSearch.Text(translated ? Localization.T(english) : english); }
+        return page.Parent is TreeViewItem category ? Name(category) + " > " + Name(page) : Name(page);
     }
 
     private IEnumerable<(string Path, TreeViewItem Page)> LeafPages()

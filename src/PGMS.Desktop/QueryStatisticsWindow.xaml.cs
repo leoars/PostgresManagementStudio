@@ -434,7 +434,7 @@ public partial class QueryStatisticsWindow : Window
     internal async Task ResetSelectedAsync(bool? confirmed)
     {
         if (busy || Availability?.IsReadable != true || Statements.SelectedItem is not QueryStatisticsEntry { CanResetIndividually: true } selected) return;
-        bool proceed = confirmed ?? MessageBox.Show(this, $"Discard the statistics of query {selected.QueryId} for database \"{selected.Database}\" and user \"{selected.User}\"?\n\nOther statements keep their counters. This cannot be undone and PostgreSQL must authorize the call.", "Reset Selected Statement", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+        bool proceed = confirmed ?? LocalizedMessageBox.Show(this, $"Discard the statistics of query {selected.QueryId} for database \"{selected.Database}\" and user \"{selected.User}\"?\n\nOther statements keep their counters. This cannot be undone and PostgreSQL must authorize the call.", "Reset Selected Statement", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
         if (!proceed) { Status.Text = "Selective reset not performed."; return; }
         SetBusy(true);
         try
@@ -451,7 +451,7 @@ public partial class QueryStatisticsWindow : Window
     internal async Task ResetAsync(bool? confirmed)
     {
         if (busy || Availability?.IsReadable != true) return;
-        bool proceed = confirmed ?? MessageBox.Show(this, "Discard all pg_stat_statements entries on this server?\n\nThis affects every database and user on the server and cannot be undone. PostgreSQL must authorize the call.", "Reset Statistics", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+        bool proceed = confirmed ?? LocalizedMessageBox.Show(this, "Discard all pg_stat_statements entries on this server?\n\nThis affects every database and user on the server and cannot be undone. PostgreSQL must authorize the call.", "Reset Statistics", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
         if (!proceed) { Status.Text = "Reset not performed."; return; }
         SetBusy(true);
         try

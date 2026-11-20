@@ -96,7 +96,8 @@ if (args.Contains("--table-design")) { await TableDesignChecks.RunAsync(connecti
 if (args.Length == 0) await TableDesignChecks.RunAsync(connection,Check);
 if (args.Contains("--diagrams")) { await DiagramChecks.RunAsync(connection,Check); await CatalogObjectChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} database diagram checks passed."); return; }
 if (args.Length == 0) { await DiagramChecks.RunAsync(connection,Check); await CatalogObjectChecks.RunAsync(connection,Check); }
-if (args.Contains("--results-text")) { await ResultsTextChecks.RunAsync(connection,Check); await LiveQueryProgressChecks.RunAsync(connection,Check); await SchemaCompareChecks.RunAsync(connection,Check); await ExtensionTypeChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} results text checks passed."); return; }
+if (args.Contains("--results-text")) { await ResultsTextChecks.RunAsync(connection,Check); await LiveQueryProgressChecks.RunAsync(connection,Check); await SchemaCompareChecks.RunAsync(connection,Check); await ExtensionTypeChecks.RunAsync(connection,Check); await SpatialChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} results text checks passed."); return; }
+if (args.Contains("--spatial")) { await ExtensionTypeChecks.RunAsync(connection,Check); await SpatialChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} spatial checks passed."); return; }
 if (args.Length == 0) { await ResultsTextChecks.RunAsync(connection,Check); await LiveQueryProgressChecks.RunAsync(connection,Check); await SchemaCompareChecks.RunAsync(connection,Check); }
 if (args.Contains("--reports")) { await ServerReportChecks.RunAsync(connection,Check); Console.WriteLine($"{passed} server report checks passed."); return; }
 if (args.Length == 0) await ServerReportChecks.RunAsync(connection,Check);
@@ -243,6 +244,19 @@ try
     await session.ExecuteAsync("ROLLBACK;");
     var schemas = await catalog.ChildrenAsync(new(CatalogKind.Schemas, "Schemas", "postgres"));
     Check(schemas.Any(s => s.Name == schemaName), "empty schema appears; administration does not use editor transaction");
+    // M1143: Object Explorer ▸ General ▸ Hide system objects.
+    Check(!schemas.Any(s => s.Name is "pg_catalog" or "information_schema"), "system schemas are hidden by default");
+    var withSystem = new CatalogService(catalog.ConnectionFor("postgres")) { ShowSystemObjects = true };
+    // M1145: they go to the System Schemas and System Databases folders, the first child of each folder.
+    var shownSchemas = await withSystem.ChildrenAsync(new(CatalogKind.Schemas, "Schemas", "postgres"));
+    var systemSchemas = await withSystem.ChildrenAsync(shownSchemas[0]);
+    Check(shownSchemas[0].Kind == CatalogKind.SystemSchemas && shownSchemas[0].Name == CatalogService.SystemSchemasFolder && !shownSchemas.Any(s => s.Name is "pg_catalog" or "information_schema")
+        && systemSchemas.Select(s => s.Name).SequenceEqual(["information_schema", "pg_catalog"]), "with system objects shown, pg_catalog and information_schema are listed in System Schemas, without pg_toast");
+    var shownDatabases = await withSystem.ChildrenAsync(new(CatalogKind.Databases, "Databases"));
+    var systemDatabases = await withSystem.ChildrenAsync(shownDatabases[0]);
+    Check(shownDatabases[0].Kind == CatalogKind.SystemDatabases && systemDatabases.Any(d => d.Name.StartsWith("template1", StringComparison.Ordinal)) && !shownDatabases.Any(d => d.Name.StartsWith("template1", StringComparison.Ordinal))
+        && !(await catalog.ChildrenAsync(new(CatalogKind.Databases, "Databases"))).Any(d => d.Kind == CatalogKind.SystemDatabases || d.Name.StartsWith("template1", StringComparison.Ordinal)),
+        "template databases are listed in System Databases only when system objects are shown");
     string schemaId = SqlIdentifier.Quote(schemaName);
     await session.ExecuteAsync($"CREATE TABLE {schemaId}.sample(id integer PRIMARY KEY, note text); CREATE FUNCTION {schemaId}.f(a integer) RETURNS integer LANGUAGE sql AS 'SELECT a'; CREATE FUNCTION {schemaId}.f(a text) RETURNS text LANGUAGE sql AS 'SELECT a';");
     var tables = await catalog.ChildrenAsync(new(CatalogKind.Tables, "Tables", "postgres", schemaName));

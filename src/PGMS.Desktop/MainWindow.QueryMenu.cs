@@ -192,6 +192,7 @@ public partial class MainWindow
         var from = origin ?? (null, title);
         view.Diagram.MissingIndexDetailsRequested += async suggestions => await OpenMissingIndexScriptAsync(from, suggestions);
         var document = new AvalonDock.Layout.LayoutDocument { Title = planDocumentSequence++ == 0 ? title : $"{title} {planDocumentSequence}", ContentId = Guid.NewGuid().ToString(), Content = view };
+        AttachPlanCommands(view.Diagram, () => document.Title);
         planDocuments.Add(view);
         document.Closed += (_, _) => { planDocuments.Remove(view); RefreshCommands(); };
         AddDocument(document);

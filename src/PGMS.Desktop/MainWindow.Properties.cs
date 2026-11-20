@@ -56,6 +56,8 @@ public partial class MainWindow
         else if (anchorable.Content is null) anchorable.Content = PropertiesContent;
         RefreshPropertiesWindow(force: true);
         anchorable.Show(); anchorable.IsActive = true;
+        SizeNewPane(anchorable);
+        FocusToolContent(PropertiesContent as FrameworkElement);
     }
 
     /// <summary>F4 opens the Properties window, except in a combo box, where F4 opens the list as in Windows.</summary>

@@ -77,7 +77,7 @@ public partial class ServerTlsDialog : Window
         try { bundle = CreateBundle(); }
         catch (ArgumentException ex) { Feedback.Text = ex.Message; return; }
         string names = bundle.Names.Count > 0 ? string.Join(", ", bundle.Names) : bundle.Subject;
-        if (confirm && MessageBox.Show(this, $"Enable TLS on {host}:{port} with this certificate?\n\nNames: {names}\nValid until: {bundle.NotAfter:yyyy-MM-dd}\n{(bundle.SelfSigned ? "Self-signed" : "Issued by a certificate authority")}\n\nNew connections will use it after a configuration reload; nothing is restarted.", "Configure Server TLS", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (confirm && LocalizedMessageBox.Show(this, $"Enable TLS on {host}:{port} with this certificate?\n\nNames: {names}\nValid until: {bundle.NotAfter:yyyy-MM-dd}\n{(bundle.SelfSigned ? "Self-signed" : "Issued by a certificate authority")}\n\nNew connections will use it after a configuration reload; nothing is restarted.", "Configure Server TLS", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         SetBusy(true); Feedback.Text = "Writing certificate files, enabling TLS and verifying a new session…";
         string message;
         try

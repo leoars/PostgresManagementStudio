@@ -25,7 +25,7 @@ public partial class OptionsDialog
     {
         foreach (var category in Pages.Items.OfType<TreeViewItem>())
             foreach (var page in category.Items.OfType<TreeViewItem>().Prepend(category))
-                if (string.Equals(page.Header as string, header, StringComparison.OrdinalIgnoreCase) && page.Items.Count == 0) { page.IsSelected = true; return; }
+                if ((string.Equals(page.Header as string, header, StringComparison.OrdinalIgnoreCase) || string.Equals(Localization.EnglishHeader(page, null) as string, header, StringComparison.OrdinalIgnoreCase)) && page.Items.Count == 0) { page.IsSelected = true; return; }
     }
 
     internal IReadOnlyList<string> ShownCommands => KeyboardCommandList.Items.Cast<string>().ToList();

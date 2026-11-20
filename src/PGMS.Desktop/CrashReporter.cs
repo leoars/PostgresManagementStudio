@@ -77,7 +77,7 @@ internal static partial class CrashReporter
         if (!terminating) return;
         try
         {
-            MessageBox.Show($"PGMS hit an unexpected error and has to close.{Environment.NewLine}{Environment.NewLine}{Mask(error.Message)}{Environment.NewLine}{Environment.NewLine}" + (logFile is null ? "The details could not be saved." : $"The details were saved to:{Environment.NewLine}{logFile}"), "PGMS", MessageBoxButton.OK, MessageBoxImage.Error);
+            LocalizedMessageBox.Show($"PGMS hit an unexpected error and has to close.{Environment.NewLine}{Environment.NewLine}{Mask(error.Message)}{Environment.NewLine}{Environment.NewLine}" + (logFile is null ? "The details could not be saved." : $"The details were saved to:{Environment.NewLine}{logFile}"), "PGMS", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         catch
         {

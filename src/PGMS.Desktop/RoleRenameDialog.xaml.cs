@@ -24,7 +24,7 @@ public partial class RoleRenameDialog : Window
     public async Task ApplyAsync()
     {
         if (busy) return; var request = Request; var c = new NpgsqlConnectionStringBuilder(connection);
-        if (MessageBox.Show(this, $"Rename role {request.Name} to {request.NewName}?\nServer: {c.Host}:{c.Port}\n\n{request.ToSql()}", "Rename Role", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (LocalizedMessageBox.Show(this, $"Rename role {request.Name} to {request.NewName}?\nServer: {c.Host}:{c.Port}\n\n{request.ToSql()}", "Rename Role", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         SetBusy(true); Feedback.Text = "Applying…";
         try { await new AdministrativeEditService(connection).ApplyAsync(request); WasApplied = true; busy = false; DialogResult = true; }
         catch (Exception ex) when (ex is NpgsqlException or IOException or TimeoutException or InvalidOperationException or ArgumentException) { Feedback.Text = ex is PostgresException pg ? $"{pg.SqlState}: {pg.MessageText}" : ex.Message; }

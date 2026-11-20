@@ -31,7 +31,7 @@ internal static class ColumnSelectionPrompt
 {
     public static IReadOnlyList<string>? Show(Window? owner, IReadOnlyList<string> current)
     {
-        var boxes = DiagramColumnFields.All.Select(f => new CheckBox { Content = f, IsChecked = current.Contains(f), Margin = new Thickness(0, 3, 0, 3) }).ToArray();
+        var boxes = DiagramColumnFields.All.Select(f => new CheckBox { Content = f, Tag = f, IsChecked = current.Contains(f), Margin = new Thickness(0, 3, 0, 3) }).ToArray();
         var ok = new Button { Content = "OK", Width = 76, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
         var cancel = new Button { Content = "Cancel", Width = 76, IsCancel = true };
         var fields = new StackPanel { Margin = new Thickness(0, 6, 0, 12) };
@@ -42,7 +42,7 @@ internal static class ColumnSelectionPrompt
             Content = new StackPanel { Margin = new Thickness(12), Children = { new TextBlock { Text = "Show these fields after the column name:", TextWrapping = TextWrapping.Wrap }, fields, new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Children = { ok, cancel } } } }
         };
         ok.Click += (_, _) => dialog.DialogResult = true;
-        return dialog.ShowDialog() == true ? boxes.Where(b => b.IsChecked == true).Select(b => (string)b.Content).ToArray() : null;
+        return dialog.ShowDialog() == true ? boxes.Where(b => b.IsChecked == true).Select(b => (string)b.Tag).ToArray() : null;
     }
 }
 

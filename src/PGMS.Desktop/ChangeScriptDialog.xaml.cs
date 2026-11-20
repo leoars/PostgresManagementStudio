@@ -24,6 +24,6 @@ public partial class ChangeScriptDialog : Window
         var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "SQL files (*.sql)|*.sql|All files (*.*)|*.*", DefaultExt = ".sql", FileName = "ChangeScript.sql" };
         if (dialog.ShowDialog(this) != true) return;
         try { File.WriteAllText(dialog.FileName, Script.Text, new UTF8Encoding(false)); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { MessageBox.Show(this, ex.Message, "PGMS", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { LocalizedMessageBox.Show(this, ex.Message, "PGMS", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 }

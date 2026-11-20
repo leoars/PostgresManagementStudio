@@ -61,7 +61,7 @@ public partial class ColumnTypeDialog : Window
     {
         if(busy || !ApplyButton.IsEnabled)return;var request=Request;
         string confirmation=add?"Add this column? Domain defaults and constraints apply to existing rows.":"Convert stored values? Casts may truncate or round values. Review backups before applying.";
-        if(MessageBox.Show(this,Target.Text+"\n\n"+request.ToSql()+"\n\n"+confirmation,add?"Confirm Column Addition":"Confirm Column Conversion",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Operation canceled. Nothing was sent.";return;}
+        if(LocalizedMessageBox.Show(this,Target.Text+"\n\n"+request.ToSql()+"\n\n"+confirmation,add?"Confirm Column Addition":"Confirm Column Conversion",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Operation canceled. Nothing was sent.";return;}
         using var source=new CancellationTokenSource();cancellation=source;busy=true;RequiresParentRefresh=true;Update(true);CancelButton.Focus();Feedback.Text=add?"Adding column…":"Converting column…";
         try{await new AdministrativeEditService(connection).ApplyAsync(request,source.Token);WasApplied=true;Feedback.Text="Command completed. Inspect the column before another change.";}
         catch(Exception ex)when(ex is NpgsqlException or System.IO.IOException or TimeoutException or OperationCanceledException or InvalidOperationException or ArgumentException){Feedback.Text=(source.IsCancellationRequested?"Conversion interrupted.":ex is PostgresException pg?$"{pg.SqlState}: {pg.MessageText}":ex.Message)+" Result not confirmed. Inspect before retrying; cancellation cannot undo a completed commit.";}

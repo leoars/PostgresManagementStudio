@@ -21,6 +21,8 @@ public partial class QueryView : UserControl, IAsyncDisposable
     internal static readonly RoutedUICommand CopyWithoutHeaders = new("Copy without headers", nameof(CopyWithoutHeaders), typeof(QueryView));
     public Guid RecoveryId { get; }
     public long RecoveryRevision{get;private set;}
+    /// <summary>State kept with the draft changed outside the text (Pin Tab): the next checkpoint writes the draft again.</summary>
+    internal void MarkRecoveryChanged()=>RecoveryRevision++;
     public long EditRevision { get; private set; }
     public string? FilePath { get; internal set; }
     public SqlFileVersion? FileVersion { get; internal set; }
@@ -191,6 +193,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
         Messages.Clear();
         ClearResultPages();
         ResultSets.Items.Clear();
+        ApplyResultSetLayout();
         displayLimited = false;
         resultsIncomplete = true;
         UpdateExport();
@@ -266,8 +269,7 @@ public partial class QueryView : UserControl, IAsyncDisposable
         foreach (DataColumn column in table.Columns)
         {
             string path = $"[{column.ColumnName}]";
-            var text = new DataGridTextColumn { Header = column.Caption, SortMemberPath = column.ColumnName, CellStyle = ResultGridStyle.NullAwareCell(path),
-                Binding = new Binding(path) { Converter = new DatabaseValueConverter() } };
+            var text = ResultGridStyle.TextColumn(column.Caption, column.ColumnName);
             if (QueryOptions.DisplayJsonAsLink && types is not null && column.Ordinal < types.Count && ResultJson.MayHoldJson(types[column.Ordinal]))
                 text.ElementStyle = ResultGridStyle.JsonLinkText(path, OpenJsonLink);
             grid.Columns.Add(text);

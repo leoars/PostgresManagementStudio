@@ -116,7 +116,7 @@ public partial class IdentityColumnDialog:Window
         if(request.Operation is IdentityColumnOperation.Drop or IdentityColumnOperation.Restart)
         {
             string message=request.Operation==IdentityColumnOperation.Drop?"Remove automatic generation and its internal sequence? Existing values and NOT NULL remain.":"Restart the next identity value at "+request.RestartValue!.Value.ToString(CultureInfo.InvariantCulture)+"? Existing rows are unchanged; future values may conflict with them.";
-            if(MessageBox.Show(this,Target.Text+"\n\n"+request.ToSql()+"\n\n"+message,"Confirm Identity Change",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Identity change canceled. Nothing was sent.";return;}
+            if(LocalizedMessageBox.Show(this,Target.Text+"\n\n"+request.ToSql()+"\n\n"+message,"Confirm Identity Change",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes){Feedback.Text="Identity change canceled. Nothing was sent.";return;}
         }
         using var source=new CancellationTokenSource();cancellation=source;SetBusy(true);Feedback.Text="Applying identity change…";RequiresParentRefresh=true;
         try{await new AdministrativeEditService(connection).ApplyAsync(request,source.Token);WasApplied=true;Feedback.Text="Command completed. Inspect current identity metadata before another change.";}

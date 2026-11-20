@@ -36,9 +36,103 @@ public partial class OptionsDialog : Window
         DefaultTableViewBox.SelectedItem = DefaultTableViewBox.Items.OfType<ComboBoxItem>().First(i => (string)i.Tag == designers.DefaultTableView.ToString());
         LaunchAddTableBox.IsChecked = designers.LaunchAddTableOnNewDiagram;
         SelectRecentBox.IsChecked = document.AutoSelectRecentConnection;
+        CheckForUpdatesBox.IsChecked = document.CheckForUpdates;
+        // Same as Microsoft Windows (no saved language) first, then the languages by their own names.
+        LanguageBox.Items.Add(new ComboBoxItem { Content = "Same as Microsoft Windows", Tag = "" });
+        foreach (var (code, name) in Localization.Languages) LanguageBox.Items.Add(new ComboBoxItem { Content = name, Tag = code });
+        LanguageBox.SelectedItem = LanguageBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == (document.Language ?? "")) ?? LanguageBox.Items[0];
         QueryShortcutsGrid.ItemsSource = shortcutRows = EnvironmentOptions.Document.QueryShortcutKeys.Select(k => new QueryShortcutRow(k) { Text = document.QueryShortcut(k) ?? "" }).ToList();
+        var editor = document.EditorSettings;
+        EditorWordWrapBox.IsChecked = editor.WordWrap; EditorLineNumbersBox.IsChecked = editor.LineNumbers; EditorIntelliSenseBox.IsChecked = editor.IntelliSense;
+        EditorTabSizeBox.Text = editor.TabSize.ToString(CultureInfo.InvariantCulture);
+        EditorInsertSpacesBox.IsChecked = editor.InsertSpaces; EditorKeepTabsBox.IsChecked = !editor.InsertSpaces;
         LoadFontsAndColors(document.Appearance);
         LoadKeyboard(document, commands ?? []);
+        // M1141: Environment ▸ AutoRecover, Documents, Tabs and Windows.
+        var recovery = document.Recovery;
+        AutoRecoverBox.IsChecked = recovery.Enabled;
+        AutoRecoverIntervalBox.Text = recovery.IntervalMinutes.ToString(CultureInfo.InvariantCulture);
+        AutoRecoverLifetimeBox.Text = recovery.LifetimeDays.ToString(CultureInfo.InvariantCulture);
+        var files = document.DocumentOptions;
+        DetectChangesBox.IsChecked = files.DetectChanges; ReloadUnmodifiedBox.IsChecked = files.ReloadUnmodified; AllowReadOnlyBox.IsChecked = files.AllowEditingReadOnly;
+        OpenFromActiveBox.IsChecked = files.OpenFromActiveDirectory; CheckLineEndingsBox.IsChecked = files.CheckLineEndings; SaveInBackgroundBox.IsChecked = files.SaveInBackground;
+        UseSaveEncodingBox.IsChecked = files.UseSaveEncoding;
+        SaveEncodingBox.SelectedItem = SaveEncodingBox.Items.OfType<ComboBoxItem>().First(i => (string)i.Tag == files.SaveEncoding.ToString());
+        var tabs = document.TabsSettings;
+        InsertTabsRightBox.IsChecked = tabs.InsertTabsToRight; SkipLayoutConfirmBox.IsChecked = tabs.SkipLayoutConfirmation;
+        LoadFormatter(document.FormatterSettings);
+        // M1143: Table Options, Object Explorer ▸ General and rename, Live Query Statistics.
+        OverrideTimeoutBox.IsChecked = designers.OverrideTimeout;
+        DesignerTimeoutBox.Text = designers.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+        WarnNoPrimaryKeyBox.IsChecked = designers.WarnNoPrimaryKey;
+        var explorer = document.ExplorerSettings;
+        HideSystemObjectsBox.IsChecked = explorer.HideSystemObjects; ConfirmRenameBox.IsChecked = explorer.ConfirmRename;
+        LivePollingBox.Text = document.LiveStatistics.PollingMilliseconds.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private (CheckBox Box, Func<SqlFormatterSettings, bool> Get, Func<SqlFormatterSettings, bool, SqlFormatterSettings> Set)[] FormatterBoxes => [
+        (FormatAlignBodiesBox, s => s.AlignClauseBodies, (s, v) => s with { AlignClauseBodies = v }), (FormatOnSaveBox, s => s.FormatOnSave, (s, v) => s with { FormatOnSave = v }),
+        (FormatMultiSelectBox, s => s.MultilineSelectList, (s, v) => s with { MultilineSelectList = v }), (FormatMultiSetBox, s => s.MultilineSetItems, (s, v) => s with { MultilineSetItems = v }),
+        (FormatMultiWhereBox, s => s.MultilineWherePredicates, (s, v) => s with { MultilineWherePredicates = v }), (FormatMultiGroupBox, s => s.MultilineGroupBy, (s, v) => s with { MultilineGroupBy = v }),
+        (FormatMultiHavingBox, s => s.MultilineHavingPredicates, (s, v) => s with { MultilineHavingPredicates = v }), (FormatMultiOrderBox, s => s.MultilineOrderBy, (s, v) => s with { MultilineOrderBy = v }),
+        (FormatMultiValuesBox, s => s.MultilineValues, (s, v) => s with { MultilineValues = v }),
+        (FormatNlFromBox, s => s.NewLineBeforeFrom, (s, v) => s with { NewLineBeforeFrom = v }), (FormatNlWhereBox, s => s.NewLineBeforeWhere, (s, v) => s with { NewLineBeforeWhere = v }),
+        (FormatNlGroupBox, s => s.NewLineBeforeGroupBy, (s, v) => s with { NewLineBeforeGroupBy = v }), (FormatNlHavingBox, s => s.NewLineBeforeHaving, (s, v) => s with { NewLineBeforeHaving = v }),
+        (FormatNlOrderBox, s => s.NewLineBeforeOrderBy, (s, v) => s with { NewLineBeforeOrderBy = v }), (FormatNlOffsetBox, s => s.NewLineBeforeOffset, (s, v) => s with { NewLineBeforeOffset = v }),
+        (FormatNlWindowBox, s => s.NewLineBeforeWindow, (s, v) => s with { NewLineBeforeWindow = v }), (FormatNlReturningBox, s => s.NewLineBeforeReturning, (s, v) => s with { NewLineBeforeReturning = v }),
+        (FormatNlJoinBox, s => s.NewLineBeforeJoin, (s, v) => s with { NewLineBeforeJoin = v }), (FormatNlAfterJoinBox, s => s.NewLineAfterJoin, (s, v) => s with { NewLineAfterJoin = v }),
+        (FormatNlOnBox, s => s.NewLineBeforeOn, (s, v) => s with { NewLineBeforeOn = v }), (FormatNlCloseBox, s => s.NewLineBeforeClosingParenthesis, (s, v) => s with { NewLineBeforeClosingParenthesis = v }),
+        (FormatTypeSpaceBox, s => s.SpaceBetweenTypeAndParameters, (s, v) => s with { SpaceBetweenTypeAndParameters = v })];
+
+    private void LoadFormatter(SqlFormatterSettings settings)
+    {
+        foreach (var (box, get, _) in FormatterBoxes) box.IsChecked = get(settings);
+        FormatCasingBox.SelectedItem = FormatCasingBox.Items.OfType<ComboBoxItem>().First(i => (string)i.Tag == settings.KeywordCasing.ToString());
+        FormatIndentBox.Text = settings.IndentationSize.ToString(CultureInfo.InvariantCulture);
+        FormatNewLinesBox.Text = settings.NewLinesAfterStatement.ToString(CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>The SQL Formatter pages (M1142), or null after showing what is wrong.</summary>
+    private SqlFormatterSettings? ReadFormatter()
+    {
+        int? indent = ParseRange(FormatIndentBox.Text, SqlFormatterSettings.MinIndentation, SqlFormatterSettings.MaxIndentation);
+        int? lines = ParseRange(FormatNewLinesBox.Text, 0, SqlFormatterSettings.MaxNewLines);
+        if (indent is null || lines is null)
+        {
+            var (wrong, page) = indent is null ? (FormatIndentBox, FormatIndentationPage) : (FormatNewLinesBox, FormatNewLinePage);
+            var error = indent is null ? FormatterError : FormatNewLinesError;
+            error.Text = indent is null ? $"Enter an indentation size from {SqlFormatterSettings.MinIndentation} to {SqlFormatterSettings.MaxIndentation}." : $"Enter a number of new lines from 0 to {SqlFormatterSettings.MaxNewLines}.";
+            error.Visibility = Visibility.Visible;
+            page.IsSelected = true;
+            System.Windows.Input.FocusManager.SetFocusedElement(this, wrong);
+            wrong.Focus(); wrong.SelectAll();
+            return null;
+        }
+        var settings = new SqlFormatterSettings(Enum.Parse<SqlKeywordCasing>((string)((ComboBoxItem)FormatCasingBox.SelectedItem).Tag)) with { IndentationSize = indent.Value, NewLinesAfterStatement = lines.Value };
+        foreach (var (box, _, set) in FormatterBoxes) settings = set(settings, box.IsChecked == true);
+        return settings;
+    }
+
+    /// <summary>The Environment pages of M1141, or null after showing what is wrong.</summary>
+    private (AutoRecoverSettings Recovery, DocumentSettings Documents, TabsAndWindowsSettings Tabs)? ReadEnvironmentPages()
+    {
+        int? interval = ParseRange(AutoRecoverIntervalBox.Text, AutoRecoverSettings.MinInterval, AutoRecoverSettings.MaxInterval);
+        int? lifetime = ParseRange(AutoRecoverLifetimeBox.Text, AutoRecoverSettings.MinLifetime, AutoRecoverSettings.MaxLifetime);
+        if (interval is null || lifetime is null)
+        {
+            var wrong = interval is null ? AutoRecoverIntervalBox : AutoRecoverLifetimeBox;
+            AutoRecoverError.Text = interval is null ? $"Enter a backup interval from {AutoRecoverSettings.MinInterval} to {AutoRecoverSettings.MaxInterval} minutes." : $"Enter a lifetime from {AutoRecoverSettings.MinLifetime} to {AutoRecoverSettings.MaxLifetime} days.";
+            AutoRecoverError.Visibility = Visibility.Visible;
+            AutoRecoverPage.IsSelected = true;
+            System.Windows.Input.FocusManager.SetFocusedElement(this, wrong);
+            wrong.Focus(); wrong.SelectAll();
+            return null;
+        }
+        var recovery = new AutoRecoverSettings(AutoRecoverBox.IsChecked == true, interval.Value, lifetime.Value);
+        var documents = new DocumentSettings(DetectChangesBox.IsChecked == true, ReloadUnmodifiedBox.IsChecked == true, AllowReadOnlyBox.IsChecked == true, OpenFromActiveBox.IsChecked == true,
+            CheckLineEndingsBox.IsChecked == true, SaveInBackgroundBox.IsChecked == true, UseSaveEncodingBox.IsChecked == true, Enum.Parse<SqlFileFormat>((string)((ComboBoxItem)SaveEncodingBox.SelectedItem).Tag));
+        var tabs = new TabsAndWindowsSettings(InsertTabsRightBox.IsChecked == true, SkipLayoutConfirmBox.IsChecked == true);
+        return (recovery, documents, tabs);
     }
 
     private readonly List<QueryShortcutRow> shortcutRows = [];
@@ -57,7 +151,7 @@ public partial class OptionsDialog : Window
     internal async Task ClearHistoryAsync()
     {
         if (clearHistory is null) return;
-        bool confirmed = ConfirmClearHistory?.Invoke() ?? MessageBox.Show(this, QueryHistoryWindow.ClearQuestion, "Clear Query History", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+        bool confirmed = ConfirmClearHistory?.Invoke() ?? LocalizedMessageBox.Show(this, QueryHistoryWindow.ClearQuestion, "Clear Query History", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
         if (!confirmed) return;
         ClearHistoryButton.IsEnabled = false; ClearHistoryStatus.Text = "Clearing…";
         try { int removed = await clearHistory(); ClearHistoryStatus.Text = $"Query History cleared: {removed:N0} execution(s) removed."; }
@@ -84,7 +178,24 @@ public partial class OptionsDialog : Window
         KeyboardPanel.Visibility = page == KeyboardPage ? Visibility.Visible : Visibility.Collapsed;
         DesignersPanel.Visibility = page == DesignersPage ? Visibility.Visible : Visibility.Collapsed;
         ConnectionDialogPanel.Visibility = page == ConnectionDialogPage ? Visibility.Visible : Visibility.Collapsed;
+        ProductUpdatesPanel.Visibility = page == ProductUpdatesPage ? Visibility.Visible : Visibility.Collapsed;
+        InternationalPanel.Visibility = page == InternationalPage ? Visibility.Visible : Visibility.Collapsed;
         FontsAndColorsPanel.Visibility = page == FontsAndColorsPage ? Visibility.Visible : Visibility.Collapsed;
+        TextEditorPanel.Visibility = page == TextEditorPage ? Visibility.Visible : Visibility.Collapsed;
+        AutoRecoverPanel.Visibility = page == AutoRecoverPage ? Visibility.Visible : Visibility.Collapsed;
+        DocumentsPanel.Visibility = page == DocumentsPage ? Visibility.Visible : Visibility.Collapsed;
+        TabsPanel.Visibility = page == TabsPage ? Visibility.Visible : Visibility.Collapsed;
+        TaskListPanel.Visibility = page == TaskListPage ? Visibility.Visible : Visibility.Collapsed;
+        WindowsPanel.Visibility = page == WindowsPage ? Visibility.Visible : Visibility.Collapsed;
+        FormatAlignmentPanel.Visibility = page == FormatAlignmentPage ? Visibility.Visible : Visibility.Collapsed;
+        FormatFormattingPanel.Visibility = page == FormatFormattingPage ? Visibility.Visible : Visibility.Collapsed;
+        FormatGeneralPanel.Visibility = page == FormatGeneralPage ? Visibility.Visible : Visibility.Collapsed;
+        FormatIndentationPanel.Visibility = page == FormatIndentationPage ? Visibility.Visible : Visibility.Collapsed;
+        FormatMultilinePanel.Visibility = page == FormatMultilinePage ? Visibility.Visible : Visibility.Collapsed;
+        FormatNewLinePanel.Visibility = page == FormatNewLinePage ? Visibility.Visible : Visibility.Collapsed;
+        FormatSpacingPanel.Visibility = page == FormatSpacingPage ? Visibility.Visible : Visibility.Collapsed;
+        ExplorerGeneralPanel.Visibility = page == ExplorerGeneralPage ? Visibility.Visible : Visibility.Collapsed;
+        LiveStatisticsPanel.Visibility = page == LiveStatisticsPage ? Visibility.Visible : Visibility.Collapsed;
         int shared = Array.IndexOf(SharedPages, page);
         QueryPages.Visibility = shared >= 0 ? Visibility.Visible : Visibility.Collapsed;
         if (shared >= 0) QueryPages.ShowPage(shared);
@@ -120,6 +231,16 @@ public partial class OptionsDialog : Window
             wrong.Focus(); wrong.SelectAll();
             return;
         }
+        if (ParseRange(EditorTabSizeBox.Text, TextEditorSettings.MinTabSize, TextEditorSettings.MaxTabSize) is not { } tabSize)
+        {
+            TextEditorError.Text = $"Enter a tab and indent size from {TextEditorSettings.MinTabSize} to {TextEditorSettings.MaxTabSize}.";
+            TextEditorError.Visibility = Visibility.Visible;
+            TextEditorPage.IsSelected = true;
+            System.Windows.Input.FocusManager.SetFocusedElement(this, EditorTabSizeBox);
+            EditorTabSizeBox.Focus(); EditorTabSizeBox.SelectAll();
+            return;
+        }
+        var textEditor = new TextEditorSettings(EditorWordWrapBox.IsChecked == true, EditorLineNumbersBox.IsChecked == true, tabSize, EditorInsertSpacesBox.IsChecked == true, EditorIntelliSenseBox.IsChecked == true);
         if (QueryPages.TryRead() is not { } queryDefaults) { SharedPages[QueryPages.RejectedPage].IsSelected = true; return; }
         int? days = ParseRange(HistoryDaysBox.Text, QueryHistorySettings.MinRetentionDays, QueryHistorySettings.MaxRetentionDays);
         int? count = ParseRange(HistoryCountBox.Text, QueryHistorySettings.MinExecutions, QueryHistorySettings.MaxExecutionsLimit);
@@ -141,14 +262,38 @@ public partial class OptionsDialog : Window
         var destination = DefaultResultsBox.SelectedIndex switch { 1 => ResultsDestination.Text, 2 => ResultsDestination.File, _ => ResultsDestination.Grid };
         var scripting = new PGMS.PostgreSql.ScriptingOptions(ScriptHeadersBox.IsChecked == true, ScriptDatabaseBox.IsChecked == true, ScriptExistenceBox.IsChecked == true);
         var tableView = Enum.Parse<DiagramTableView>((string)((ComboBoxItem)DefaultTableViewBox.SelectedItem).Tag);
-        var designers = new DesignerOptions(tableView, LaunchAddTableBox.IsChecked == true);
-        bool selectRecent = SelectRecentBox.IsChecked == true;
+        var designers = new DesignerOptions(tableView, LaunchAddTableBox.IsChecked == true, OverrideTimeoutBox.IsChecked == true,
+            ParseRange(DesignerTimeoutBox.Text, DesignerOptions.MinTimeout, DesignerOptions.MaxTimeout) ?? 3600, WarnNoPrimaryKeyBox.IsChecked == true);
+        bool selectRecent = SelectRecentBox.IsChecked == true, checkUpdates = CheckForUpdatesBox.IsChecked == true;
+        string? language = (LanguageBox.SelectedItem as ComboBoxItem)?.Tag is string { Length: > 0 } code ? code : null;
         if (ReadFontsAndColors() is not { } fontsAndColors) return;
+        if (ReadEnvironmentPages() is not { } environment) return;
+        if (ReadFormatter() is not { } formatter) return;
+        int? designerTimeout = ParseRange(DesignerTimeoutBox.Text, DesignerOptions.MinTimeout, DesignerOptions.MaxTimeout) ?? (OverrideTimeoutBox.IsChecked == true ? null : 3600);
+        int? polling = ParseRange(LivePollingBox.Text, LiveQueryStatisticsSettings.Min, LiveQueryStatisticsSettings.Max);
+        if (designerTimeout is null || polling is null)
+        {
+            var (wrong, error, page, message) = designerTimeout is null
+                ? (DesignerTimeoutBox, DesignersError, DesignersPage, $"Enter a time-out from {DesignerOptions.MinTimeout} to {DesignerOptions.MaxTimeout:N0} seconds.")
+                : (LivePollingBox, LivePollingError, LiveStatisticsPage, $"Enter a polling interval from {LiveQueryStatisticsSettings.Min} to {LiveQueryStatisticsSettings.Max:N0} milliseconds.");
+            error.Text = message; error.Visibility = Visibility.Visible; page.IsSelected = true;
+            if (designerTimeout is null) OverrideTimeoutBox.IsChecked = true;
+            System.Windows.Input.FocusManager.SetFocusedElement(this, wrong);
+            wrong.Focus(); wrong.SelectAll();
+            return;
+        }
+        designers = designers with { TimeoutSeconds = designerTimeout.Value };
+        var explorerOptions = new ObjectExplorerSettings(HideSystemObjectsBox.IsChecked == true, ConfirmRenameBox.IsChecked == true);
+        var live = new LiveQueryStatisticsSettings(polling.Value);
         QueryShortcutsGrid.CommitEdit(DataGridEditingUnit.Row, true);
         var shortcuts = shortcutRows.Where(r => !string.IsNullOrWhiteSpace(r.Text)).ToDictionary(r => r.Shortcut, r => r.Text.Trim());
         options.Update(d => d with { RestoreWindowPlacement = restore, Window = restore ? d.Window : null, SelectTopRows = selectTop.Value, EditTopRows = editTop.Value, DefaultResultsDestination = destination, QueryDefaults = queryDefaults, QueryHistory = historySettings,
-            RecentFilesCount = recentCount, RecentFiles = d.RecentFiles?.Take(recentCount).ToList(), Scripting = scripting, Designers = designers, AutoSelectRecentConnection = selectRecent, QueryShortcuts = shortcuts,
-            KeyboardShortcuts = keyboardShortcuts.Count == 0 ? null : new Dictionary<string, string>(keyboardShortcuts), FontsAndColors = fontsAndColors == new FontsAndColorsSettings() ? null : fontsAndColors });
+            RecentFilesCount = recentCount, RecentFiles = d.RecentFiles?.Take(recentCount).ToList(), Scripting = scripting, Designers = designers, AutoSelectRecentConnection = selectRecent, CheckForUpdates = checkUpdates, QueryShortcuts = shortcuts,
+            OptionsRevision = EnvironmentOptions.Document.CurrentOptionsRevision, KeyboardShortcuts = keyboardShortcuts.Count == 0 ? null : new Dictionary<string, string>(keyboardShortcuts), FontsAndColors = fontsAndColors == new FontsAndColorsSettings() ? null : fontsAndColors,
+            TextEditor = textEditor == new TextEditorSettings() ? null : textEditor, Language = language,
+            AutoRecover = environment.Recovery == new AutoRecoverSettings() ? null : environment.Recovery, Documents = environment.Documents == new DocumentSettings() ? null : environment.Documents,
+            TabsAndWindows = environment.Tabs == new TabsAndWindowsSettings() ? null : environment.Tabs, SqlFormatter = formatter == new SqlFormatterSettings() ? null : formatter,
+            ObjectExplorer = explorerOptions == new ObjectExplorerSettings() ? null : explorerOptions, LiveQueryStatistics = live == new LiveQueryStatisticsSettings() ? null : live });
         try { DialogResult = true; }
         catch (InvalidOperationException) { Close(); } // shown without ShowDialog
     }

@@ -2,11 +2,22 @@
  <Grid Margin="10">
   <Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <Grid.ColumnDefinitions><ColumnDefinition Width="190"/><ColumnDefinition/></Grid.ColumnDefinitions>
-  <TreeView x:Name="Pages" Background="{DynamicResource Pgms.ContentBackground}" AutomationProperties.Name="Option pages" SelectedItemChanged="PageChanged">
+  <TreeView x:Name="Pages" local:Localization.TranslateItems="True" Background="{DynamicResource Pgms.ContentBackground}" AutomationProperties.Name="Option pages" SelectedItemChanged="PageChanged">
    <TreeViewItem Header="Environment" IsExpanded="True">
     <TreeViewItem x:Name="GeneralPage" Header="General" IsSelected="True"/>
+    <!-- B1 review (M1141): AutoRecover, Documents, Tabs, Task List and Windows, in the SSMS 22.11 order. -->
+    <TreeViewItem x:Name="AutoRecoverPage" Header="AutoRecover"/>
+    <TreeViewItem x:Name="DocumentsPage" Header="Documents"/>
     <TreeViewItem x:Name="FontsAndColorsPage" Header="Fonts and Colors"/>
-    <TreeViewItem x:Name="KeyboardPage" Header="Keyboard"/><TreeViewItem x:Name="QueryShortcutsPage" Header="Query Shortcuts"/>
+    <TreeViewItem x:Name="InternationalPage" Header="International Settings"/>
+    <TreeViewItem x:Name="KeyboardPage" Header="Keyboard"/><TreeViewItem x:Name="ProductUpdatesPage" Header="Product Updates"/><TreeViewItem x:Name="QueryShortcutsPage" Header="Query Shortcuts"/>
+    <TreeViewItem x:Name="TabsPage" Header="Tabs"/>
+    <TreeViewItem x:Name="TaskListPage" Header="Task List"/>
+    <TreeViewItem x:Name="WindowsPage" Header="Windows"/>
+   </TreeViewItem>
+   <!-- SSMS 22.11 order: Environment, …, Text Editor, Languages, …, Connection Dialog (options-tree.txt, M1063). -->
+   <TreeViewItem Header="Text Editor" IsExpanded="True">
+    <TreeViewItem x:Name="TextEditorPage" Header="Transact-SQL"/>
    </TreeViewItem>
    <TreeViewItem x:Name="ConnectionDialogPage" Header="Connection Dialog"/>
    <TreeViewItem Header="Designers" IsExpanded="True">
@@ -15,6 +26,7 @@
    <TreeViewItem Header="Query Execution" IsExpanded="True">
     <TreeViewItem x:Name="ExecutionGeneralPage" Header="General"/>
     <TreeViewItem x:Name="ExecutionAdvancedPage" Header="Advanced"/>
+    <TreeViewItem x:Name="LiveStatisticsPage" Header="Live Query Statistics"/>
     <TreeViewItem x:Name="HistoryPage" Header="Query History"/>
    </TreeViewItem>
    <TreeViewItem Header="Query Results" IsExpanded="True">
@@ -22,7 +34,18 @@
     <TreeViewItem x:Name="ResultsGridPage" Header="Grid"/>
     <TreeViewItem x:Name="ResultsTextPage" Header="Text"/>
    </TreeViewItem>
+   <!-- B1 review (M1142): the seven SQL Formatter pages of SSMS 22.11, mapped to Format SQL. -->
+   <TreeViewItem Header="SQL Formatter" IsExpanded="True">
+    <TreeViewItem x:Name="FormatAlignmentPage" Header="Alignment"/>
+    <TreeViewItem x:Name="FormatFormattingPage" Header="Formatting"/>
+    <TreeViewItem x:Name="FormatGeneralPage" Header="General"/>
+    <TreeViewItem x:Name="FormatIndentationPage" Header="Indentation"/>
+    <TreeViewItem x:Name="FormatMultilinePage" Header="Multiline"/>
+    <TreeViewItem x:Name="FormatNewLinePage" Header="New Line"/>
+    <TreeViewItem x:Name="FormatSpacingPage" Header="Spacing"/>
+   </TreeViewItem>
    <TreeViewItem Header="Object Explorer" IsExpanded="True">
+    <TreeViewItem x:Name="ExplorerGeneralPage" Header="General"/>
     <TreeViewItem x:Name="CommandsPage" Header="Commands"/>
     <TreeViewItem x:Name="ScriptingPage" Header="Scripting"/>
    </TreeViewItem>
@@ -40,6 +63,22 @@
      </StackPanel>
      <TextBlock Text="From 1 to 24. The list keeps the query files opened or saved in PGMS by this Windows user." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,4,0,0"/>
      <TextBlock x:Name="GeneralError" Foreground="{DynamicResource Pgms.ErrorText}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
+    </StackPanel>
+    <StackPanel x:Name="TextEditorPanel" Visibility="Collapsed">
+     <TextBlock Text="General" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="EditorWordWrapBox" Content="_Word wrap"/>
+     <CheckBox x:Name="EditorLineNumbersBox" Content="_Line numbers" Margin="0,4,0,0"/>
+     <TextBlock Text="Tabs" FontWeight="SemiBold" Margin="0,14,0,6"/>
+     <StackPanel Orientation="Horizontal">
+      <Label Content="_Tab and indent size:" Target="{Binding ElementName=EditorTabSizeBox}" Padding="0" VerticalAlignment="Center"/>
+      <TextBox x:Name="EditorTabSizeBox" Width="50" Margin="8,0,0,0" AutomationProperties.Name="Tab and indent size"/>
+     </StackPanel>
+     <RadioButton x:Name="EditorInsertSpacesBox" Content="Insert _spaces" Margin="0,6,0,0" GroupName="EditorTabs"/>
+     <RadioButton x:Name="EditorKeepTabsBox" Content="_Keep tabs" Margin="0,4,0,0" GroupName="EditorTabs"/>
+     <TextBlock Text="IntelliSense" FontWeight="SemiBold" Margin="0,14,0,6"/>
+     <CheckBox x:Name="EditorIntelliSenseBox" Content="_Enable IntelliSense"/>
+     <TextBlock Text="Line numbers and tabs change every open query window at once. Word wrap and IntelliSense are where new query windows start; View ▸ Word Wrap and Query ▸ IntelliSense Enabled change only the active one." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,10,0,0"/>
+     <TextBlock x:Name="TextEditorError" Foreground="{DynamicResource Pgms.ErrorText}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
     </StackPanel>
     <StackPanel x:Name="QueryResultsPanel" Visibility="Collapsed">
      <TextBlock Text="General" FontWeight="SemiBold" Margin="0,0,0,6"/>
@@ -64,6 +103,26 @@
      </Grid>
      <TextBlock Text="Number of rows read by Select Top Rows and edited by Edit Top Rows on a table or view in Object Explorer. Defaults: 1000 and 200." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0"/>
      <TextBlock x:Name="CommandsError" Foreground="{DynamicResource Pgms.ErrorText}" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
+     <TextBlock Text="Rename" FontWeight="SemiBold" Margin="0,14,0,6"/>
+     <CheckBox x:Name="ConfirmRenameBox" Content="_Prompt to confirm the renaming of schema objects"/>
+     <CheckBox Content="Prepend dragged object name with schema and period" IsEnabled="False" Margin="0,4,0,0"/>
+     <CheckBox Content="Surround object names with quotes when dragged" IsEnabled="False" Margin="0,4,0,0"/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,6,0,0" Text="Renaming a key, constraint or trigger in place (F2) asks before running ALTER … RENAME. Objects cannot be dragged from Object Explorer to the editor in PGMS, so the drag options are disabled; the audit and PowerShell options of SSMS have no PostgreSQL counterpart."/>
+    </StackPanel>
+    <StackPanel x:Name="ExplorerGeneralPanel" Visibility="Collapsed">
+     <TextBlock Text="General" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="HideSystemObjectsBox" Content="_Hide system objects in Object Explorer"/>
+     <CheckBox Content="Group objects by schema" IsChecked="True" IsEnabled="False" Margin="0,4,0,0"/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="System objects are the pg_catalog and information_schema schemas and the template databases. Off (the default, as in SSMS), they are listed in the System Schemas and System Databases folders; on, the folders and their objects are hidden after a refresh. PostgreSQL objects always belong to a schema, so Object Explorer always groups them by schema."/>
+    </StackPanel>
+    <StackPanel x:Name="LiveStatisticsPanel" Visibility="Collapsed">
+     <TextBlock Text="Live Query Statistics" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <StackPanel Orientation="Horizontal">
+      <Label Content="_Polling interval (milliseconds):" Target="{Binding ElementName=LivePollingBox}" Padding="0" VerticalAlignment="Center"/>
+      <TextBox x:Name="LivePollingBox" Width="70" Margin="8,0,0,0" TextAlignment="Right" AutomationProperties.Name="Polling interval in milliseconds"/>
+     </StackPanel>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="How often Include Live Query Statistics reads the progress of a running query (250 to 60000; 250 by default, as in SSMS). PostgreSQL has no per-operator counters while a query runs and no compilation phase to poll, so the SSMS compilation polling interval does not apply. Used by query windows opened from now on."/>
+     <TextBlock x:Name="LivePollingError" Foreground="{DynamicResource Pgms.ErrorText}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
     </StackPanel>
     <StackPanel x:Name="HistoryPanel" Visibility="Collapsed">
      <TextBlock Text="Query History" FontWeight="SemiBold" Margin="0,0,0,6"/>
@@ -141,6 +200,173 @@
      </Grid>
      <CheckBox x:Name="LaunchAddTableBox" Content="_Launch Add Table dialog on new diagram" Margin="0,10,0,0"/>
      <TextBlock Text="The table view applies to tables added to a diagram from now on; tables already on a diagram keep theirs." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0"/>
+     <!-- B1 review (M1143): Table Options, the PostgreSQL counterparts of the SSMS Table Designer options. -->
+     <TextBlock Text="Table Options" FontWeight="SemiBold" Margin="0,14,0,6"/>
+     <CheckBox x:Name="OverrideTimeoutBox" Content="_Override the time-out for table designer updates"/>
+     <StackPanel Orientation="Horizontal" Margin="20,4,0,0">
+      <Label Content="Transaction time-out after (_seconds):" Target="{Binding ElementName=DesignerTimeoutBox}" Padding="0" VerticalAlignment="Center"/>
+      <TextBox x:Name="DesignerTimeoutBox" Width="70" Margin="8,0,0,0" TextAlignment="Right" AutomationProperties.Name="Transaction time-out in seconds" IsEnabled="{Binding IsChecked, ElementName=OverrideTimeoutBox}"/>
+     </StackPanel>
+     <CheckBox x:Name="WarnNoPrimaryKeyBox" Content="_Warn on null primary keys" Margin="0,6,0,0"/>
+     <CheckBox Content="Auto generate change scripts" IsChecked="True" IsEnabled="False" Margin="0,4,0,0"/>
+     <CheckBox Content="Warn about difference detection" IsChecked="True" IsEnabled="False" Margin="0,4,0,0"/>
+     <CheckBox Content="Warn about tables affected" IsEnabled="False" Margin="0,4,0,0"/>
+     <CheckBox Content="Prevent saving changes that require table re-creation" IsEnabled="False" Margin="0,4,0,0"/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,6,0,0" Text="With the override (on by default, 3600 seconds, as in SSMS), a statement of a Table Designer save that runs longer stops the save and nothing is changed; without it, the save waits as long as it needs (Cancel stops it). The warning asks before saving a table without a primary key. Table Designer always shows the change script before saving and refuses a table changed by someone else since it was read; it changes tables with ALTER TABLE and never re-creates them, so the last options do not apply."/>
+     <TextBlock x:Name="DesignersError" Foreground="{DynamicResource Pgms.ErrorText}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
+    </StackPanel>
+    <!-- B1 review (M1141): Environment ▸ AutoRecover, Documents, Tabs, Task List and Windows. Options PGMS cannot apply are shown off and disabled, with the reason. -->
+    <StackPanel x:Name="AutoRecoverPanel" Visibility="Collapsed">
+     <TextBlock Text="AutoRecover" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="AutoRecoverBox" Content="_Automatically back up unsaved files"/>
+     <Grid Margin="0,10,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Label Content="Backup _interval (minutes):" Target="{Binding ElementName=AutoRecoverIntervalBox}" Padding="0" VerticalAlignment="Center"/>
+      <TextBox x:Name="AutoRecoverIntervalBox" Grid.Column="1" TextAlignment="Right" Padding="2,1" AutomationProperties.Name="Backup interval in minutes"/>
+      <Label Grid.Row="1" Content="AutoRecover information _lifetime (days):" Target="{Binding ElementName=AutoRecoverLifetimeBox}" Padding="0" VerticalAlignment="Center" Margin="0,8,0,0"/>
+      <TextBox x:Name="AutoRecoverLifetimeBox" Grid.Row="1" Grid.Column="1" TextAlignment="Right" Padding="2,1" Margin="0,8,0,0" AutomationProperties.Name="AutoRecover information lifetime in days"/>
+     </Grid>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="PGMS keeps an encrypted copy of every unsaved query (DPAPI, this Windows user) and offers it again after PGMS closes unexpectedly. The interval is in minutes (1 to 60; 5 by default, as in SSMS): an unexpected close loses at most the changes of the last interval. Copies older than the lifetime are discarded instead of restored. Turning backups off removes the copies of this session."/>
+     <TextBlock x:Name="AutoRecoverError" Foreground="{DynamicResource Pgms.ErrorText}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
+    </StackPanel>
+    <StackPanel x:Name="DocumentsPanel" Visibility="Collapsed">
+     <TextBlock Text="Documents" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="DetectChangesBox" Content="_Detect when file is changed outside the environment"/>
+     <CheckBox x:Name="ReloadUnmodifiedBox" Content="_Reload modified files unless there are unsaved changes" Margin="20,4,0,0" IsEnabled="{Binding IsChecked, ElementName=DetectChangesBox}"/>
+     <CheckBox x:Name="AllowReadOnlyBox" Content="_Allow editing of read-only files; warn when attempting to save" Margin="0,4,0,0"/>
+     <CheckBox x:Name="OpenFromActiveBox" Content="_Open file using directory of currently active document" Margin="0,4,0,0"/>
+     <CheckBox x:Name="CheckLineEndingsBox" Content="_Check for consistent line endings on load" Margin="0,4,0,0"/>
+     <CheckBox x:Name="SaveInBackgroundBox" Content="Automatically save files when PGMS is in the _background" Margin="0,4,0,0"/>
+     <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+      <CheckBox x:Name="UseSaveEncodingBox" Content="Save files with a specific _encoding:" VerticalAlignment="Center"/>
+      <ComboBox x:Name="SaveEncodingBox" Width="190" Margin="8,0,0,0" AutomationProperties.Name="Save encoding" IsEnabled="{Binding IsChecked, ElementName=UseSaveEncodingBox}" local:Localization.NoTranslate="True">
+       <ComboBoxItem Content="UTF-8" Tag="Utf8"/><ComboBoxItem Content="UTF-8 with signature (BOM)" Tag="Utf8Bom"/><ComboBoxItem Content="UTF-16 LE" Tag="Utf16LittleEndian"/><ComboBoxItem Content="UTF-16 BE" Tag="Utf16BigEndian"/><ComboBoxItem Content="UTF-32 LE" Tag="Utf32LittleEndian"/><ComboBoxItem Content="UTF-32 BE" Tag="Utf32BigEndian"/>
+      </ComboBox>
+     </StackPanel>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,10,0,0" Text="Changes made outside PGMS are checked when PGMS becomes the active window. A file whose tab has unsaved changes is reloaded only if you agree. Read-only files open without editing when the third option is off. Files are always saved as Unicode, so the SSMS option about code pages does not apply; Solution Explorer and global undo do not exist in PGMS."/>
+    </StackPanel>
+    <StackPanel x:Name="TabsPanel" Visibility="Collapsed">
+     <TextBlock Text="Document Tabs" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="InsertTabsRightBox" Content="_Insert new tabs to the right of existing tabs"/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="20,2,0,8" Text="Off (the default, as in SSMS), a new tab goes first, after the pinned tabs. On, it goes after the open ones. Recovered queries always come back after the open tabs, in their saved order."/>
+     <CheckBox Content="Show tabs in multiple rows" IsEnabled="False"/>
+     <CheckBox Content="Show pinned tabs in a separate row" IsEnabled="False" Margin="0,4,0,0"/>
+     <CheckBox Content="Bold text on selected tabs" IsEnabled="False" IsChecked="True" Margin="0,4,0,0"/>
+     <CheckBox Content="Show Close button on document tabs" IsEnabled="False" IsChecked="True" Margin="0,4,0,0"/>
+     <CheckBox Content="Show Pin button on unpinned tabs" IsEnabled="False" Margin="0,4,0,0"/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="The other SSMS options of this page (tab layout, sorting, rows, widths, buttons, dirty indicator, colorization) are shown disabled: the tab well of PGMS (AvalonDock) draws its tabs in one row, on top, with the close button, and Window ▸ Pin Tab marks pinned tabs."/>
+    </StackPanel>
+    <StackPanel x:Name="TaskListPanel" Visibility="Collapsed">
+     <TextBlock Text="Task List" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <TextBlock Text="Tokens:" Margin="0,0,0,3"/>
+     <ListBox IsEnabled="False" Height="90" AutomationProperties.Name="Tokens" local:Localization.NoTranslate="True">
+      <ListBoxItem Content="TODO (Normal)"/><ListBoxItem Content="HACK (Normal)"/><ListBoxItem Content="UNDONE (Normal)"/>
+     </ListBox>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="PGMS has no Task List window, so comment tokens are not collected and this page cannot be changed. Errors of the last execution are in View ▸ Error List."/>
+    </StackPanel>
+    <StackPanel x:Name="WindowsPanel" Visibility="Collapsed">
+     <TextBlock Text="Tool Windows" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="SkipLayoutConfirmBox" Content="_Skip confirmation when applying custom window layout"/>
+     <CheckBox Content="Show auto-hidden windows on mouse over" IsEnabled="False" IsChecked="True" Margin="0,4,0,0"/>
+     <CheckBox Content="Keep the auto-hide flyout open when it loses focus" IsEnabled="False" Margin="0,4,0,0"/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="Window ▸ Apply Window Layout asks before rearranging the tool windows unless the first option is on. In PGMS an auto-hidden window always opens when the mouse rests on its tab and closes when it loses focus, and floating windows always belong to the main window, so those options are shown disabled."/>
+    </StackPanel>
+    <!-- B1 review (M1142): SQL Formatter. Options the PGMS formatter has no counterpart for are shown with the behavior it has, disabled. -->
+    <StackPanel x:Name="FormatAlignmentPanel" Visibility="Collapsed">
+     <TextBlock Text="Alignment" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="FormatAlignBodiesBox" Content="_Align clause bodies"/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="20,2,0,8" Text="On, the body of each clause starts after the longest clause keyword of the query (FROM, WHERE, ORDER BY…). Off, one space after its own keyword."/>
+     <CheckBox Content="Align column definition fields" IsEnabled="False"/>
+     <CheckBox Content="Align set clause item" IsEnabled="False" Margin="0,4,0,0"/>
+    </StackPanel>
+    <StackPanel x:Name="FormatFormattingPanel" Visibility="Collapsed">
+     <TextBlock Text="Formatting" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="FormatOnSaveBox" Content="Format on _save"/>
+     <Grid Margin="0,8,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
+      <Label Content="_Keyword casing:" Target="{Binding ElementName=FormatCasingBox}" Padding="0" VerticalAlignment="Center"/>
+      <ComboBox x:Name="FormatCasingBox" Grid.Column="1" AutomationProperties.Name="Keyword casing">
+       <ComboBoxItem Content="Uppercase" Tag="Upper"/><ComboBoxItem Content="Lowercase" Tag="Lower"/><ComboBoxItem Content="Unchanged" Tag="Unchanged"/>
+      </ComboBox>
+     </Grid>
+     <CheckBox Content="Preserve comments" IsChecked="True" IsEnabled="False" Margin="0,8,0,0"/>
+     <CheckBox Content="AS keyword on own line" IsEnabled="False" Margin="0,4,0,0"/>
+     <CheckBox Content="Terminate block statements" IsEnabled="False" Margin="0,4,0,0"/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="Format on save formats the whole query (one Undo step) before it is written. Comments are always kept, commas stay at the end of the line, and function and identifier names keep their case; identifier brackets and column alias styles are T-SQL options with no PostgreSQL counterpart."/>
+    </StackPanel>
+    <StackPanel x:Name="FormatGeneralPanel" Visibility="Collapsed">
+     <TextBlock Text="General" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <Label Content="SQL engine:" Padding="0,0,0,3"/>
+     <ComboBox IsEnabled="False" Width="200" HorizontalAlignment="Left" SelectedIndex="0" local:Localization.NoTranslate="True" AutomationProperties.Name="SQL engine"><ComboBoxItem Content="PostgreSQL"/></ComboBox>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="Format SQL reads PostgreSQL syntax of any supported version; SSMS chooses a SQL Server version and engine here."/>
+    </StackPanel>
+    <StackPanel x:Name="FormatIndentationPanel" Visibility="Collapsed">
+     <TextBlock Text="Indentation" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <StackPanel Orientation="Horizontal">
+      <Label Content="_Indentation size:" Target="{Binding ElementName=FormatIndentBox}" Padding="0" VerticalAlignment="Center"/>
+      <TextBox x:Name="FormatIndentBox" Width="50" Margin="8,0,0,0" TextAlignment="Right" AutomationProperties.Name="Indentation size"/>
+     </StackPanel>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,4,0,8" Text="Spaces before each column and constraint of CREATE TABLE (1 to 16)."/>
+     <CheckBox Content="Indent set clause" IsEnabled="False"/>
+     <CheckBox Content="Indent view body" IsEnabled="False" Margin="0,4,0,0"/>
+     <TextBlock x:Name="FormatterError" Foreground="{DynamicResource Pgms.ErrorText}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
+    </StackPanel>
+    <StackPanel x:Name="FormatMultilinePanel" Visibility="Collapsed">
+     <TextBlock Text="Multiline" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="FormatMultiSelectBox" Content="Multiline _select elements list"/>
+     <CheckBox x:Name="FormatMultiSetBox" Content="Multiline s_et clause items" Margin="0,4,0,0"/>
+     <CheckBox x:Name="FormatMultiWhereBox" Content="Multiline _where predicates list" Margin="0,4,0,0"/>
+     <CheckBox x:Name="FormatMultiGroupBox" Content="Multiline _GROUP BY elements list" Margin="0,4,0,0"/>
+     <CheckBox x:Name="FormatMultiHavingBox" Content="Multiline _HAVING predicates list" Margin="0,4,0,0"/>
+     <CheckBox x:Name="FormatMultiOrderBox" Content="Multiline _ORDER BY elements list" Margin="0,4,0,0"/>
+     <CheckBox x:Name="FormatMultiValuesBox" Content="Multiline insert _sources list (VALUES)" Margin="0,4,0,0"/>
+     <CheckBox Content="Multiline insert targets list" IsEnabled="False" Margin="0,4,0,0"/>
+     <CheckBox Content="Multiline view columns list" IsEnabled="False" Margin="0,4,0,0"/>
+     <CheckBox Content="Multiline PARTITION BY elements list" IsEnabled="False" Margin="0,4,0,0"/>
+     <CheckBox Content="Multiline IN values list" IsEnabled="False" Margin="0,4,0,0"/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="On, each item or predicate goes on its own line; off, the list stays on one line. Column lists in parentheses are always kept on one line."/>
+    </StackPanel>
+    <StackPanel x:Name="FormatNewLinePanel" Visibility="Collapsed">
+     <TextBlock Text="New Line" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="FormatNlFromBox" Content="New line before _from clause"/>
+     <CheckBox x:Name="FormatNlWhereBox" Content="New line before _where clause" Margin="0,3,0,0"/>
+     <CheckBox x:Name="FormatNlGroupBox" Content="New line before _group by clause" Margin="0,3,0,0"/>
+     <CheckBox x:Name="FormatNlHavingBox" Content="New line before _having clause" Margin="0,3,0,0"/>
+     <CheckBox x:Name="FormatNlOrderBox" Content="New line before _order by clause" Margin="0,3,0,0"/>
+     <CheckBox x:Name="FormatNlOffsetBox" Content="New line before offset clause (LIMIT, OFFSET, FETCH)" Margin="0,3,0,0"/>
+     <CheckBox x:Name="FormatNlWindowBox" Content="New line before window clause" Margin="0,3,0,0"/>
+     <CheckBox x:Name="FormatNlReturningBox" Content="New line before output clause (RETURNING)" Margin="0,3,0,0"/>
+     <CheckBox x:Name="FormatNlJoinBox" Content="New line before _join clause" Margin="0,3,0,0"/>
+     <CheckBox x:Name="FormatNlAfterJoinBox" Content="New line after JOIN _keyword" Margin="0,3,0,0"/>
+     <CheckBox x:Name="FormatNlOnBox" Content="New line before O_N clause" Margin="0,3,0,0"/>
+     <CheckBox x:Name="FormatNlCloseBox" Content="New line before _closing parenthesis in multiline list" Margin="0,3,0,0"/>
+     <CheckBox Content="New line before opening parenthesis in multiline list" IsEnabled="False" Margin="0,3,0,0"/>
+     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+      <Label Content="Number of _new lines after statement:" Target="{Binding ElementName=FormatNewLinesBox}" Padding="0" VerticalAlignment="Center"/>
+      <TextBox x:Name="FormatNewLinesBox" Width="50" Margin="8,0,0,0" TextAlignment="Right" AutomationProperties.Name="Number of new lines after statement"/>
+     </StackPanel>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,4,0,0" Text="Blank lines between statements, from 0 to 5. The closing parenthesis option applies to CREATE TABLE."/>
+     <TextBlock x:Name="FormatNewLinesError" Foreground="{DynamicResource Pgms.ErrorText}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
+    </StackPanel>
+    <StackPanel x:Name="FormatSpacingPanel" Visibility="Collapsed">
+     <TextBlock Text="Spacing" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="FormatTypeSpaceBox" Content="Space between data _type and parameters"/>
+     <CheckBox Content="Space between parameters in data type" IsChecked="True" IsEnabled="False" Margin="0,4,0,0"/>
+     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0" Text="On (the default, as in SSMS), varchar (20); off, as PostgreSQL writes it, varchar(20). Parameters are always separated by a comma and a space: numeric(10, 2)."/>
+    </StackPanel>
+    <!-- PGMS-085 (M1125): Environment ▸ International Settings, as in SSMS; the language changes when PGMS starts again. -->
+    <StackPanel x:Name="InternationalPanel" Visibility="Collapsed">
+     <TextBlock Text="International Settings" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <Label Content="_Language:" Target="{Binding ElementName=LanguageBox}" Padding="0,0,0,4"/>
+     <ComboBox x:Name="LanguageBox" Width="260" HorizontalAlignment="Left" AutomationProperties.Name="Language"/>
+     <TextBlock Text="Changes will not take effect until PGMS is restarted." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,8,0,0"/>
+     <TextBlock Text="The translations were made without review by native speakers. SQL, PostgreSQL terms and the names of your objects are not translated." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="0,6,0,0"/>
+    </StackPanel>
+    <StackPanel x:Name="ProductUpdatesPanel" Visibility="Collapsed">
+     <TextBlock Text="Product Updates" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <CheckBox x:Name="CheckForUpdatesBox" Content="_Check for new PGMS versions when PGMS starts"/>
+     <TextBlock Text="A few seconds after opening, PGMS reads the release list of the public repository on GitHub (pre-releases included). The request sends your IP address to GitHub, as any web request does. When a newer version exists, Update available appears next to Search in the title bar. Nothing is downloaded or installed, and a failed check says nothing. Help ▸ Check for Updates asks on demand, even when this is off." TextWrapping="Wrap" Foreground="{DynamicResource Pgms.SecondaryText}" Margin="20,4,0,0"/>
     </StackPanel>
     <StackPanel x:Name="ConnectionDialogPanel" Visibility="Collapsed">
      <TextBlock Text="Connection Dialog" FontWeight="SemiBold" Margin="0,0,0,6"/>

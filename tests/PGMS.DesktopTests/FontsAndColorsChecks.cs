@@ -38,7 +38,7 @@ internal static class FontsAndColorsChecks
         var dialog = new OptionsDialog(store) { ShowInTaskbar = false }; dialog.Show(); await Idle();
         var page = (TreeViewItem)dialog.FindName("FontsAndColorsPage");
         var environment = (TreeViewItem)page.Parent;
-        check((string)environment.Header == "Environment" && environment.Items.IndexOf(page) == 1, "Fonts and Colors is under Environment, after General");
+        check((string)environment.Header == "Environment" && environment.Items.IndexOf(page) == 3, "Fonts and Colors is under Environment, after General, AutoRecover and Documents (SSMS 22.11 order, M1141)");
         page.IsSelected = true; await Idle();
         check(dialog.FontsAndColorsPanel.Visibility == Visibility.Visible && dialog.FontCategoryBox.Items.Cast<string>().SequenceEqual(FontsAndColorsSettings.Categories) && (string)dialog.FontCategoryBox.SelectedItem == "Text Editor",
             "Show settings for lists Text Editor, Grid Results and Text Results, Text Editor first");

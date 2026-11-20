@@ -55,7 +55,7 @@ public sealed record SqlTemplate(string Folder, string Name, string Text, string
 public sealed record SqlSnippetLiteral(string Id, string ToolTip, string Default);
 
 /// <summary>A code snippet in the Visual Studio format that SSMS uses (.snippet). Only $selected$, $end$ and declared literals are replaced; any other $…$ (PostgreSQL dollar quoting) stays as text.</summary>
-public sealed record SqlSnippet(string Folder, string Title, string Description, bool IsExpansion, bool IsSurroundsWith, IReadOnlyList<SqlSnippetLiteral> Literals, string Code, string Delimiter = "$")
+public sealed record SqlSnippet(string Folder, string Title, string Description, bool IsExpansion, bool IsSurroundsWith, IReadOnlyList<SqlSnippetLiteral> Literals, string Code, string Delimiter = "$", string? SourceFile = null)
 {
     public abstract record Part;
     public sealed record TextPart(string Text) : Part;
@@ -154,7 +154,7 @@ public static class SqlTemplateCatalog
     {
         var all = new List<SqlSnippet>(BuiltInSnippets);
         foreach (var (folder, file) in UserFiles(userDirectory ?? UserSnippetsDirectory, "*.snippet"))
-            try { all.AddRange(SqlSnippet.Load(File.ReadAllText(file), folder)); }
+            try { all.AddRange(SqlSnippet.Load(File.ReadAllText(file), folder).Select(s => s with { SourceFile = file })); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         return all;
     }

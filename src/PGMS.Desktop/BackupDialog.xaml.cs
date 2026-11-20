@@ -204,7 +204,7 @@ public partial class BackupDialog : Window
             {
                 if (!File.Exists(picker.FileName)) return;
                 args.Cancel = true;
-                MessageBox.Show(this, "Choose a new file name. Existing backups are never overwritten.", "Back Up Database", MessageBoxButton.OK, MessageBoxImage.Information);
+                LocalizedMessageBox.Show(this, "Choose a new file name. Existing backups are never overwritten.", "Back Up Database", MessageBoxButton.OK, MessageBoxImage.Information);
             };
             if (picker.ShowDialog(this) == true) ArchivePath.Text = picker.FileName;
         }
@@ -230,7 +230,7 @@ public partial class BackupDialog : Window
             {
                 if(!restore){Feedback.Text=$"{name} does not exist. Choose an existing database.";return;}
                 string question=$"Create the database {name} and restore into it?\n\nIt is created with CREATE DATABASE … TEMPLATE template0 and kept if the restore fails.";
-                if(!(ConfirmCreateDatabase?.Invoke(name) ?? MessageBox.Show(this,question,Title,MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes))return;
+                if(!(ConfirmCreateDatabase?.Invoke(name) ?? LocalizedMessageBox.Show(this,question,Title,MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes))return;
                 try{await BackupService.CreateRestoreDatabaseAsync(connectionString,name);created=true;databases=[..databases,name];}
                 catch(Exception ex)when(ex is NpgsqlException or ArgumentException or IOException or InvalidOperationException or TimeoutException){Feedback.Text="The database was not created: "+(ex is PostgresException pg?$"{pg.SqlState}: {pg.MessageText}":ex.Message);return;}
             }
@@ -240,7 +240,7 @@ public partial class BackupDialog : Window
         if(globals && restore)
         {
             if(GlobalReviewed.IsChecked!=true){Feedback.Text="Review the global SQL script and destination, then confirm the review checkbox.";return;}
-            if(MessageBox.Show(this,"Restore global objects on this server? Earlier statements can remain committed if a later command fails.\n\n"+Target.Text+"\n\nScript: "+ArchivePath.Text,Title,MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
+            if(LocalizedMessageBox.Show(this,"Restore global objects on this server? Earlier statements can remain committed if a later command fails.\n\n"+Target.Text+"\n\nScript: "+ArchivePath.Text,Title,MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
         }
         cancellation = new CancellationTokenSource();
         LimitSchema.IsEnabled=SchemaFilterName.IsEnabled=SelectionKindSelector.IsEnabled=TableFilterName.IsEnabled=false;

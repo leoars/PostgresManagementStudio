@@ -72,7 +72,7 @@ public partial class CheckConstraintDialog : Window
     public async Task ApplyAsync()
     {
         if (busy) return; var request = Request;
-        if (request.Operation == CheckConstraintOperation.Drop && MessageBox.Show(this, Target.Text + "\n\n" + request.ToSql() + "\n\nDrop this CHECK constraint?", "Confirm constraint deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (request.Operation == CheckConstraintOperation.Drop && LocalizedMessageBox.Show(this, Target.Text + "\n\n" + request.ToSql() + "\n\nDrop this CHECK constraint?", "Confirm constraint deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         SetBusy(true); Feedback.Text = "Applying operation…";
         try { await new AdministrativeEditService(connection).ApplyAsync(request); WasApplied = true; busy = false; DialogResult = true; }
         catch (Exception ex) when (ex is NpgsqlException or System.IO.IOException or TimeoutException or InvalidOperationException or ArgumentException) { Feedback.Text = ex is PostgresException pg ? $"{pg.SqlState}: {pg.MessageText}" : ex.Message; }

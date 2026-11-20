@@ -334,5 +334,6 @@ internal static class QueryRecoveryChecks
         await RecoveryAsyncChecks.RunAsync(check);
         await RecoveryProcessChecks.RunAsync(root, check);
         await RecoveryPreferenceChecks.RunAsync(check);
+        await DeferredTabChecks.RunAsync(check);
     }
 }

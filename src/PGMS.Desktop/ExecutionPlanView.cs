@@ -99,6 +99,8 @@ public sealed class ExecutionPlanView : UserControl
     public event EventHandler? SaveRequested;
     /// <summary>Show Execution Plan In New Tab of the context menu.</summary>
     public event EventHandler? ShowInNewTabRequested;
+    /// <summary>Show Execution Plan JSON, Show Execution Plan as Text and Compare Showplan of the context menu (PGMS-084); the items show only when a host handles them.</summary>
+    public event Action<PlanCommand>? PlanCommandRequested;
     /// <summary>Missing Index Details… of the context menu, with the suggestions to script.</summary>
     public event Action<IReadOnlyList<PlanIndexSuggestion>>? MissingIndexDetailsRequested;
     /// <summary>Asks the percentage for Custom Zoom: receives the current one, null cancels. Replaced by tests.</summary>
@@ -208,9 +210,19 @@ public sealed class ExecutionPlanView : UserControl
     internal static int? ParseZoom(string text) =>
         int.TryParse(text.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int value) && value is >= MinZoomPercent and <= MaxZoomPercent ? value : null;
 
+    /// <summary>The plan this view showed before the current one (B1 review, M1140): Compare with Previous Plan compares the two.
+    /// Clearing the view keeps it; showing a new plan moves the current one here.</summary>
+    public IReadOnlyList<ExecutionPlanStatement>? PreviousStatements { get; private set; }
+    private IReadOnlyList<ExecutionPlanStatement>? lastStatements;
+
     public void Show(IReadOnlyList<ExecutionPlanStatement> statements)
     {
-        sections.Children.Clear(); shown.Clear(); boxes.Clear(); SelectedOperator = null; Zoom = 1;
+        if (statements.Count > 0)
+        {
+            if (lastStatements is { Count: > 0 } last && !ReferenceEquals(last, statements)) PreviousStatements = last;
+            lastStatements = statements;
+        }
+        sections.Children.Clear(); shown.Clear(); boxes.Clear(); panels.Clear(); SelectedOperator = null; Zoom = 1;
         foreach (var statement in statements)
         {
             sections.Children.Add(Header(statement));
@@ -242,6 +254,12 @@ public sealed class ExecutionPlanView : UserControl
         }
         Add("_Save Execution Plan As…", "PlanSaveAs", () => SaveRequested?.Invoke(this, EventArgs.Empty));
         var newTab = Add("Show Execution Plan In New _Tab", "PlanShowInNewTab", () => ShowInNewTabRequested?.Invoke(this, EventArgs.Empty));
+        // PGMS-084 (M1119): the counterparts of Show Execution Plan XML and Compare Showplan, for the statement of the selected operator.
+        var json = Add("Show Execution Plan _JSON", "PlanShowJson", () => PlanCommandRequested?.Invoke(PlanCommand.ShowJson));
+        var text = Add("Show Execution Plan as Te_xt", "PlanShowText", () => PlanCommandRequested?.Invoke(PlanCommand.ShowText));
+        var compare = Add("Com_pare Showplan", "PlanCompare", () => PlanCommandRequested?.Invoke(PlanCommand.Compare));
+        // B1 review (M1140): the plan shown before this one in the same view, without a file.
+        var previous = Add("Compare with Pre_vious Plan", "PlanComparePrevious", () => PlanCommandRequested?.Invoke(PlanCommand.ComparePrevious));
         Add("Find _Node", "PlanFindNode", OpenFind);
         var missing = Add("_Missing Index Details…", "PlanMissingIndex", () => { if (MissingIndexTarget is { Count: > 0 } target) MissingIndexDetailsRequested?.Invoke(target); });
         menu.Items.Add(new Separator());
@@ -252,9 +270,11 @@ public sealed class ExecutionPlanView : UserControl
         // As in SSMS, the item is always listed and gray when the plan has no suggestion.
         menu.Opened += (_, _) =>
         {
-            foreach (var item in menu.Items.OfType<MenuItem>()) item.IsEnabled = shown.Count > 0 && (item != missing || MissingIndexTarget.Count > 0);
+            foreach (var item in menu.Items.OfType<MenuItem>()) item.IsEnabled = shown.Count > 0 && (item != missing || MissingIndexTarget.Count > 0) && (item != previous || PreviousStatements is { Count: > 0 });
+            previous.Visibility = PlanCommandRequested is null ? Visibility.Collapsed : Visibility.Visible;
             // A plan already in a tab of its own has nowhere newer to go: the item shows only where a host opens the tab (the query tab).
             newTab.Visibility = ShowInNewTabRequested is null ? Visibility.Collapsed : Visibility.Visible;
+            foreach (var item in new[] { json, text, compare }) item.Visibility = PlanCommandRequested is null ? Visibility.Collapsed : Visibility.Visible;
         };
         return menu;
     }
@@ -355,8 +375,24 @@ public sealed class ExecutionPlanView : UserControl
         ToolTipService.SetInitialShowDelay(panel, 500);
         ToolTipService.SetShowDuration(panel, 60000);
         boxes[op] = (label, text, statement);
+        panels[op] = panel;
         return panel;
     }
+
+    private readonly Dictionary<ExecutionPlanOperator, StackPanel> panels = [];
+
+    /// <summary>Showplan Comparison (B1 review, M1140): shades an operator's box (icon and text) to show how it differs from the other plan,
+    /// as SSMS shades plan regions; <paramref name="note"/> is read by the Narrator. Null clears the mark.</summary>
+    public void Mark(ExecutionPlanOperator op, Brush? shade, string? note)
+    {
+        if (!panels.TryGetValue(op, out var panel)) return;
+        panel.Background = shade ?? Brushes.Transparent;
+        AutomationProperties.SetItemStatus(panel, note ?? "");
+    }
+
+    /// <summary>The operators shaded by <see cref="Mark"/>, with their note (tests).</summary>
+    public IReadOnlyList<(ExecutionPlanOperator Operator, string Note)> MarkedOperators =>
+        [.. panels.Where(p => p.Value.Background != Brushes.Transparent).Select(p => (p.Key, AutomationProperties.GetItemStatus(p.Value)))];
 
     /// <summary>Rows that an arrow carries, from the operator it leaves.</summary>
     internal static IReadOnlyList<KeyValuePair<string, string>> ArrowRows(ExecutionPlanOperator source)
@@ -457,3 +493,6 @@ public sealed class ExecutionPlanView : UserControl
         return brush;
     }
 }
+
+/// <summary>Plan commands handled by the host window (PGMS-084).</summary>
+public enum PlanCommand { ShowJson, ShowText, Compare, ComparePrevious }

@@ -10,7 +10,8 @@ public sealed record QueryOptions(
     bool RetainLineBreaks = true, bool GridDiscardResults = false, bool DisplayJsonAsLink = true,
     TextOutputFormat TextFormat = TextOutputFormat.ColumnAligned, string CustomDelimiter = ";", bool TextIncludeHeaders = true, bool TextIncludeQuery = false, bool TextRightAlignNumeric = false, bool TextDiscardResults = false, int TextMaxCharacters = TextResultsWriter.DefaultMaxCharacters,
     int GridPageRows = QueryOptions.DefaultGridPageRows,
-    int PlanWarningRatio = ExecutionPlanWarningOptions.DefaultRatio, int PlanWarningMinimumRows = ExecutionPlanWarningOptions.DefaultMinimum)
+    int PlanWarningRatio = ExecutionPlanWarningOptions.DefaultRatio, int PlanWarningMinimumRows = ExecutionPlanWarningOptions.DefaultMinimum,
+    bool GridStackResults = false)
 {
     public const int MaxTimeoutSeconds = 86400, MaxLockTimeoutMilliseconds = 86400000, MaxTextCharacters = 8192, DefaultGridPageRows = 100000, MinGridPageRows = 100, MaxGridPageRows = 1000000;
 

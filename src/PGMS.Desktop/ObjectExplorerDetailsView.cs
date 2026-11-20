@@ -111,6 +111,23 @@ public sealed partial class ObjectExplorerDetailsView : UserControl
         await ShowAsync(folder);
     }
 
+    private static readonly double[] DefaultStarWidths = [2.0, 1.0, 1.0, 1.0];
+
+    /// <summary>Window ▸ Reset Current Object Explorer Details View (PGMS-082, M1121): column order and widths as created, no sorting, no search text.</summary>
+    public void ResetView()
+    {
+        for (int i = 0; i < grid.Columns.Count; i++)
+        {
+            var column = grid.Columns[i];
+            column.DisplayIndex = i;
+            column.Width = new DataGridLength(DefaultStarWidths[Math.Min(i, DefaultStarWidths.Length - 1)], DataGridLengthUnitType.Star);
+            column.SortDirection = null;
+        }
+        grid.Items.SortDescriptions.Clear();
+        search.Text = "";
+        ApplySearch();
+    }
+
     private void ApplySearch()
     {
         string text = search.Text.Trim();
@@ -140,7 +157,8 @@ public sealed partial class ObjectExplorerDetailsView : UserControl
         CatalogKind.DataType => entry.DataTypeKind switch { "e" => "Enum", "d" => "Domain", "c" => "Composite Type", "r" => "Range Type", _ => "Data Type" },
         CatalogKind.Databases or CatalogKind.Schemas or CatalogKind.Tables or CatalogKind.Views or CatalogKind.MaterializedViews or CatalogKind.Sequences or CatalogKind.Functions or CatalogKind.Procedures
             or CatalogKind.Columns or CatalogKind.Indexes or CatalogKind.Roles or CatalogKind.Enums or CatalogKind.Domains or CatalogKind.DatabaseDiagrams or CatalogKind.Keys or CatalogKind.Constraints or CatalogKind.Triggers or CatalogKind.Extensions
-            or CatalogKind.CompositeTypes or CatalogKind.ForeignServers or CatalogKind.Replication or CatalogKind.Publications or CatalogKind.Subscriptions => "Folder",
+            or CatalogKind.CompositeTypes or CatalogKind.ForeignServers or CatalogKind.Replication or CatalogKind.Publications or CatalogKind.Subscriptions
+        or CatalogKind.SystemDatabases or CatalogKind.SystemSchemas => "Folder",
         CatalogKind.DatabaseDiagram => "Database Diagram",
         _ => WordBreak().Replace(entry.Kind.ToString(), " ")
     };

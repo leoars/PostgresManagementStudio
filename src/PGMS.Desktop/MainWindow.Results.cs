@@ -36,12 +36,12 @@ public partial class MainWindow
         ResultsToGridButton.IsChecked = mode == ResultsDestination.Grid;
         ResultsToFileButton.IsChecked = mode == ResultsDestination.File;
         var query = ActiveQuery;
-        EstimatedPlanButton.IsEnabled = EstimatedPlanMenu.IsEnabled = ParseMenu.IsEnabled = query is { IsConnected: true, IsBusy: false };
-        ClientStatisticsMenu.IsEnabled = ResetClientStatisticsMenu.IsEnabled = OpenServerMenu.IsEnabled = query is not null;
-        ClientStatisticsMenu.IsChecked = query?.IncludeClientStatistics == true;
-        LiveStatisticsMenu.IsEnabled = query is not null; LiveStatisticsMenu.IsChecked = query?.IncludeLiveStatistics == true;
-        IntelliSenseMenu.IsEnabled = ListMembersMenu.IsEnabled = CompleteWordMenu.IsEnabled = RefreshCacheMenu.IsEnabled = query is not null;
-        IntelliSenseMenu.IsChecked = query?.IntelliSenseEnabled == true;
+        EstimatedPlanButton.IsEnabled = EstimatedPlanMenu.IsEnabled = ParseMenu.IsEnabled = ParseButton.IsEnabled = query is { IsConnected: true, IsBusy: false };
+        ClientStatisticsMenu.IsEnabled = ClientStatisticsButton.IsEnabled = ResetClientStatisticsMenu.IsEnabled = OpenServerMenu.IsEnabled = query is not null;
+        ClientStatisticsButton.IsChecked = ClientStatisticsMenu.IsChecked = query?.IncludeClientStatistics == true;
+        LiveStatisticsMenu.IsEnabled = LiveStatisticsButton.IsEnabled = query is not null; LiveStatisticsButton.IsChecked = LiveStatisticsMenu.IsChecked = query?.IncludeLiveStatistics == true;
+        IntelliSenseMenu.IsEnabled = IntelliSenseButton.IsEnabled = ListMembersMenu.IsEnabled = CompleteWordMenu.IsEnabled = RefreshCacheMenu.IsEnabled = query is not null;
+        IntelliSenseButton.IsChecked = IntelliSenseMenu.IsChecked = query?.IntelliSenseEnabled == true;
         ActualPlanButton.IsEnabled = ActualPlanMenu.IsEnabled = query is not null;
         ActualPlanButton.IsChecked = ActualPlanMenu.IsChecked = query?.IncludeActualPlan == true;
     }

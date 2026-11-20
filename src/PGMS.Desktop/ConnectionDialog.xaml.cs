@@ -49,6 +49,7 @@ public partial class ConnectionDialog : Window
     public ConnectionDialog(Guid? profileId = null, string? newProfileGroup = null, string? profilePath = null)
     {
         InitializeComponent(); WindowWorkArea.Attach(this); this.newProfileGroup = newProfileGroup;
+        Localization.SetNoTranslate(Ssl, true); // The items are the SslMode values read back below (M1127).
         if (profilePath is not null) store = new(profilePath);
         preferences = new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(profilePath ?? ConnectionProfileStore.DefaultPath))!, "connect-dialog.json"));
         var saved = preferences.Load();
@@ -125,7 +126,7 @@ public partial class ConnectionDialog : Window
     }
     private void DeleteProfile(object sender, RoutedEventArgs e)
     {
-        if (selectedId is not { } id || MessageBox.Show(this, "Delete this saved profile and its protected password?", "Delete Profile", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (selectedId is not { } id || LocalizedMessageBox.Show(this, "Delete this saved profile and its protected password?", "Delete Profile", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         try { store.Delete(id); ReloadProfiles(); NewProfile(sender, e); Error.Text = "Profile deleted."; }
         catch (Exception ex) when (IsProfileError(ex)) { Error.Text = "Profile was not deleted. " + ex.Message; }
     }

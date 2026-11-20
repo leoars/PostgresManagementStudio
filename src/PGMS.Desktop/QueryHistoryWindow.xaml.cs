@@ -51,7 +51,7 @@ public partial class QueryHistoryWindow : Window
     public QueryHistoryWindow(QueryHistoryRecorder recorder, Func<QueryHistoryEntry, Task> openInTab)
     {
         this.recorder = recorder; this.openInTab = openInTab;
-        Confirm = question => MessageBox.Show(this, question, "Query History", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+        Confirm = question => LocalizedMessageBox.Show(this, question, "Query History", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
         InitializeComponent(); WindowWorkArea.Attach(this);
         Target.Text = $"Query History — executions recorded on this computer for the Windows user {Environment.UserName}.\nStored encrypted for this user (DPAPI) in {recorder.Store.DirectoryPath}; never sent to a server.";
         ConnectionFilter.Items.Add(new ComboBoxItem { Content = "All connections", Tag = null }); ConnectionFilter.SelectedIndex = 0;
@@ -74,7 +74,7 @@ public partial class QueryHistoryWindow : Window
             FillConnections();
             Apply();
             int executions = groups.Sum(g => g.Executions.Count);
-            Status.Text = $"{groups.Count:N0} distinct quer{(groups.Count == 1 ? "y" : "ies")}, {executions:N0} execution(s)." +
+            Status.Text = (groups.Count == 1 ? $"{groups.Count:N0} distinct query, {executions:N0} execution(s)." : $"{groups.Count:N0} distinct queries, {executions:N0} execution(s).") +
                 (snapshot.UnreadableFiles > 0 ? $" {snapshot.UnreadableFiles} history file(s) could not be read (damaged, from another Windows user or renamed) and were left untouched; Clear History removes them." : "");
         }
         catch (Exception ex) when (QueryHistoryRecorder.IsDiskError(ex)) { Status.Text = "Query History could not be read. " + ex.Message; }

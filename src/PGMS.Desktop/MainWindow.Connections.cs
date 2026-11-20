@@ -28,6 +28,7 @@ public partial class MainWindow
     {
         if (PickFilesToOpen is { } pick) return pick();
         var dialog = new OpenFileDialog { Filter = "SQL files (*.sql)|*.sql|All files (*.*)|*.*", Multiselect = true };
+        if (OpenDialogDirectory() is { } folder) dialog.InitialDirectory = folder; // Environment ▸ Documents (M1141)
         return dialog.ShowDialog(this) == true ? dialog.FileNames : [];
     }
 
@@ -81,7 +82,9 @@ public partial class MainWindow
             await query.DisconnectAsync();
             done++;
         }
-        Status.Text = (stopped ? "Disconnect All Queries stopped; " : "") + $"Disconnected {done:N0} quer{(done == 1 ? "y" : "ies")}." + (busy > 0 ? $" {busy:N0} running quer{(busy == 1 ? "y keeps its" : "ies keep their")} connection." : "");
+        // Whole sentences for singular and plural, so each translates as one pattern (B1 review, M1139).
+        Status.Text = (stopped ? "Disconnect All Queries stopped; " : "") + (done == 1 ? $"Disconnected {done:N0} query." : $"Disconnected {done:N0} queries.")
+            + (busy == 1 ? $" {busy:N0} running query keeps its connection." : busy > 1 ? $" {busy:N0} running queries keep their connection." : "");
         RefreshCommands();
         return done;
     }
